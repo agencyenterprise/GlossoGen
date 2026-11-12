@@ -2043,6 +2043,28 @@ the commit log.</p>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>glossogen new-scenario &lt;name&gt;</code> writes only the scenario's folder</strong>,
+  <code>&lt;target-dir&gt;/&lt;name&gt;/</code>: the module, <code>knobs_default.json</code>, <code>prompts/</code>, an
+  <code>__init__.py</code> and <code>test_&lt;name&gt;.py</code>. It no longer writes a <code>pyproject.toml</code>,
+  README, <code>.gitignore</code> or <code>.env.example</code>, and changes nothing else in the
+  project. <code>--target-dir</code> is optional and defaults to the working directory;
+  <code>--glossogen-ref</code> is gone. Running it again with another name adds a folder
+  beside the first. The scan of the project directory finds the folder with no
+  configuration, and the command prints the next steps. It imports the
+  configured scenario sources again and, when none loads the new folder, says
+  how to add it there. The generated test
+  marks its async tests <code>@pytest.mark.asyncio</code> and looks the scenario up by name
+  with the new <code>glossogen.testing.assert_scenario_is_loaded</code>, so it needs no
+  pytest configuration. The <code>package-data</code> a wheel needs is described in
+  <code>docs/creating-a-scenario.md</code>.</li>
+<li>Loading a scenario catalog fails when two scenarios read their prompts and
+  presets from the same directory (<code>scenario_package_files()</code>), naming both
+  scenarios, their modules and the directory; <code>validate &lt;path&gt;</code> reports the same.
+  Two scenarios in one folder would list each other's presets and share prompt
+  templates with the same file name. Give each scenario a folder of its own.</li>
+<li><code>POST /runs/{scenario}/{run}/evaluate</code> on a run whose scenario the server has
+  not loaded answers 422 with the CLI's "not loaded" message, which lists the
+  sources the server loaded, in place of "Unknown scenario".</li>
 <li><strong>Breaking for scenarios and metrics outside glossogen: entry points,
   <code>SCENARIO_API_VERSION</code> and discovery by <code>events.py</code> are gone.</strong> glossogen no
   longer reads the <code>glossogen.scenarios.v1</code> or <code>glossogen.metrics</code> entry-point

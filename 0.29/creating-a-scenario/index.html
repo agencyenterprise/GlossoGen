@@ -1961,7 +1961,7 @@
 <h1 id="creating-a-scenario">Creating a scenario<a class="headerlink" href="#creating-a-scenario" title="Permanent link">&para;</a></h1>
 <p>A scenario is one self-contained N-agent coordination task. This page is the
 reference for every file in a scenario package and every extension surface, in
-the order you meet them when editing a generated package into your own scenario.</p>
+the order you meet them when editing a generated scenario into your own.</p>
 <p>A scenario owns:</p>
 <ul>
 <li><strong>A team declaration</strong> — the roles, the comm topology, who can read and send
@@ -1981,29 +1981,48 @@ the order you meet them when editing a generated package into your own scenario.
 <p>A scenario declares its events and its run-detail extension on the scenario
 class; a frontend plug-in is registered in the frontend.</p>
 <h2 id="start-from-the-generator">Start from the generator<a class="headerlink" href="#start-from-the-generator" title="Permanent link">&para;</a></h2>
-<p>Generate a project rather than assembling one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge<span class="w"> </span>--target-dir<span class="w"> </span>.
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>reactor-purge
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[testing]&quot;</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>scenarios/reactor_purge.py
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pytest
+<p>Generate a scenario rather than assembling one. From your project's root, with
+glossogen installed in its environment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>./reactor_purge
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pytest<span class="w"> </span>./reactor_purge/test_reactor_purge.py
+</code></pre></div>
+<p><code>new-scenario</code> writes one folder, <code>&lt;target-dir&gt;/&lt;name&gt;/</code>, and nothing else in
+the project. <code>--target-dir</code> defaults to the working directory. The folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>reactor_purge/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── __init__.py              # makes the folder a package, so pytest and glossogen import it under one name
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── reactor_purge.py         # @scenario(name=&quot;reactor_purge&quot;): ids, knobs, event, teams, world
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── knobs_default.json       # the canonical preset
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├── prompts/                 # every word an agent or judge reads
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│   ├── briefer_system.jinja
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│   └── relay_system.jinja
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>└── test_reactor_purge.py    # the scripted round loop; see Testing a scenario
 </code></pre></div>
 <p>What you get already runs: two agents relay a code word over a metered link,
-<code>validate</code> passes, the tests pass, and <code>glossogen run</code> completes. Editing one
+<code>validate</code> passes, the test passes, and <code>glossogen run</code> completes. Editing one
 thing at a time and watching what breaks is a faster way through this contract
-than writing it from scratch, and the generated README lists what to change in
-which order. (Working inside a glossogen checkout, glossogen itself is already
-in the environment; run the commands with that checkout's environment, from the
-generated project's directory.)</p>
-<p>The project:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>reactor-purge/
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── pyproject.toml               # [tool.glossogen] scenarios = [&quot;scenarios&quot;], package-data
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── tests/                       # the scripted round loop; see Testing a scenario
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>└── scenarios/
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    ├── reactor_purge.py         # @scenario(name=&quot;reactor_purge&quot;): ids, knobs, event, teams, world
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    ├── knobs_default.json       # the canonical preset
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    └── prompts/                 # every word an agent or judge reads
-</code></pre></div>
+than writing it from scratch.</p>
+<p>The command refuses a destination folder that already exists, and a name a
+loaded scenario holds. Run it again with another name to add a second scenario:
+each one gets a folder of its own, because a scenario reads its prompts and
+presets from the folder holding its module (see
+<a href="#in-this-repo-or-in-your-own-package">In this repo, or in your own package</a>).</p>
+<p>No configuration is needed. With no scenario source configured, glossogen scans
+the project directory, so a folder at the root or a level down
+(<code>experiments/reactor_purge/</code>) is found. After writing, the command imports the
+sources the working directory configures, the way the next command will, and
+checks that they load the new module. When they do not, such as a
+<code>[tool.glossogen] scenarios</code> list that leaves it out or a folder under <code>tests/</code>,
+it says so and names the fix where those sources come from: <code>--scenarios</code>,
+<code>GLOSSOGEN_SCENARIOS</code>, or <code>[tool.glossogen] scenarios</code>, with a line for pytest
+where it needs one. It never writes the configuration itself.</p>
+<p>After writing, it prints the next steps: install glossogen in the project's
+environment, put <code>ANTHROPIC_API_KEY</code> in a <code>.env</code> at the project root, then the
+<code>validate</code>, <code>glossogen run</code> and <code>pytest</code> lines for the new folder. The generated
+test needs no pytest configuration: its async tests are marked
+<code>@pytest.mark.asyncio</code>, which the <code>testing</code> extra's <code>pytest-asyncio</code> runs. Run
+pytest from the project root; the test looks the scenario up by name, the way
+<code>glossogen run</code> does.</p>
 <p>The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those
 files; in a project of your own, split them whenever the module grows.</p>
@@ -2741,36 +2760,56 @@ directory you run from, with paths relative to that file:</p>
 <p>A source is a folder, a <code>.py</code> file or a module name. A folder is searched for
 files that use <code>@scenario</code>, and only those are imported, so scripts and helpers
 beside them never run. Files are imported by module name relative to the project
-directory, so <code>scenarios/reactor_purge.py</code> is <code>scenarios.reactor_purge</code> and
-relative imports inside your package work. A module name that is a package, such
+directory, so <code>experiments/reactor_purge/reactor_purge.py</code> is
+<code>experiments.reactor_purge.reactor_purge</code> and relative imports inside your
+package work. A module name that is a package, such
 as an installed scenario pack, has its directory searched the same way.</p>
 <p>With none of the three set, glossogen scans the project directory, the one
 holding that <code>pyproject.toml</code>, skipping environments (<code>.venv</code>, <code>venv</code>, <code>env</code>,
 <code>site-packages</code>, <code>node_modules</code>), <code>tests</code>, <code>build</code>, <code>dist</code>, hidden and
 <code>_</code>-prefixed folders, and the runs directory. <code>scenarios = []</code> turns the scan
-off. Naming the folder keeps what glossogen imports explicit, which is why the
-generator does.</p>
+off. Naming the folders keeps what glossogen imports explicit.</p>
 <p>What differs from an in-repo scenario:</p>
 <ul>
 <li><strong>A name another loaded scenario holds is an error</strong>, naming both modules,
   when the second one is imported. Pick another name.</li>
-<li><strong>Presets and prompts sit beside your module.</strong> <code>package-data</code> in the
-  generated <code>pyproject.toml</code> ships them only if you build a wheel.</li>
-<li><strong>No frontend plug-in.</strong> The platform UI renders everything it derives from
-  your knobs schema and event log.</li>
-<li><strong>Configuration is read from your project</strong>: the <code>.env</code> sits beside your
-  <code>pyproject.toml</code>. See <a href="../installation/#configure-environment">Configure environment</a>.</li>
+<li><strong>Presets and prompts sit beside your module.</strong> A scenario reads them from the
+  directory <code>scenario_package_files()</code> returns, which by default is the folder
+  holding its module. Two loaded scenarios for which it returns the same
+  directory would list each other's presets and share any prompt template with
+  the same file name, so loading them fails with an error naming both scenarios,
+  their modules and the directory. With the default, that means two scenario
+  modules in one folder: give each scenario a folder of its own, such as
+  <code>&lt;name&gt;/&lt;name&gt;.py</code> with its own <code>prompts/</code> and <code>knobs_*.json</code>, which is what
+  <code>new-scenario</code> writes.</li>
+<li><strong>Prompts and presets ship in a wheel only if you declare them.</strong> If you build
+  a wheel of your scenarios, setuptools packages only <code>.py</code> files unless told
+  otherwise, and an installed scenario then fails at its first template render.
+  Declare them for every package, so each scenario folder ships its own:</li>
 </ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[tool.setuptools.package-data]</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="s2">&quot;*&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;**/*.jinja&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;**/*.json&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p><code>glossogen validate &lt;path&gt;</code> checks this when the project's <code>pyproject.toml</code> has
+  a <code>[build-system]</code>.
+- <strong>No frontend plug-in.</strong> The platform UI renders everything it derives from
+  your knobs schema and event log.
+- <strong>Configuration is read from your project</strong>: the <code>.env</code> sits beside your
+  <code>pyproject.toml</code>. See <a href="../installation/#configure-environment">Configure environment</a>.</p>
 <p>Launching is the same either way: <code>glossogen run</code>, or the MCP <code>start_run</code> tool.
 A command that needs a scenario the process did not load says so, lists the
-sources it loaded and where each was configured, and says how to add yours.</p>
+sources it loaded and where each was configured, and says how to add yours. The
+server's evaluate endpoint answers a run of such a scenario with the same
+message.</p>
+<p>Each process builds its scenario list once, when it starts. A scenario you add
+while <code>glossogen serve</code> is running appears there only after you restart it.</p>
 <h3 id="viewing-your-runs-in-the-web-ui">Viewing your runs in the web UI<a class="headerlink" href="#viewing-your-runs-in-the-web-ui" title="Permanent link">&para;</a></h3>
 <p>Start the server from inside your project, or pass <code>--scenarios</code>, since the
 scenario sources decide which scenarios resolve: a server started from a
 glossogen checkout knows only the scenarios that checkout loads, so your run
 would list under a name it cannot build. Runs the server launches inherit its
 sources.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
 </code></pre></div>
 <p>The flags, the <code>--ui-image</code> pin and the checkout alternative are covered in
 <a href="../web-ui/">Web UI</a>.</p>
@@ -2784,11 +2823,11 @@ scripted round loop (<code>run_rounds</code>) that exercises what <code>validate
 world's state machine, the postmortem phase, and the round verdict, with no LLM
 and no waiting.</p>
 <p>Then one short real run, end to end:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>Pass criteria:</p>
 <ol>
@@ -2799,10 +2838,10 @@ and no waiting.</p>
    <code>make dev</code> + <code>make dev-frontend</code>.</li>
 </ol>
 <p>Then evaluate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
 </code></pre></div>
 <p>The report should hold one Measurement per metric with sensible <code>score</code> and
 <code>per_round</code> values.</p>
