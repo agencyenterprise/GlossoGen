@@ -56,6 +56,7 @@ Any host that runs the two images works the same way.
 | whatever the installed identity provider reads | Required for multi-tenant auth. With no provider installed the server is single-tenant. See [Authentication](#authentication) |
 | `OAUTH_ISSUER_URL` | Public backend URL. Enables the [MCP endpoint](mcp-integration.md) |
 | `FRONTEND_URL` | Base URL the MCP consent flow redirects the browser to. Falls back to the first `ALLOWED_ORIGINS` entry, then `http://localhost:3000`. Set it in multi-tenant mode so `/mcp-consent` reaches the right host |
+| `GLOSSOGEN_SCENARIOS` | The image sets it empty, so the server loads the built-in scenarios and does not scan `/app`. Leave it empty, or list the modules of scenarios you want the server to load. See [Scenario sources](../Architecture.md#scenario-sources) |
 | `ENABLE_EVALUATIONS` | Set `false` to disable the REST evaluate endpoint: it returns 403 and the frontend hides its button. Does not affect the CLI |
 
 **Frontend service**: reads `API_URL` at runtime (required), plus any

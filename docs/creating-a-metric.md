@@ -5,11 +5,11 @@ LLM judge, and returns one or more `Measurement` entries that land in
 `<scenario>_report.json`.
 
 A metric written against the [scenario hooks](#scenario-hooks), rather than
-against one scenario's own events, works on scenarios you did not write. It can
-live in this repo or ship in your own package without touching this repo at
-all. A metric can also be scoped to a single scenario, reading that scenario's
-own events and living under its `evaluation/` directory; the
-[registration section](#in-this-repo) covers that shape.
+against one scenario's own events, works on scenarios you did not write, and is
+added to this repo as a generic metric. A metric can also be scoped to a single
+scenario, reading that scenario's own events and returned from its
+`scenario_metrics()`; the [registration section](#registering-it) covers both
+shapes, in this repo and in your own project.
 
 ## Before you write one
 
@@ -278,8 +278,9 @@ and how `evaluation_cost` accumulates.
 Other ways to reach the same runner:
 
 - **REST**: `POST /api/g/<slug>/runs/<scenario>/<run_dir_name>/evaluate` with a
-  metric list. Validated against `available_metric_names(scenario_cls)`, so an
-  external metric works once installed. Gated by `ENABLE_EVALUATIONS`.
+  metric list. Validated against `available_metric_names(scenario_cls)`, so a
+  metric your scenario returns from `scenario_metrics()` works once the server
+  loads that scenario. Gated by `ENABLE_EVALUATIONS`.
 - **The frontend's "Run Eval" button**, which calls that endpoint.
 
 A metric that raises is logged with its traceback and recorded as failed. The

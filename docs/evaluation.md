@@ -255,7 +255,7 @@ consolidated set. `communication_open_coding` and
 - `communication_feature_presence` — `score` is the number of ontology categories
   at confidence ≥ 0.5
 
-A metric of your own, in this repo or in another installed package, is covered
+A metric of your own, generic in this repo or returned by your scenario, is covered
 in [Creating a metric](creating-a-metric.md), along with the
 [scenario hooks](creating-a-metric.md#scenario-hooks) the metrics above read.
 

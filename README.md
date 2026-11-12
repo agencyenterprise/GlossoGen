@@ -20,7 +20,7 @@ shorthand.
 Everything else lives in the
 **[documentation](https://agencyenterprise.github.io/GlossoGen/)**: installing,
 running and evaluating simulations, the web UI, the fork and swap flows, and how
-to ship scenarios and metrics in a package of your own.
+to write a scenario, with its own metrics, in a project of your own.
 
 ## Install
 

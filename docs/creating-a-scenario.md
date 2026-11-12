@@ -20,7 +20,8 @@ A scenario owns:
 - **Optional surfaces** — scenario-specific metrics, run-detail data on the API,
   and a frontend plug-in, all opt-in.
 
-Events, run-detail extensions and frontend plug-ins are discovered automatically.
+A scenario declares its events and its run-detail extension on the scenario
+class; a frontend plug-in is registered in the frontend.
 
 ## Start from the generator
 
@@ -756,7 +757,7 @@ The report should hold one Measurement per metric with sensible `score` and
       channel (teams sharing a link get one pooled entry, not one each).
 - [ ] With a run-detail extension: `make gen-api-types` re-run.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist if Pydantic fields
-      or auto-discovered classes get flagged.
+      or classes nothing imports by name get flagged.
 - [ ] One end-to-end smoke run completes and `round_success` returns a non-empty
       per-round list.
 
@@ -768,7 +769,7 @@ The report should hold one Measurement per metric with sensible `score` and
   `starts_as_member` on that role. The run completes and only the experiment's
   meaning changed.
 - **Vulture flags scenario classes as unused.** Pydantic fields and
-  auto-discovered classes look unused. Regenerate the whitelist over the same
+  classes nothing imports by name look unused. Regenerate the whitelist over the same
   paths `make lint-server` checks, or the new file drops the entries covering
   the paths it left out:
   `VIRTUAL_ENV= uv run --no-sync vulture src/ scripts/ linter/ --min-confidence 60 --make-whitelist > vulture_whitelist.py`

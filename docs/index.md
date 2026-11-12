@@ -116,7 +116,7 @@ metric with per-round and per-agent breakdowns.
 
 The platform's own metrics are generic: a scenario opts into one by implementing
 the hook the metric reads, so the same measurement works on any scenario. A
-scenario or another installed package can also ship metrics of its own. The
+scenario can also return metrics of its own. The
 catalogue and the hook table are in [Evaluation](evaluation.md).
 
 ## Web UI

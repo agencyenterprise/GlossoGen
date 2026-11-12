@@ -33,7 +33,7 @@ def validate_run_config(
     prepared = scenario_cls.prepare_config(config=dict(scenario_config))
     scenario = scenario_cls.create_from_config(config=dict(prepared))
     # Read at run time by direct-channel routing and by the metrics. A scenario
-    # from another distribution built against an older ``PrimaryChannel`` fails
+    # from outside glossogen built against an older ``PrimaryChannel`` fails
     # here, before a run directory is claimed, rather than at evaluation.
     scenario.get_primary_channels()
 

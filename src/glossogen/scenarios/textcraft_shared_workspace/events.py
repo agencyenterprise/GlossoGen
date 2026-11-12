@@ -1,4 +1,4 @@
-"""Evaluator-only ground truth, isolated from runtime imports for event discovery."""
+"""Evaluator-only ground truth events of the textcraft shared workspace scenario."""
 
 from typing import Literal
 

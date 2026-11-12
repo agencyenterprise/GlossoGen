@@ -2,8 +2,8 @@
 
 The analysis layer names no metric, and this is what keeps that true once sidecars
 are in play: it walks the registry, asks each metric for its keyed observations, and
-returns them by metric name. A metric another distribution ships gets read the same
-way, because it is in the same registry.
+returns them by metric name. A metric a scenario returns from ``scenario_metrics()`` is
+read the same way.
 
 Reading is per run and hits the filesystem once per metric that has a file, so it is
 never done unless a query actually groups by a metric key.

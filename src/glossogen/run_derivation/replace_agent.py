@@ -726,7 +726,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
     validation.
     """
     _validate_replacement_payload(request=request)
-    # Raises with the installed scenario names before any file is touched.
+    # Raises with the loaded scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
 
     refuse_unforkable_source(
