@@ -120,7 +120,9 @@ Every key a query names is checked against what the selection carries at that gr
 the same list `--list-fields` prints. A `--group-by`, `--filter` or `--measure` key the
 selection does not carry is refused by name rather than answered with one group called
 `""` or a column of blanks, and a `gte` / `lte` filter whose bound is not a number is
-refused the same way. A selection that carries no key of a kind cannot check that kind:
+refused the same way.
+
+A selection that carries no key of a kind cannot check that kind:
 one with runs but no rows at the asked grain answers with an empty result, and a cohort
 nothing has evaluated yet still answers a metric measure with blanks. A selection that
 matches no runs, or a `--run-id` that does not exist, is refused.
