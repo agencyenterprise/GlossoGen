@@ -26,7 +26,9 @@ class; a frontend plug-in is registered in the frontend.
 ## Start from the generator
 
 Generate a scenario rather than assembling one. From your project's root, with
-glossogen installed in its environment:
+`glossogen[testing]` installed in its environment (see
+[Installation](installation.md#as-a-dependency); the extra brings pytest). In a
+uv project, prefix each command with `uv run`, or activate `.venv` first:
 
 ```bash
 glossogen new-scenario reactor_purge
@@ -75,11 +77,13 @@ it says so and names the setting to change. It never writes the configuration
 itself. [In this repo, or in your own package](#in-this-repo-or-in-your-own-package)
 covers the sources.
 
-It then prints the four commands above for the new folder, and a reminder to
-put the key in `.env`. Run pytest from the project root: the test looks the
-scenario up by name, the way `glossogen run` does, and from inside the folder
-it reports the scenario as not loaded. The `testing` extra installs
-`pytest-asyncio`, which runs the generated async tests with no configuration.
+It then prints the next steps for the new folder: installing glossogen, the
+key in `.env`, and the `validate`, `run` and `pytest` lines. Run pytest from the
+project root: the test looks the scenario up by name, the way `glossogen run`
+does. In a folder with no `pyproject.toml` above it, pytest run from inside the
+scenario's folder reports the scenario as not loaded. The `testing` extra
+installs `pytest-asyncio`, which runs the generated async tests with no
+configuration.
 
 The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those
@@ -618,8 +622,9 @@ and the canonical example
 though the module can be named anything. Declare an extras model whose
 `scenario_name` is a `Literal` of your scenario's name (`validate` checks it), a
 `ScenarioRunDetailExtension` subclass naming that model, and a `build_extras` that
-walks the events. Then regenerate the frontend types so the discriminated union
-picks up your variant:
+walks the events. The extras then appear as `scenario_extras` in the run-detail
+API response. In this repo, also regenerate the frontend types so the
+discriminated union picks up your variant:
 
 ```bash
 make gen-api-types
@@ -821,8 +826,10 @@ Pass criteria:
 2. The run's `your_scenario.jsonl` holds your round-start event once per round
    (`reactor_purge_round_opened` in the generated scenario) and one
    `round_result_recorded` per round, per team when there are several.
-3. With a run-detail extension, the run's page in
-   [`glossogen serve`](#viewing-your-runs-in-the-web-ui) shows your data.
+3. With a run-detail extension, `GET /api/g/local/runs/your_scenario/<timestamp>`
+   on [`glossogen serve`](#viewing-your-runs-in-the-web-ui) carries your data
+   under `scenario_extras`. A panel showing it on the run page needs a
+   [frontend plug-in](#frontend-plug-in), which only an in-repo scenario has.
 
 Once the log shows `Simulation complete`, evaluate it:
 
@@ -853,7 +860,7 @@ The report should hold one Measurement per metric with sensible `score` and
 - [ ] `judge_round_result` returns at least one `RoundResult` per round, and
       `get_primary_channels()` returns one entry per independently metered
       channel (teams sharing a link get one pooled entry, not one each).
-- [ ] With a run-detail extension: `make gen-api-types` re-run.
+- [ ] In this repo, with a run-detail extension: `make gen-api-types` re-run.
 - [ ] `make lint` is clean. Regenerate the vulture whitelist if Pydantic fields
       or classes nothing imports by name get flagged.
 - [ ] One end-to-end smoke run completes and `round_success` returns a non-empty
