@@ -14,6 +14,7 @@ run. The postmortem ends when the agents go idle or its own time limit passes,
 and the clock opens the next round.
 
 ```bash
+mkdir -p runs
 glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
@@ -207,15 +208,15 @@ and resume runs, where a reconstructed history keeps growing, set
 
 `agent_model_settings` is what every agent in a run sends with each request, unless
 its [`model_overrides` entry](#per-agent-models) names its own `model_settings`. It
-works for every scenario, since it lives on the knobs all of them share, and no
-scenario reads it. Its settings are a subset of pydantic-ai's `ModelSettings`,
-under the same names and types, so pydantic-ai's documentation says what each one
-does and which providers honour it. More can be added as fields of
-`AgentModelSettings`. Every setting but `max_tokens` (default `16384`, reasoning
-tokens included) is unset by default, and an unset one sends nothing, leaving the
-provider's default in place. A scenario's own choices live in its presets, so a
-setting the run names wins over them like any other knob. A provider that refuses a value
-fails the call, and the run carries on with the error in its log.
+is one of the knobs every scenario shares. Its settings are a subset of
+pydantic-ai's `ModelSettings`, under the same names and types, so pydantic-ai's
+documentation says what each one does and which providers honour it.
+
+Every setting but `max_tokens` (default `16384`, reasoning tokens included) is
+unset by default, and an unset one sends nothing, leaving the provider's default
+in place. A scenario's own choices live in its presets, so a setting the run
+names wins over them like any other knob. A provider that refuses a value fails
+the call, and the run carries on with the error in its log.
 
 ```bash
 glossogen run veyru \
@@ -228,15 +229,15 @@ In a config file it is one object: `"agent_model_settings": {"thinking": "medium
 A fork's `--knobs` replaces the source's object whole rather than merging into it,
 so name every setting the fork should keep. That includes the ones a scenario's
 presets set: signal_game's `parallel_tool_calls: false` is lost from a fork whose
-`--knobs` names `agent_model_settings` without it, and from a fork of a signal_game
-run recorded before the setting moved into the presets, since that run's config
-does not carry it.
+`--knobs` names `agent_model_settings` without it.
 
 `thinking` takes pydantic-ai's `ThinkingLevel`: `minimal`, `low`, `medium`,
 `high`, `xhigh` or `max`, or `true` (on, at the provider's default) and `false` (off).
 pydantic-ai turns the level into each provider's own parameter: OpenAI's
 `reasoning.effort`, and on Anthropic adaptive thinking with an `effort`, or a
-token budget on models without adaptive thinking. A level a provider never offers
+token budget on models without adaptive thinking.
+
+A level a provider never offers
 becomes the nearest one it has, and `false` to a model that cannot stop thinking,
 such as `claude-opus-5-5`, becomes the least thinking it accepts: adaptive thinking
 at `low` effort. A level the provider offers for some models only is sent as is:
@@ -336,24 +337,25 @@ Give each provider its own queue: providers rate-limit independently, and a
 single queue mixing models stalls every slot of one provider while the spec at
 its head waits for a slot on the other.
 
+Save this as `sweep.sh` in your project, the directory holding `runs/`:
+
 ```bash
 #!/bin/bash
 # One queue per model, run in parallel. Each spec is "<source> <knobs>".
-cd "$(git rev-parse --show-toplevel)"
-LOG=/tmp/sweep.log
+LOG=sweep.log
 CAP=6
 
 declare -a GPT_SPECS=("<source_a> <knobs.json>" "<source_b> <knobs.json>")
 declare -a SONNET_SPECS=("<source_c> <knobs.json>" "<source_d> <knobs.json>")
 
 count_running_for_model() {
-  pgrep -f "Python -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "[Pp]ython -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 launch_one() {
   local model=$1 provider=$2 source=$3 knobs=$4
   echo "$(date) [$model] launching source=$source knobs=$knobs" >> "$LOG"
-  VIRTUAL_ENV= uv run --no-sync python -m glossogen replace-agent veyru \
+  glossogen replace-agent veyru \
     --source-run-dir "runs/veyru/$source" \
     --after-round 14 --rounds-after 11 \
     --replaced-agent-id field_observer \
@@ -377,13 +379,13 @@ process_queue claude-sonnet-4-6 anthropic "${SONNET_SPECS[@]}" &
 wait
 ```
 
-Start it detached so it outlives your terminal, then watch the log and the live
-simulations:
+Start it detached, from the environment where `glossogen` is on your `PATH`, so
+it outlives your terminal. Then watch the log and count the live simulations:
 
 ```bash
-nohup bash /tmp/sweep.sh > /tmp/sweep.stdout 2>&1 &
-tail -20 /tmp/sweep.log
-pgrep -af "Python -m glossogen run veyru .* --resume"
+nohup bash sweep.sh > sweep.stdout 2>&1 &
+tail -20 sweep.log
+pgrep -f "[Pp]ython -m glossogen run veyru" | wc -l
 ```
 
 Each `replace-agent`, `cross-run-replace-agent` and `fork-at-round` call prepares
@@ -392,12 +394,14 @@ returns. The simulation writes its own `<scenario>_stdout.log` in the new
 directory. A fresh `glossogen run` does not detach, so a queue of them launches
 each with `&`.
 
-**Anchor the `pgrep` pattern on the interpreter's process name.** Homebrew's
-Python on macOS runs as `Python`, capitalised, so `Python -m glossogen run`
-matches simulations only. A loose pattern such as `glossogen run veyru` also
-matches any shell whose command line quotes it, the counting shell included.
-Keep the count in a function rather than inlined into a wrapping command for the
-same reason.
+**Anchor the `pgrep` pattern on the interpreter.** A fork's simulation runs as
+`python -m glossogen run ...`, which Homebrew's Python on macOS spells `Python`,
+so `[Pp]ython -m glossogen run` matches simulations on either system. A loose
+pattern such as `glossogen run veyru` also matches any shell whose command line
+quotes it, the counting shell included. Keep the count in a function rather
+than inlined into a wrapping command for the same reason. A `glossogen run` you
+launched yourself shows as `.../bin/glossogen run ...` instead, so count those
+with `bin/glossogen run`.
 
 **Override a knob together with the knobs its validators check against it.** A
 config that fails validation exits before claiming a run directory, so a
