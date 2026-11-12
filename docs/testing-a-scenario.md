@@ -12,7 +12,8 @@ pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/Glosso
 
 `<tag>` is a release, as in [Installation](installation.md#as-a-dependency).
 Run pytest from the project root, where `glossogen run` would find your
-scenario. From inside the scenario's folder the tests report it as not loaded.
+scenario. In a folder with no `pyproject.toml` above it, pytest run from inside
+the scenario's folder reports the scenario as not loaded.
 
 The extra installs `pytest-asyncio`. Mark each async test
 `@pytest.mark.asyncio`, as the test `new-scenario` writes does, or set
@@ -184,3 +185,6 @@ get a `StubLLMProvider` whose answers the test chose. The interesting assertion
 is usually about what the judge was shown, since the answers were chosen.
 `SmokeScenario` is a two-agent, one-channel scenario to score against when your
 metric is not tied to a domain of your own.
+
+Next: [Creating a metric](creating-a-metric.md) for a score of your own, or
+[Running simulations](running-simulations.md) once the tests pass.
