@@ -32,7 +32,13 @@ glossogen installed in its environment:
 glossogen new-scenario reactor_purge
 glossogen validate ./reactor_purge
 pytest ./reactor_purge/test_reactor_purge.py
+glossogen run reactor_purge --config knobs_default \
+  --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs round_count=1
 ```
+
+The run needs `ANTHROPIC_API_KEY` in a `.env` at the project root (see
+[Configure environment](installation.md#configure-environment)). The other
+three commands need no key.
 
 `new-scenario` writes one folder, `<target-dir>/<name>/`, and nothing else in
 the project. `--target-dir` defaults to the working directory. The folder:
@@ -53,32 +59,27 @@ What you get already runs: two agents relay a code word over a metered link,
 thing at a time and watching what breaks is a faster way through this contract
 than writing it from scratch.
 
-The command refuses a destination folder that already exists, a name a
-loaded scenario holds, and a name Python can already import: a standard library
-module such as `signal` or `secrets`, an installed package, or a folder on the
-import path. It says which module the new folder would hide, before writing
-anything. Run it again with another name to add a second scenario:
-each one gets a folder of its own, because a scenario reads its prompts and
-presets from the folder holding its module (see
-[In this repo, or in your own package](#in-this-repo-or-in-your-own-package)).
+The command refuses a folder that already exists, a name a loaded scenario
+holds, and a name Python can already import, such as the standard library's
+`signal` or `secrets`. It says why before writing anything. Run it again with
+another name to add a second scenario. Each one gets a folder of its own,
+because a scenario reads its prompts and presets from the folder holding its
+module.
 
 No configuration is needed. With no scenario source configured, glossogen scans
 the project directory, so a folder at the root or a level down
-(`experiments/reactor_purge/`) is found. After writing, the command imports the
-sources the working directory configures, the way the next command will, and
-checks that they load the new module. When they do not, such as a
+(`experiments/reactor_purge/`) is found. After writing, the command checks that
+the next command will load the new module. When it will not, such as a
 `[tool.glossogen] scenarios` list that leaves it out or a folder under `tests/`,
-it says so and names the fix where those sources come from: `--scenarios`,
-`GLOSSOGEN_SCENARIOS`, or `[tool.glossogen] scenarios`, with a line for pytest
-where it needs one. It never writes the configuration itself.
+it says so and names the setting to change. It never writes the configuration
+itself. [In this repo, or in your own package](#in-this-repo-or-in-your-own-package)
+covers the sources.
 
-After writing, it prints the next steps: install glossogen in the project's
-environment, put `ANTHROPIC_API_KEY` in a `.env` at the project root, then the
-`validate`, `glossogen run` and `pytest` lines for the new folder. The generated
-test needs no pytest configuration: its async tests are marked
-`@pytest.mark.asyncio`, which the `testing` extra's `pytest-asyncio` runs. Run
-pytest from the project root; the test looks the scenario up by name, the way
-`glossogen run` does.
+It then prints the four commands above for the new folder, and a reminder to
+put the key in `.env`. Run pytest from the project root: the test looks the
+scenario up by name, the way `glossogen run` does, and from inside the folder
+it reports the scenario as not loaded. The `testing` extra installs
+`pytest-asyncio`, which runs the generated async tests with no configuration.
 
 The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those
@@ -264,7 +265,7 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 
 | Member | Does |
 |---|---|
-| `name()`, `scenario_description()` | The name given to `@scenario`; a one-line description read from `prompts/description.jinja` |
+| `name()`, `scenario_description()` | The name given to `@scenario`; the markdown description the run list and run page show. The shipped scenarios render it from `prompts/description.jinja` |
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
 | `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
@@ -474,8 +475,10 @@ scenario that delivers messages inside tool results and so has no use for
 
 A replacement posts through `self.runtime.publish_message(agent_id, channel_id,
 text, force)`, which applies `validate_outgoing_message` and
-`transform_outgoing_message`, logs the message and notifies the other members;
-`force=True` skips the unread-messages check. `self.runtime.direct_channel_for(agent_id,
+`transform_outgoing_message`, logs the message and notifies the other members.
+`force=True` skips the unread-messages check.
+
+`self.runtime.direct_channel_for(agent_id,
 recipient_agent_ids)` returns the channel whose members are exactly the sender and
 those recipients: a primary channel with those members, or else
 `dm:<sorted ids joined by +>`, created the first time and logged as
@@ -683,22 +686,24 @@ scenarios = ["scenarios"]            # a folder, a .py file, or a module name
 subcommand, every command rejects it as an unrecognized argument. A blank value
 is ignored, so `--scenarios ""` loads the built-in scenarios only.
 
-A source is a folder, a `.py` file or a module name. A folder is searched for
-files that use `@scenario`, and only those are imported, so scripts and helpers
-beside them never run. Files are imported by module name relative to the project
-directory, so `experiments/reactor_purge/reactor_purge.py` is
-`experiments.reactor_purge.reactor_purge` and relative imports inside your
-package work. A module name that is a package, such
-as an installed scenario pack, has its directory searched for files that use
-`@scenario`, descending only through subpackages (folders with an
-`__init__.py`) whose names do not start with `.` or `_`. That search has no
-skip list and no file limit, and does not enter a namespace folder. If you
-keep scenarios in a package with a `src/` layout and install it, name it as a
-module source (`scenarios = ["my_scenarios"]`): the project scan would import
+A folder source is searched for files that use `@scenario`, and only those are
+imported, so scripts and helpers beside them never run. Files are imported by
+module name relative to the project directory:
+`experiments/reactor_purge/reactor_purge.py` is
+`experiments.reactor_purge.reactor_purge`, and relative imports inside your
+package work.
+
+A module source that is a package, such as an installed scenario pack, has its
+directory searched the same way. The search descends only through subpackages
+(folders with an `__init__.py`) whose names do not start with `.` or `_`. It
+has no skip list and no file limit, and does not enter a namespace folder.
+
+If you keep scenarios in an installed package with a `src/` layout, name it as a
+module source (`scenarios = ["my_scenarios"]`). The project scan would import
 the same files as `src.my_scenarios...`, a second name beside the one your
-tests and installed code use. The registry treats one file imported under two
-module names as one definition, so the two names do not conflict, but the
-module source keeps the name the same everywhere.
+tests and installed code use. The two names do not conflict, because the
+registry treats one file under two names as one definition, but the module
+source keeps the name the same everywhere.
 
 With none of the three set, glossogen scans the project directory: the one
 holding the nearest `pyproject.toml`, or the working directory when there is none.
@@ -754,8 +759,10 @@ What differs from an in-repo scenario:
   "*" = ["**/*.jinja", "**/*.json"]
   ```
 
-  `glossogen validate <path>` checks this when the project's `pyproject.toml` has
-  a `[build-system]`.
+  `glossogen validate <path>` checks this when the project's `pyproject.toml`
+  builds with setuptools. With another build backend, such as the `uv_build`
+  that `uv init --package` writes, it prints a note and you check the wheel
+  yourself.
 - **No frontend plug-in.** The platform UI renders everything it derives from
   your knobs schema and event log.
 - **Configuration is read from your project**: the `.env` sits beside your
@@ -799,6 +806,7 @@ and no waiting.
 Then one short real run, end to end:
 
 ```bash
+mkdir -p runs
 glossogen run your_scenario \
   --model claude-haiku-4-5-20251001 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
@@ -809,12 +817,14 @@ glossogen run your_scenario \
 Pass criteria:
 
 1. The log ends with `Simulation complete. Run directory: runs/your_scenario/<timestamp>`.
-2. The JSONL holds your `<Scenario>CaseStarted` event once per round and one
-   `RoundResultRecorded` per round (per team per round when multi-team).
-3. With a run-detail extension, the round-timeline modal shows your data under
-   `make dev` + `make dev-frontend`.
+   The timestamp is a Unix time, such as `1794504106`.
+2. The run's `your_scenario.jsonl` holds your round-start event once per round
+   (`reactor_purge_round_opened` in the generated scenario) and one
+   `round_result_recorded` per round, per team when there are several.
+3. With a run-detail extension, the run's page in
+   [`glossogen serve`](#viewing-your-runs-in-the-web-ui) shows your data.
 
-Then evaluate it:
+Once the log shows `Simulation complete`, evaluate it:
 
 ```bash
 glossogen evaluate your_scenario \
