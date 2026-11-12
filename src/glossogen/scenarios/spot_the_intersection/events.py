@@ -73,9 +73,9 @@ class SpotTheIntersectionRoundStarted(EventBase):
 class IntersectionSubmissionRecorded(EventBase):
     """Emitted for every accepted ``submit_object`` call.
 
-    ``team_characters`` is the team's link-character count when this viewer
-    submitted; on the submission that completes the team it is the count the
-    team is scored on.
+    ``team_characters`` is the team's charge under the run's ``team_characters``
+    knob when this viewer submitted; on the submission that completes the team
+    it is the count the team is scored on.
     """
 
     event_type: Literal["intersection_submission_recorded"] = "intersection_submission_recorded"

@@ -1,22 +1,51 @@
 """Per-team round state, the outcome a round leaves, and how a round is scored.
 
 A team is correct only when every member submitted the round's answer, within
-the character budget when one is set. Among correct teams, the fewest link
+the character budget when one is set. Among correct teams, the fewest charged
 characters wins. A simulated opponent is ranked by the same rule. ``score_round``
 is the one place that rule lives, read by the live world and by the event-log
-reconstruction alike.
+reconstruction alike. ``charged_characters`` is the one place a team's charge
+is computed from what each member sent.
 """
 
 import math
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from fractions import Fraction
 from typing import NamedTuple, Self
 
 from glossogen.engine.fewest_characters_winner import fewest_characters_winners
+from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
 from glossogen.scenarios.spot_the_intersection.ids import TEAM_B_ID
+
+
+class TeamCharacters(StrEnum):
+    """What a team is charged for a round, from the characters each member sent.
+
+    ``TOTAL`` charges every character the members sent. ``BUSIEST_MEMBER``
+    charges the most characters any one member sent, so the budget, when one is
+    set, caps each member.
+    """
+
+    TOTAL = "total"
+    BUSIEST_MEMBER = "busiest_member"
+
+
+def charged_characters(characters_by_agent: Mapping[str, int], rule: TeamCharacters) -> int:
+    """A team's charge under ``rule``, from what each member sent."""
+    if rule == TeamCharacters.BUSIEST_MEMBER:
+        return max(characters_by_agent.values(), default=0)
+    return sum(characters_by_agent.values())
+
+
+def busiest_member(characters_by_agent: Mapping[str, int]) -> str | None:
+    """The member who sent the most characters, or ``None`` before anyone has sent any."""
+    if not characters_by_agent:
+        return None
+    return max(characters_by_agent, key=lambda agent_id: characters_by_agent[agent_id])
 
 
 class IntersectionOutcome(NamedTuple):
@@ -70,6 +99,7 @@ class TeamState:
     link_channel_id: str
     member_agent_ids: tuple[str, ...]
     submissions_by_agent: dict[str, BoardObject]
+    characters_by_agent: dict[str, int]
     locked: bool
     characters_at_lock: int
     round_budget_exceeded: bool
@@ -82,6 +112,7 @@ class TeamState:
             link_channel_id=link_channel_id,
             member_agent_ids=member_agent_ids,
             submissions_by_agent={},
+            characters_by_agent={},
             locked=False,
             characters_at_lock=0,
             round_budget_exceeded=False,
@@ -92,13 +123,17 @@ class TeamState:
         """Every member must submit."""
         return len(self.member_agent_ids)
 
-    def snapshot(self, answer: BoardObject, characters_used: int) -> TeamSnapshot:
+    def charged(self, rule: TeamCharacters) -> int:
+        """What this team has been charged so far this round under ``rule``."""
+        return charged_characters(characters_by_agent=self.characters_by_agent, rule=rule)
+
+    def snapshot(self, answer: BoardObject, rule: TeamCharacters) -> TeamSnapshot:
         """This team's state for scoring.
 
         A locked team is charged what it had spent when its last member
         submitted, so nothing said afterwards changes its score.
         """
-        characters = characters_used
+        characters = self.charged(rule=rule)
         if self.locked:
             characters = self.characters_at_lock
         return snapshot_from_submissions(
@@ -111,11 +146,29 @@ class TeamState:
         )
 
     def reset_for_new_round(self) -> None:
-        """Clear the submissions, the lock and the budget flag."""
+        """Clear the submissions, the characters sent, the lock and the budget flag."""
         self.submissions_by_agent = {}
+        self.characters_by_agent = {}
         self.locked = False
         self.characters_at_lock = 0
         self.round_budget_exceeded = False
+
+
+def metered_team_id(
+    teams: Mapping[str, TeamState], sender_agent_id: str, channel_id: str
+) -> str | None:
+    """The team a message costs, or ``None`` for one that costs nothing.
+
+    A member's message on its team's link or on a direct channel costs its team;
+    direct channels only join members of one team. Anything else, the world's
+    own notices and the discussion channels included, is free.
+    """
+    for team in teams.values():
+        if sender_agent_id not in team.member_agent_ids:
+            continue
+        if channel_id == team.link_channel_id or channel_id.startswith(DIRECT_CHANNEL_PREFIX):
+            return team.team_id
+    return None
 
 
 def snapshot_from_submissions(

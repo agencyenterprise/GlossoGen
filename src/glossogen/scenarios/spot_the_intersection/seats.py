@@ -38,6 +38,13 @@ class Seat(NamedTuple):
     board_index: int
 
 
+class Teammate(NamedTuple):
+    """Another member of a viewer's team: the id to address and the name it goes by."""
+
+    agent_id: str
+    role_name: str
+
+
 def team_ids_for(two_teams: bool, simulated_opponent: bool) -> tuple[str, ...]:
     """The teams whose viewers play a run; a simulated Team B has none."""
     if two_teams and simulated_opponent:
@@ -83,6 +90,18 @@ def postmortem_display_name_for(team_id: str) -> str:
     if team_id == TEAM_SOLO_ID:
         return "team discussion"
     return f"team discussion ({_TEAM_LABELS[team_id]})"
+
+
+def teammates_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[Teammate]:
+    """The other members of ``agent_id``'s team, in seat order."""
+    for team in teams:
+        if any(role.agent_id == agent_id for role in team.roles):
+            return [
+                Teammate(agent_id=role.agent_id, role_name=role.role_name)
+                for role in team.roles
+                if role.agent_id != agent_id
+            ]
+    raise ValueError(f"{agent_id} is on no team")
 
 
 def seats_by_agent_id(teams: tuple[TeamSpec, ...]) -> dict[str, Seat]:

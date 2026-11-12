@@ -1,6 +1,6 @@
 """spot_the_intersection's implementation of ``build_communication_rounds``.
 
-Joins each round's link-channel messages with that round's
+Joins each round's link-channel and direct-channel messages with that round's
 ``SpotTheIntersectionRoundStarted`` event: every seat's board as its viewer read
 it, the answer, and every object held by more than one board and fewer than all
 (decoys, near-misses, and twin objects that some boards share), so a
@@ -11,7 +11,8 @@ from glossogen.evaluation.metrics.communication.round_view import (
     CommunicationRoundView,
     round_views_with_case,
 )
-from glossogen.models.event import SimulationEvent
+from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
+from glossogen.models.event import ChannelCreated, SimulationEvent
 from glossogen.scenarios.spot_the_intersection.events import SpotTheIntersectionRoundStarted
 from glossogen.scenarios.spot_the_intersection.ids import (
     LINK_A_CHANNEL_ID,
@@ -23,11 +24,19 @@ _LINK_CHANNEL_IDS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNE
 
 
 def build_communication_rounds(events: list[SimulationEvent]) -> list[CommunicationRoundView]:
-    """Group link-channel messages by round and attach the boards and answer."""
+    """Group link and direct-channel messages by round and attach the boards and answer.
+
+    A direct message's line carries its channel id, which names both viewers.
+    """
+    direct_channel_ids = frozenset(
+        event.channel_id
+        for event in events
+        if isinstance(event, ChannelCreated) and event.channel_id.startswith(DIRECT_CHANNEL_PREFIX)
+    )
     return round_views_with_case(
         events=events,
         case_event_cls=SpotTheIntersectionRoundStarted,
-        channel_ids=_LINK_CHANNEL_IDS,
+        channel_ids=_LINK_CHANNEL_IDS | direct_channel_ids,
         render_header=_header,
         render_ground_truth_block=_ground_truth,
         missing_case_header="(unknown)",

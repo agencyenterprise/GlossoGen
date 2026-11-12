@@ -1,3 +1,4 @@
-You have access to the following communication channels. Use the exact channel_id when sending messages:
-{% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
+{% if one_to_one %}You belong to the following channels.{% if postmortem_enabled %} To post on the discussion channel, call send_message with its exact channel_id as to.{% endif %}
+{% else %}You have access to the following communication channels. Use the exact channel_id when sending messages:
+{% endif %}{% for channel in channels %}- "{{ channel.display_name }}" (channel_id: {{ channel.channel_id }})
 {% endfor %}

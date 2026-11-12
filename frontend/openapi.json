@@ -5446,7 +5446,7 @@
           "team_characters"
         ],
         "title": "IntersectionSubmission",
-        "description": "One accepted ``submit_object`` call.\n\n``team_characters`` is the team's link-character count when the viewer\nsubmitted."
+        "description": "One accepted ``submit_object`` call.\n\n``team_characters`` is the team's charge under the run's ``team_characters``\nknob when the viewer submitted."
       },
       "JsonValue": {},
       "JudgeGroundTruthMetadata": {

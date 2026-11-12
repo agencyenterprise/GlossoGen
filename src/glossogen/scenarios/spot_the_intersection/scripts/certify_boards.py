@@ -36,6 +36,7 @@ from glossogen.scenarios.spot_the_intersection.knobs import (
     SpotTheIntersectionKnobs,
     largest_board_size,
 )
+from glossogen.scenarios.spot_the_intersection.messaging import Messaging
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
 from glossogen.scenarios.spot_the_intersection.single_board_guessers import (
     LEAK_Z_THRESHOLD,
@@ -61,13 +62,15 @@ class SweepRow(NamedTuple):
 def knobs_at(preset: dict[str, Any], team_size: int) -> list[SpotTheIntersectionKnobs]:
     """The preset at ``team_size`` on each grid to sweep: its own if it fits, and the smallest.
 
-    Decoys need three viewers, so a two-viewer team runs without them.
+    Decoys and one-to-one messaging need three viewers, so a two-viewer team runs
+    without decoys and broadcasts. Board generation does not read the messaging.
     """
     config = dict(preset)
     config["team_size"] = team_size
     if team_size < 3:
         config["decoy_count_values"] = [0]
         config["decoy_count_weights"] = [1]
+        config["messaging"] = Messaging.BROADCAST.value
     probe = SpotTheIntersectionKnobs.model_validate({**config, "grid_size": MAX_GRID_SIZE})
     smallest = max(3, math.ceil(math.sqrt(2 * largest_board_size(knobs=probe))))
     grids = sorted({max(preset["grid_size"], smallest), smallest})

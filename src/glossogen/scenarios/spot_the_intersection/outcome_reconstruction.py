@@ -2,9 +2,9 @@
 
 Used on resume, fork and replace-agent. Reads ``SpotTheIntersectionRoundStarted``
 for each round's answer as recorded, ``IntersectionSubmissionRecorded`` for each
-member's submission and its team's character count at that moment,
-``MessageSent`` on each team's link for a team that never locked, and
-``RoundEnded`` for which rounds finished.
+member's submission and its team's charge at that moment, ``MessageSent`` from
+each member on its team's link and direct channels for a team that never locked,
+and ``RoundEnded`` for which rounds finished.
 
 A finished round is scored through :func:`score_round`, the rule the live world
 applies, so the next round's briefing reports the right previous result. A round
@@ -35,18 +35,26 @@ from glossogen.scenarios.spot_the_intersection.events import (
 from glossogen.scenarios.spot_the_intersection.world_state import (
     IntersectionOutcome,
     SimulatedOpponent,
+    TeamCharacters,
     TeamSnapshot,
     TeamState,
+    charged_characters,
+    metered_team_id,
     score_round,
     snapshot_from_submissions,
 )
 
 
 class TeamInProgress(NamedTuple):
-    """One team's state partway through a round: who submitted what, and its spend."""
+    """One team's state partway through a round.
+
+    ``characters_by_agent`` is what each member had sent, and ``characters`` is
+    the team's charge: the count latched on its last submission once it locked.
+    """
 
     team_id: str
     submissions_by_agent: dict[str, BoardObject]
+    characters_by_agent: dict[str, int]
     characters: int
 
 
@@ -69,11 +77,14 @@ class RestoredRounds(NamedTuple):
 
 
 class _RecordedRounds(NamedTuple):
-    """What a log records per round, read in one pass."""
+    """What a log records per round, read in one pass.
+
+    ``characters_sent`` maps a round to each team's per-member character counts.
+    """
 
     started: dict[int, SpotTheIntersectionRoundStarted]
     submissions: dict[int, dict[str, list[IntersectionSubmissionRecorded]]]
-    unlocked_characters: dict[int, dict[str, int]]
+    characters_sent: dict[int, dict[str, dict[str, int]]]
     ended: set[int]
 
 
@@ -83,6 +94,7 @@ def restore_rounds_from_events(
     competitive: bool,
     simulated_opponent: SimulatedOpponent | None,
     budget: int,
+    team_characters: TeamCharacters,
     events: list[Any],
 ) -> RestoredRounds:
     """Record an outcome for every round ``events`` shows finished.
@@ -106,9 +118,8 @@ def restore_rounds_from_events(
                 team=team,
                 round_started=round_started,
                 submissions=recorded.submissions.get(round_number, {}).get(team_id, []),
-                unlocked_characters=recorded.unlocked_characters.get(round_number, {}).get(
-                    team_id, 0
-                ),
+                characters_by_agent=recorded.characters_sent.get(round_number, {}).get(team_id, {}),
+                team_characters=team_characters,
                 budget=budget,
             )
             for team_id, team in teams.items()
@@ -122,15 +133,15 @@ def restore_rounds_from_events(
             outcome_log.record(team_id=outcome.team_id, round_number=round_number, outcome=outcome)
     return RestoredRounds(
         started_rounds=frozenset(recorded.started),
-        in_progress=_round_in_progress(teams=teams, recorded=recorded),
+        in_progress=_round_in_progress(
+            teams=teams, recorded=recorded, team_characters=team_characters
+        ),
     )
 
 
 def _read_rounds(teams: dict[str, TeamState], events: list[Any]) -> _RecordedRounds:
-    """Index the log's round starts, submissions, link spend and round ends."""
-    team_id_by_link = {team.link_channel_id: team.team_id for team in teams.values()}
-    members = {team.team_id: frozenset(team.member_agent_ids) for team in teams.values()}
-    recorded = _RecordedRounds(started={}, submissions={}, unlocked_characters={}, ended=set())
+    """Index the log's round starts, submissions, per-member spend and round ends."""
+    recorded = _RecordedRounds(started={}, submissions={}, characters_sent={}, ended=set())
     for event in events:
         if isinstance(event, SpotTheIntersectionRoundStarted):
             recorded.started[event.round_number] = event
@@ -138,18 +149,23 @@ def _read_rounds(teams: dict[str, TeamState], events: list[Any]) -> _RecordedRou
             by_team = recorded.submissions.setdefault(event.round_number, {})
             by_team.setdefault(event.team_id, []).append(event)
         elif isinstance(event, MessageSent):
-            team_id = team_id_by_link.get(event.message.channel_id)
-            # The world's own notices on a link are not metered live either.
-            if team_id is not None and event.message.sender_agent_id in members[team_id]:
-                by_team = recorded.unlocked_characters.setdefault(event.round_number, {})
-                by_team[team_id] = by_team.get(team_id, 0) + len(event.message.text)
+            team_id = metered_team_id(
+                teams=teams,
+                sender_agent_id=event.message.sender_agent_id,
+                channel_id=event.message.channel_id,
+            )
+            if team_id is not None:
+                by_team = recorded.characters_sent.setdefault(event.round_number, {})
+                by_agent = by_team.setdefault(team_id, {})
+                sender = event.message.sender_agent_id
+                by_agent[sender] = by_agent.get(sender, 0) + len(event.message.text)
         elif isinstance(event, RoundEnded):
             recorded.ended.add(event.round_number)
     return recorded
 
 
 def _round_in_progress(
-    teams: dict[str, TeamState], recorded: _RecordedRounds
+    teams: dict[str, TeamState], recorded: _RecordedRounds, team_characters: TeamCharacters
 ) -> RoundInProgress | None:
     """The latest round the log started and never ended, if there is one."""
     unfinished = [number for number in recorded.started if number not in recorded.ended]
@@ -160,6 +176,7 @@ def _round_in_progress(
     in_progress: list[TeamInProgress] = []
     for team_id, team in teams.items():
         submissions = recorded.submissions.get(round_number, {}).get(team_id, [])
+        characters_by_agent = recorded.characters_sent.get(round_number, {}).get(team_id, {})
         in_progress.append(
             TeamInProgress(
                 team_id=team_id,
@@ -169,12 +186,12 @@ def _round_in_progress(
                     )
                     for submission in submissions
                 },
+                characters_by_agent=dict(characters_by_agent),
                 characters=_team_characters(
                     team=team,
                     submissions=submissions,
-                    unlocked_characters=recorded.unlocked_characters.get(round_number, {}).get(
-                        team_id, 0
-                    ),
+                    characters_by_agent=characters_by_agent,
+                    team_characters=team_characters,
                 ),
             )
         )
@@ -184,28 +201,34 @@ def _round_in_progress(
 def _team_characters(
     team: TeamState,
     submissions: Sequence[IntersectionSubmissionRecorded],
-    unlocked_characters: int,
+    characters_by_agent: dict[str, int],
+    team_characters: TeamCharacters,
 ) -> int:
     """What a team was charged in a round, from its recorded events.
 
     A team that locked is charged the count on its last submission, the latch
-    the live world applied; one that did not is charged every link character.
+    the live world applied. One that did not is charged under ``team_characters``
+    from everything its members sent.
     """
     if len(submissions) == team.members_required:
         return max(submission.team_characters for submission in submissions)
-    return unlocked_characters
+    return charged_characters(characters_by_agent=characters_by_agent, rule=team_characters)
 
 
 def _snapshot(
     team: TeamState,
     round_started: SpotTheIntersectionRoundStarted,
     submissions: Sequence[IntersectionSubmissionRecorded],
-    unlocked_characters: int,
+    characters_by_agent: dict[str, int],
+    team_characters: TeamCharacters,
     budget: int,
 ) -> TeamSnapshot:
     """One team's scoring state for a finished round, from its recorded events."""
     characters = _team_characters(
-        team=team, submissions=submissions, unlocked_characters=unlocked_characters
+        team=team,
+        submissions=submissions,
+        characters_by_agent=characters_by_agent,
+        team_characters=team_characters,
     )
     objects = [
         _submitted_object(submission=submission, grid_size=round_started.grid_size)

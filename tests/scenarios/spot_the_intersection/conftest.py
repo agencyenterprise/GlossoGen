@@ -31,6 +31,20 @@ def one_round_scenario() -> SimulationScenario:
     )
 
 
+def one_to_one_scenario(overrides: dict[str, object]) -> SimulationScenario:
+    """The one-to-one preset, cut to one round with no debrief, then ``overrides``."""
+    return build_scenario(
+        scenario_name=SCENARIO,
+        preset_name="knobs_one_to_one",
+        overrides={
+            "round_count": 1,
+            "max_round_duration_seconds": ROUND_SECONDS,
+            "postmortem_enabled": False,
+            **overrides,
+        },
+    )
+
+
 def world_of(scenario: SimulationScenario) -> SpotTheIntersectionWorld:
     """The scenario's world, typed."""
     world = scenario.get_world()
@@ -71,6 +85,11 @@ async def play(
         monkeypatch=monkeypatch,
         phase_timed_out=never_times_out,
     )
+
+
+def say_to(to: str, text: str) -> ToolTurn:
+    """A one-to-one turn sending ``text`` to the teammate or channel ``to``."""
+    return ToolTurn(tool_name="send_message", args={"to": to, "text": text, "force": True})
 
 
 def say_on(scenario: SimulationScenario, channel_id: str, text: str) -> ToolTurn:
