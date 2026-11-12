@@ -32,16 +32,20 @@ def test_a_scenario_without_judge_knobs_has_no_judge_and_bills_nothing() -> None
     "scenario_name",
     ["veyru", "orbital_anomaly", "drive_module_repair", "spot_the_difference"],
 )
-def test_these_judges_answer_at_temperature_zero_unless_the_run_says_otherwise(
+def test_these_judges_send_no_sampling_settings_unless_the_run_sets_them(
     scenario_name: str,
 ) -> None:
-    """Their verdicts are meant to vary as little as the provider allows."""
+    """Their presets judge with Anthropic, whose API version 2026-10-21 refuses `temperature`.
+
+    A default temperature made every judge call fail with a 400, so every
+    submission scored as nothing found.
+    """
     default = build_scenario(scenario_name=scenario_name, preset_name="knobs_default", overrides={})
-    unset = build_scenario(
+    chosen = build_scenario(
         scenario_name=scenario_name,
         preset_name="knobs_default",
         overrides={"judge_model_settings": {"thinking": "low"}},
     )
 
-    assert default.get_knobs().model_dump()["judge_model_settings"] == {"temperature": 0.0}
-    assert unset.get_knobs().model_dump()["judge_model_settings"] == {"thinking": "low"}
+    assert default.get_knobs().model_dump()["judge_model_settings"] == {}
+    assert chosen.get_knobs().model_dump()["judge_model_settings"] == {"thinking": "low"}
