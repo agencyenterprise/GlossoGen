@@ -145,6 +145,7 @@ function props(count: number): ComponentProps<typeof ChatPane> {
       error_type: "RateLimitError",
       message: "Provider limit reached",
     })),
+    [],
     {},
     {},
     {}
@@ -404,5 +405,43 @@ describe("chat virtualization", () => {
     await render(value);
     expect(container.textContent).toContain("Round 2 begins.");
     expect(container.textContent).not.toContain("Show full briefing");
+  });
+});
+
+describe("unrecognized events", () => {
+  function withUnrecognized(selectedChannel: string | null) {
+    const value = props(4);
+    const [unrecognized] = mergeEntries(
+      [],
+      [],
+      [],
+      [],
+      [
+        {
+          event_id: "gone-1",
+          event_type: "gone_board_dealt",
+          round_number: 1,
+          timestamp: new Date(1_700_000_000_000).toISOString(),
+          payload: { event_id: "gone-1", event_type: "gone_board_dealt", board: [[1, 2]] },
+        },
+      ],
+      {},
+      {},
+      {}
+    );
+    return { ...value, selectedChannel, messages: [...value.messages, unrecognized!] };
+  }
+
+  it("shows one in the timeline by its type, with the logged line on demand", async () => {
+    await render(withUnrecognized(null));
+    expect(container.textContent).toContain("gone_board_dealt");
+    expect(container.querySelector("pre")).toBeNull();
+    await clickButton("gone_board_dealt");
+    expect(container.querySelector("pre")?.textContent).toContain('"board"');
+  });
+
+  it("leaves it out of a channel view, since it carries no channel", async () => {
+    await render(withUnrecognized("link"));
+    expect(container.textContent).not.toContain("gone_board_dealt");
   });
 });

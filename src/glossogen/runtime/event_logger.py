@@ -3,7 +3,9 @@
 Publishes each logged event to the ``EventBus`` it is constructed with, for
 real-time delivery to SSE subscribers. Logs only the event classes it is built
 with, the platform's and the running scenario's declared ones, so every line it
-writes is one a reader of the run can parse.
+writes is one a reader of the run can parse. An ``UnrecognizedEvent``, which a
+reader builds from a line it could not parse, is refused too: a derived run copies
+its source's lines as bytes and never logs one through here.
 """
 
 import asyncio
@@ -13,7 +15,7 @@ from pathlib import Path
 import aiofiles
 import orjson
 
-from glossogen.models.event import SimulationEvent, fixed_event_type
+from glossogen.models.event import SimulationEvent, UnrecognizedEvent, fixed_event_type
 from glossogen.models.event_base import EventBase
 from glossogen.runtime.event_bus import EventBus
 
@@ -73,6 +75,12 @@ class EventLogger:
         Raises :class:`UndeclaredEventType` for an event class the logger does not
         accept, and ``RuntimeError`` if the logger has not been opened.
         """
+        if isinstance(event, UnrecognizedEvent):
+            raise UndeclaredEventType(
+                f"Refusing to log an UnrecognizedEvent (event_type {event.event_type!r}): "
+                "it is a line read back from a run's log, not an event of this run. A "
+                "derived run copies its source's lines as bytes instead."
+            )
         event_cls = type(event)
         if event_cls not in self._allowed_event_types:
             raise UndeclaredEventType(

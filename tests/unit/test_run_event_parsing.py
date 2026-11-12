@@ -13,7 +13,7 @@ from typing import Any, Literal
 import orjson
 import pytest
 
-from glossogen.models.event import MessageSent, fixed_event_type
+from glossogen.models.event import MessageSent, UnrecognizedEvent, fixed_event_type
 from glossogen.models.event_base import EventBase
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_storage import event_parsing
@@ -145,7 +145,7 @@ async def test_two_scenarios_may_declare_the_same_event_type(tmp_path: Path) -> 
     assert ping.beta_field == "b"
 
 
-async def test_an_event_the_runs_scenario_does_not_declare_is_skipped_and_counted(
+async def test_an_event_the_runs_scenario_does_not_declare_is_kept_unrecognized_and_counted(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Another scenario's event in this run is not parsed with that scenario's class."""
@@ -162,7 +162,12 @@ async def test_an_event_the_runs_scenario_does_not_declare_is_skipped_and_counte
     with caplog.at_level(logging.WARNING):
         events = await load_events(log_path=log)
 
-    assert [type(event).__name__ for event in events] == ["SimulationStarted", "MessageSent"]
+    assert [type(event).__name__ for event in events] == [
+        "SimulationStarted",
+        "UnrecognizedEvent",
+        "UnrecognizedEvent",
+        "MessageSent",
+    ]
     [warning] = [record for record in caplog.records if record.levelno == logging.WARNING]
     assert "scenario 'alpha' does not declare them" in warning.getMessage()
     assert "'veyru_stabilization_judged': 2" in warning.getMessage()
@@ -186,7 +191,18 @@ async def test_a_run_whose_scenario_is_not_loaded_reads_its_platform_events_and_
     with caplog.at_level(logging.WARNING):
         events = await load_events(log_path=log)
 
-    assert [type(event).__name__ for event in events] == ["SimulationStarted", "MessageSent"]
+    assert [type(event).__name__ for event in events] == [
+        "SimulationStarted",
+        "UnrecognizedEvent",
+        "MessageSent",
+        "UnrecognizedEvent",
+        "UnrecognizedEvent",
+    ]
+    assert [event.event_type for event in events if isinstance(event, UnrecognizedEvent)] == [
+        "gone_round_opened",
+        "gone_round_closed",
+        "gone_round_opened",
+    ]
     [warning] = [record for record in caplog.records if record.levelno == logging.WARNING]
     message = warning.getMessage()
     assert "made by scenario 'gone_scenario', which this process has not loaded" in message
@@ -222,9 +238,19 @@ def test_a_single_event_is_parsed_with_the_scenario_it_is_given() -> None:
     )
 
 
-def test_a_single_event_its_scenario_does_not_declare_does_not_parse() -> None:
+def test_a_single_event_its_scenario_does_not_declare_is_unrecognized() -> None:
+    raw = row(event_type="ping", alpha_field=1)
+
+    event = parse_event(raw=raw, scenario_name="veyru")
+
+    assert isinstance(event, UnrecognizedEvent)
+    assert event.event_type == "ping"
+    assert event.model_dump(mode="json") == raw
+
+
+def test_a_malformed_event_of_a_declared_type_still_raises() -> None:
     with pytest.raises(ValueError):
-        parse_event(raw=row(event_type="ping", alpha_field=1), scenario_name="veyru")
+        parse_event(raw=row(event_type="ping", alpha_field="not a number"), scenario_name="alpha")
 
 
 def test_the_parser_is_built_once_per_scenario() -> None:

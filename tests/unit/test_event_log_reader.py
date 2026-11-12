@@ -22,7 +22,12 @@ from typing import Any
 import orjson
 import pytest
 
-from glossogen.models.event import LLMResponseReceived, MessageSent, RoundAdvanced
+from glossogen.models.event import (
+    LLMResponseReceived,
+    MessageSent,
+    RoundAdvanced,
+    UnrecognizedEvent,
+)
 from glossogen.run_storage.event_log_reader import (
     extract_agent_configs,
     extract_scenario_config,
@@ -328,7 +333,7 @@ def test_extracting_from_events_with_no_start_event_raises() -> None:
         extract_scenario_config(events=[])
 
 
-async def test_an_event_no_class_declares_is_skipped_and_counted(
+async def test_an_event_no_class_declares_is_kept_unrecognized_and_counted(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A run naming an event this build has no class for still reads back.
@@ -353,17 +358,19 @@ async def test_an_event_no_class_declares_is_skipped_and_counted(
     with caplog.at_level(logging.WARNING):
         events = await load_events(log_path=log)
 
-    assert [event.event_id for event in events] == ["start", "a", "e"]
+    assert [event.event_id for event in events] == ["start", "a", "b", "c", "d", "e"]
+    assert [type(event).__name__ for event in events[2:5]] == ["UnrecognizedEvent"] * 3
     assert "a_scenario_that_is_not_installed" in caplog.text
     assert "an_event_renamed_since_the_run" in caplog.text
 
 
-async def test_a_skipped_event_still_advances_the_round_backfill(tmp_path: Path) -> None:
-    """Skipping an unreadable event must not shift the rounds of the readable ones.
+async def test_an_unrecognized_event_still_advances_the_round_backfill(tmp_path: Path) -> None:
+    """An unrecognized event must not shift the rounds of the readable ones.
 
     The backfill infers each event's round from the last `round_advanced` it
-    walked past, so a reader that skipped a row before observing it would file
+    walked past, so a reader that passed a row by before observing it would file
     every later event under the wrong round, and every per-round metric with it.
+    The unrecognized row gets the running round too, without its line gaining one.
     """
     log = write_log(
         path=tmp_path / "run.jsonl",
@@ -371,11 +378,14 @@ async def test_a_skipped_event_still_advances_the_round_backfill(tmp_path: Path)
             start_row(scenario_name="smoke"),
             base_row(event_id="a", event_type="round_advanced", round_number=4, trigger="idle"),
             base_row(event_id="b", event_type="no_class_declares_this"),
-            message_row(event_id="m1", text="after the skipped row"),
+            message_row(event_id="m1", text="after the unrecognized row"),
         ],
     )
 
     events = await load_events(log_path=log)
 
     sent = next(event for event in events if isinstance(event, MessageSent))
-    assert sent.round_number == 4, "the skipped row must not reset the running round"
+    assert sent.round_number == 4, "the unrecognized row must not reset the running round"
+    unrecognized = next(event for event in events if isinstance(event, UnrecognizedEvent))
+    assert unrecognized.round_number == 4
+    assert "round_number" not in unrecognized.model_dump(mode="json")

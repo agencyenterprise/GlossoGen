@@ -7,6 +7,7 @@ type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
+type UnrecognizedEventEntry = components["schemas"]["UnrecognizedEventEntry"];
 
 /** Generic LLM-judge ground truth for a single judged action tool call.
  *
@@ -32,8 +33,8 @@ export function judgeMetadataFromExtras(
 }
 
 /** Unified display type used by ChatPane and AgentDrawer to render
- *  channel messages, reasoning entries, tool uses, and run-cycle failures
- *  in a single timeline. */
+ *  channel messages, reasoning entries, tool uses, run-cycle failures and
+ *  unrecognized events in a single timeline. */
 export interface DisplayEntry {
   message_id: string;
   channel_id: string;
@@ -59,6 +60,10 @@ export interface DisplayEntry {
   /** True when this entry renders an AgentRunCycleFailed event (content filter
    *  refusal, HTTP error, unexpected model behavior, etc.). */
   is_run_cycle_failure: boolean;
+  /** True when this entry renders a logged event of a type the server does not
+   *  parse for the run's scenario. It names no agent and no channel, so
+   *  ``sender_agent_id`` is empty and it shows only in "all activity". */
+  is_unrecognized: boolean;
   /** Character count of the message text — only meaningful for channel messages. */
   character_count: number;
   /** Tool use fields — only populated when is_tool_use or is_notification_result is true. */
@@ -81,6 +86,10 @@ export interface DisplayEntry {
   error_type: string;
   /** Retry-loop cycle index for run-cycle failure entries (0 otherwise). */
   cycle: number;
+  /** For unrecognized entries: the logged ``event_type`` and the whole logged
+   *  line. Empty and null otherwise. */
+  event_type: string;
+  payload: Record<string, unknown> | null;
 }
 
 const EMPTY_ENTRY_DEFAULTS = {
@@ -90,6 +99,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   is_tool_use: false,
   is_notification_result: false,
   is_run_cycle_failure: false,
+  is_unrecognized: false,
   character_count: 0,
   tool_name: "",
   tool_arguments: {} as Record<string, unknown>,
@@ -101,10 +111,12 @@ const EMPTY_ENTRY_DEFAULTS = {
   notification_display: null as ReactNode,
   error_type: "",
   cycle: 0,
+  event_type: "",
+  payload: null as Record<string, unknown> | null,
 };
 
-/** Merge channel messages, reasoning entries, tool uses, and run-cycle
- *  failures into a single sorted array.
+/** Merge channel messages, reasoning entries, tool uses, run-cycle failures
+ *  and unrecognized events into a single array sorted by round and timestamp.
  *
  *  ``judgeMetadataByCallId`` carries the generic LLM-judge ground truth
  *  keyed by tool ``call_id`` (empty for scenarios with no judged action).
@@ -121,6 +133,7 @@ export function mergeEntries(
   reasoning: ReasoningEntry[],
   toolUse: ToolUseEntry[],
   runCycleFailures: AgentRunCycleFailedEntry[],
+  unrecognizedEvents: UnrecognizedEventEntry[],
   judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>,
   toolMetadataByCallId: Record<string, ReactNode>,
   notificationDisplayByCallId: Record<string, ReactNode>
@@ -163,6 +176,20 @@ export function mergeEntries(
     is_run_cycle_failure: true,
     error_type: f.error_type,
     cycle: f.cycle,
+  }));
+
+  const unrecognizedEntries: DisplayEntry[] = unrecognizedEvents.map(u => ({
+    ...EMPTY_ENTRY_DEFAULTS,
+    message_id: u.event_id,
+    channel_id: "",
+    channel_ids: [],
+    sender_agent_id: "",
+    text: "",
+    timestamp: u.timestamp,
+    round_number: u.round_number,
+    is_unrecognized: true,
+    event_type: u.event_type,
+    payload: u.payload,
   }));
 
   const toolEntries: DisplayEntry[] = [];
@@ -212,26 +239,30 @@ export function mergeEntries(
   }
 
   // Sort priority for entries at the same timestamp:
-  // channel messages (0) → tool use / notification result (1) → reasoning
-  // or run-cycle failure (2).
+  // channel messages (0) → tool use / notification result (1) → reasoning,
+  // run-cycle failure or unrecognized event (2).
   // Tool results (e.g. read_notifications) provide context that reasoning
   // reacts to, so they should appear before reasoning from the same LLM response.
   function sortRank(e: DisplayEntry): number {
-    if (e.is_reasoning || e.is_run_cycle_failure) return 2;
+    if (e.is_reasoning || e.is_run_cycle_failure || e.is_unrecognized) return 2;
     if (e.is_tool_use || e.is_notification_result) return 1;
     return 0;
   }
 
-  return [...channelEntries, ...reasoningEntries, ...toolEntries, ...failureEntries].sort(
-    (a, b) => {
-      if (a.round_number !== b.round_number) {
-        return a.round_number - b.round_number;
-      }
-      const ts = a.timestamp.localeCompare(b.timestamp);
-      if (ts !== 0) return ts;
-      return sortRank(a) - sortRank(b);
+  return [
+    ...channelEntries,
+    ...reasoningEntries,
+    ...toolEntries,
+    ...failureEntries,
+    ...unrecognizedEntries,
+  ].sort((a, b) => {
+    if (a.round_number !== b.round_number) {
+      return a.round_number - b.round_number;
     }
-  );
+    const ts = a.timestamp.localeCompare(b.timestamp);
+    if (ts !== 0) return ts;
+    return sortRank(a) - sortRank(b);
+  });
 }
 
 /** The scenario plug-in's rendering of each ``read_notifications`` result it

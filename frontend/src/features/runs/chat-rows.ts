@@ -61,6 +61,20 @@ export function buildChatRows(messages: DisplayEntry[], announcedRounds: number[
       openAnnouncedBelow(roundNumber);
       openRound(roundNumber);
     }
+    rowIndexByMessage.set(entry.message_id, rows.length);
+    // An unrecognized event names no agent: it sits inside the current turn
+    // without ending it, and does not start one of its own.
+    if (entry.is_unrecognized) {
+      rows.push({
+        kind: "entry",
+        key: `entry-${entry.message_id}`,
+        roundNumber,
+        turn: turn ?? { agentId: "", timestamp: entry.timestamp, index: -1 },
+        isTurnStart: false,
+        entry,
+      });
+      continue;
+    }
     const isTurnStart = turn?.agentId !== entry.sender_agent_id;
     if (!turn || isTurnStart) {
       turn = {
@@ -78,7 +92,6 @@ export function buildChatRows(messages: DisplayEntry[], announcedRounds: number[
     ) {
       turn.displayName = entry.sender_display_name;
     }
-    rowIndexByMessage.set(entry.message_id, rows.length);
     rows.push({
       kind: "entry",
       key: `entry-${entry.message_id}`,

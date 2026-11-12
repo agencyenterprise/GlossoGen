@@ -51,7 +51,8 @@ function buildTimelineRows(
 ): TimelineRow[] {
   const rows: TimelineRow[] = [];
   for (const m of messages) {
-    if (m.is_reasoning || m.is_run_cycle_failure || m.is_notification_result) continue;
+    if (m.is_reasoning || m.is_run_cycle_failure || m.is_notification_result || m.is_unrecognized)
+      continue;
     if (m.is_tool_use && m.judge_metadata !== null) {
       const action =
         typeof m.tool_arguments.action === "string"

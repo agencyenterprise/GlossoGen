@@ -519,6 +519,7 @@ async def _tool_get_run(
             round_endings=detail.round_endings,
             round_results=detail.round_results,
             round_injections=[i for i in detail.round_injections if i.agent_id == agent_id],
+            unrecognized_events=detail.unrecognized_events,
             scenario_extras=detail.scenario_extras,
         )
 

@@ -32,7 +32,16 @@ function readNotifications(callId: string, result: string): ToolUseEntry {
 
 describe("a read_notifications result a scenario rendered itself", () => {
   it("is split from its call and paired by call_id whatever its type", () => {
-    const entries = mergeEntries([], [], [readNotifications("c1", WAKE_RESULT)], [], {}, {}, {});
+    const entries = mergeEntries(
+      [],
+      [],
+      [readNotifications("c1", WAKE_RESULT)],
+      [],
+      [],
+      {},
+      {},
+      {}
+    );
     const call = entries.find(e => e.is_tool_use);
     const result = entries.find(e => e.is_notification_result);
     expect(call?.paired_message_id).toBe(result?.message_id);
@@ -53,9 +62,42 @@ describe("a read_notifications result a scenario rendered itself", () => {
     ];
     const displays = notificationDisplaysByCallId(toolUse, plugin);
     expect(displays).toEqual({ c1: "rendered wake" });
-    const entries = mergeEntries([], [], toolUse, [], {}, {}, displays);
+    const entries = mergeEntries([], [], toolUse, [], [], {}, {}, displays);
     const rendered = entries.find(e => e.is_notification_result && e.call_id === "c1");
     expect(rendered?.notification_display).toBe("rendered wake");
     expect(entries.some(e => e.is_notification_result && e.call_id === "c3")).toBe(false);
+  });
+});
+
+describe("an unrecognized event", () => {
+  it("takes its place among the run's activity by round and timestamp", () => {
+    const entries = mergeEntries(
+      [],
+      [],
+      [readNotifications("c1", WAKE_RESULT), readNotifications("c2", "not json")],
+      [],
+      [
+        {
+          event_id: "gone-1",
+          event_type: "gone_board_dealt",
+          round_number: 1,
+          timestamp: "2026-10-09T06:14:00.500Z",
+          payload: { event_type: "gone_board_dealt", board: [1] },
+        },
+      ],
+      {},
+      {},
+      {}
+    );
+    expect(entries.map(e => (e.is_unrecognized ? e.event_type : e.message_id))).toEqual([
+      "tool-c1",
+      "tool-c2",
+      "gone_board_dealt",
+      "tool-c1-result",
+    ]);
+    const unrecognized = entries.find(e => e.is_unrecognized)!;
+    expect(unrecognized.sender_agent_id).toBe("");
+    expect(unrecognized.channel_ids).toEqual([]);
+    expect(unrecognized.payload).toEqual({ event_type: "gone_board_dealt", board: [1] });
   });
 });

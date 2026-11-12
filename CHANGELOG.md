@@ -51,6 +51,15 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- **A run's events of a type no loaded scenario declares are kept, not skipped.**
+  `load_events` returns each as an `UnrecognizedEvent`
+  (`glossogen.models.event`), which holds the line's `event_type` and the whole
+  line as `payload` and serializes back to an equal object; `parse_event` does the
+  same. The one warning per read now says how many were read that way. Code that
+  iterates a run's events sees them where it saw nothing before. Run detail
+  returns them as `unrecognized_events`, and the run page shows each in the "all
+  activity" timeline where it was logged, with the line as JSON on demand. The event logger refuses an
+  `UnrecognizedEvent`.
 - **`glossogen new-scenario <name>` writes only the scenario's folder**,
   `<target-dir>/<name>/`: the module, `knobs_default.json`, `prompts/`, an
   `__init__.py` and `test_<name>.py`. It no longer writes a `pyproject.toml`,

@@ -16,6 +16,7 @@ function messages(count: number) {
       error_type: "RateLimitError",
       message: "Provider limit reached",
     })),
+    [],
     {},
     {},
     {}
@@ -50,6 +51,35 @@ describe("chat navigation rows", () => {
     expect(activity.map(row => row.isTurnStart)).toEqual([true, false, true, true]);
     expect(activity[0]!.turn.displayName).toBe("Alice (generation 2)");
     expect(rows[rowIndexByRound.get(13)!]).toMatchObject({ kind: "round-start", roundNumber: 13 });
+  });
+
+  it("places an unrecognized event inside the current turn without ending it", () => {
+    const entries = messages(3);
+    entries[1] = {
+      ...entries[1]!,
+      sender_agent_id: "",
+      is_run_cycle_failure: false,
+      is_unrecognized: true,
+      event_type: "gone_board_dealt",
+    };
+    const { rows, rowIndexByMessage } = buildChatRows(entries, []);
+    const activity = rows.filter(row => row.kind === "entry");
+    expect(activity.map(row => row.isTurnStart)).toEqual([true, false, false]);
+    expect(activity.map(row => row.turn.index)).toEqual([0, 0, 0]);
+    expect(rowIndexByMessage.get(entries[1]!.message_id)).toBe(2);
+  });
+
+  it("gives an unrecognized event opening a round no turn, and lets the next agent start one", () => {
+    const entries = messages(2);
+    entries[0] = {
+      ...entries[0]!,
+      sender_agent_id: "",
+      is_run_cycle_failure: false,
+      is_unrecognized: true,
+    };
+    const activity = buildChatRows(entries, []).rows.filter(row => row.kind === "entry");
+    expect(activity.map(row => row.isTurnStart)).toEqual([false, true]);
+    expect(activity[1]!.turn.index).toBe(0);
   });
 
   it("keeps surviving entry keys stable after filters and live appends", () => {

@@ -35,6 +35,7 @@ from glossogen.models.event import (
     SimulationStarted,
     ToolCallInvoked,
     ToolResultReceived,
+    UnrecognizedEvent,
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
@@ -488,6 +489,32 @@ def test_a_scenarios_own_round_open_events_are_progress_not_play() -> None:
     )
 
     progress = classify_fork_progress(events=events, target_event_id="e-anchor")
+
+    assert progress is ForkProgress.ADVANCED
+
+
+def test_an_unrecognized_event_past_the_anchor_is_progress_like_the_event_it_was() -> None:
+    """A clone ends at the anchor, so a line past it was written by the fork itself.
+
+    Read back as unrecognized, because the scenario no longer declares its type,
+    it still counts as what the declared event would have: scenario progress.
+    """
+    events = _stamped(
+        events=[
+            RoundAdvanced(event_id="e-anchor", round_number=3, trigger="all_agents_idle"),
+            _registered(agent_id="first_agent"),
+        ]
+    )
+    unrecognized = UnrecognizedEvent.from_record(
+        record={
+            "event_id": "e-gone",
+            "event_type": "a_type_no_longer_declared",
+            "timestamp": events[-1].timestamp.isoformat(),
+        },
+        round_number=3,
+    )
+
+    progress = classify_fork_progress(events=[*events, unrecognized], target_event_id="e-anchor")
 
     assert progress is ForkProgress.ADVANCED
 

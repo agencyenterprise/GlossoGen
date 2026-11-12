@@ -3345,6 +3345,8 @@ export interface components {
             round_results: components["schemas"]["RoundResult"][];
             /** Round Injections */
             round_injections: components["schemas"]["RoundInjection"][];
+            /** Unrecognized Events */
+            unrecognized_events: components["schemas"]["UnrecognizedEventEntry"][];
             /** Scenario Extras */
             scenario_extras: (components["schemas"]["ContainerYardRunExtras"] | components["schemas"]["DriveModuleRepairRunExtras"] | components["schemas"]["MoveABoxRunExtras"] | components["schemas"]["OrbitalAnomalyRunExtras"] | components["schemas"]["SignalGameRunExtras"] | components["schemas"]["SpotTheDifferenceRunExtras"] | components["schemas"]["SpotTheIntersectionRunExtras"] | components["schemas"]["VeyruRunExtras"]) | null;
         };
@@ -4299,6 +4301,30 @@ export interface components {
             round_number: number;
             /** Result Round Number */
             result_round_number: number | null;
+        };
+        /**
+         * UnrecognizedEventEntry
+         * @description A logged event that neither the platform nor the run's loaded scenario declares.
+         *
+         *     One entry per ``UnrecognizedEvent`` the run's log read back as. ``payload`` is
+         *     the whole line as logged.
+         */
+        UnrecognizedEventEntry: {
+            /** Event Id */
+            event_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Round Number */
+            round_number: number;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Payload */
+            payload: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
         };
         /**
          * UpdateEvaluationResponse

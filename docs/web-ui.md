@@ -106,6 +106,11 @@ the group can open. See [analysis and dashboards](analysis.md).
 | 9 | The evaluation report's headline scores |
 | 10 | What the evaluation itself cost, and the judge model it ran under |
 
+A run can log events this server cannot parse: its scenario is not loaded here,
+or no longer declares that event type. "All activity" shows each one in the
+timeline where it was logged, as a muted entry naming its type, which opens to the
+line as it was logged.
+
 ## Live streaming
 
 Every `glossogen run` starts an embedded streaming server on an ephemeral port and

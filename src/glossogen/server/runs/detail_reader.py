@@ -31,6 +31,7 @@ from glossogen.models.event import (
     SimulationStarted,
     ToolCallInvoked,
     ToolResultReceived,
+    UnrecognizedEvent,
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.run_storage.derivation_manifest_reader import (
@@ -69,6 +70,7 @@ from glossogen.server.runs.models import (
     RoundResult,
     RunDetailResponse,
     ToolUseEntry,
+    UnrecognizedEventEntry,
 )
 from glossogen.server.runs.reasoning_entries import reasoning_entries_of
 from glossogen.server.runs.scenario_extension import scenario_extension
@@ -231,6 +233,7 @@ async def load_run_detail(
     round_endings: list[RoundEnding] = []
     round_results: list[RoundResult] = []
     round_injections: list[RoundInjection] = []
+    unrecognized_events: list[UnrecognizedEventEntry] = []
     # Postmortem injections share the InjectionDelivered event shape with
     # round-start injections; they always follow a PostmortemStarted for the
     # round and precede the next RoundAdvanced. Track the phase so the
@@ -471,6 +474,17 @@ async def load_run_detail(
                     )
                 )
 
+        elif isinstance(event, UnrecognizedEvent):
+            unrecognized_events.append(
+                UnrecognizedEventEntry(
+                    event_id=event.event_id,
+                    event_type=event.event_type,
+                    round_number=event.round_number,
+                    timestamp=event.timestamp,
+                    payload=event.payload,
+                )
+            )
+
         elif isinstance(event, SimulationEnded):
             status = event.reason
             total_cost_usd = event.total_cost_usd
@@ -568,6 +582,7 @@ async def load_run_detail(
         round_endings=round_endings,
         round_results=round_results,
         round_injections=round_injections,
+        unrecognized_events=unrecognized_events,
         scenario_extras=scenario_extras,
     )
 

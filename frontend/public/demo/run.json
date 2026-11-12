@@ -16536,6 +16536,7 @@
       "timestamp": "2026-06-04T20:05:17.217094Z"
     }
   ],
+  "unrecognized_events": [],
   "scenario_extras": {
     "scenario_name": "veyru",
     "cases": [

@@ -11,6 +11,7 @@ import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
 import { RunCycleFailureDisplay } from "./run-cycle-failure-display";
+import { UnrecognizedEventDisplay } from "./unrecognized-event-display";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -74,6 +75,30 @@ export const ChatEntryRow = memo(function ChatEntryRow({
   // Scenarios that rotate identity behind one agent_id still get their
   // distinct display name.
   const turnDisplayName = turn.displayName ?? agent?.role_name ?? turn.agentId;
+
+  if (entry.is_unrecognized) {
+    return (
+      <div className={cn("flex gap-2.5 px-4 py-1", isPreResume && "opacity-50")}>
+        <div className="w-7 shrink-0" />
+        <div
+          ref={el => {
+            if (el) {
+              messageRefs.current.set(entry.message_id, el);
+            } else {
+              messageRefs.current.delete(entry.message_id);
+            }
+          }}
+          className="ml-4 min-w-0 flex-1 pr-4"
+        >
+          <UnrecognizedEventDisplay
+            eventType={entry.event_type}
+            timestamp={entry.timestamp}
+            payload={entry.payload}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

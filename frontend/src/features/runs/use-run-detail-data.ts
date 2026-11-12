@@ -295,6 +295,7 @@ export function useRunDetailData({
       [...restReasoning, ...newReasoning],
       allToolUse,
       [...restRunCycleFailures, ...newFailures],
+      restData?.unrecognized_events ?? [],
       judgeMetadataByCallId,
       toolMetadataByCallId,
       notificationDisplaysByCallId(allToolUse, scenarioPlugin)
