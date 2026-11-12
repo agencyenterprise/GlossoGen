@@ -33,7 +33,8 @@ def _write(path: Path, lines: list[bytes]) -> Path:
     return path
 
 
-async def test_an_unrecognized_line_serializes_back_byte_for_byte(tmp_path: Path) -> None:
+async def test_a_line_the_logger_wrote_serializes_back_byte_for_byte(tmp_path: Path) -> None:
+    """The lines are in orjson's spelling, which is how the event logger writes every line."""
     log = _write(path=tmp_path / "gone_scenario.jsonl", lines=[START_LINE, *UNRECOGNIZED_LINES])
 
     _, *unrecognized = await load_events(log_path=log)
@@ -72,3 +73,18 @@ def test_a_line_without_the_fields_every_event_carries_does_not_validate(missing
 
     with pytest.raises(ValidationError):
         UnrecognizedEvent.from_record(record=record, round_number=0)
+
+
+async def test_a_line_spelled_otherwise_serializes_back_to_an_equal_object(tmp_path: Path) -> None:
+    """Only the decoded object is kept, so other whitespace and escapes come back respelled."""
+    line = (
+        b'{ "event_id": "e1", "timestamp": "2026-01-01T00:00:01+00:00",'
+        b' "event_type": "gone_round_scored", "score": 1e0, "text": "\\u0061" }'
+    )
+    log = _write(path=tmp_path / "gone_scenario.jsonl", lines=[START_LINE, line])
+
+    _, scored = await load_events(log_path=log)
+
+    assert isinstance(scored, UnrecognizedEvent)
+    assert scored.model_dump(mode="json") == orjson.loads(line)
+    assert list(scored.model_dump(mode="json")) == list(orjson.loads(line))

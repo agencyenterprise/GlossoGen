@@ -458,9 +458,12 @@ class UnrecognizedEvent(EventBase):
     A reader builds one for such a line instead of dropping it: the run's scenario
     may not be loaded in this process, or may no longer declare the type.
     ``payload`` is the whole line as it was logged, and serializing the event
-    gives back exactly that object. ``event_id`` and ``timestamp`` are read from
-    the line; ``round_number`` is the line's own, or the round a reader backfilled
-    for a legacy line that lacks it, which ``payload`` does not gain.
+    gives back an equal JSON object, keys in the same order. A line the event
+    logger wrote comes back byte for byte; one spelled otherwise (other
+    whitespace, escaped characters, ``1e0``) comes back in orjson's spelling.
+    ``event_id`` and ``timestamp`` are read from the line; ``round_number`` is
+    the line's own, or the round a reader backfilled for a legacy line that lacks
+    it, which ``payload`` does not gain.
 
     No parser dispatches to it and the event logger refuses it, so it is never
     emitted live.

@@ -54,7 +54,7 @@ the commit log.
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`
   (`glossogen.models.event`), which holds the line's `event_type` and the whole
-  line as `payload` and serializes back to it unchanged; `parse_event` does the
+  line as `payload` and serializes back to an equal object; `parse_event` does the
   same. The one warning per read now says how many were read that way. Code that
   iterates a run's events sees them where it saw nothing before. Run detail
   returns them as `unrecognized_events`, and the run page shows each in the "all
