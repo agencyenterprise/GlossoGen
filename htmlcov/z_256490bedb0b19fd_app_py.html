@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_256490bedb0b19fd_app_factory_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-12 09:29 +0000
+            created at 2026-11-12 12:36 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -95,21 +95,16 @@
     <p class="pln"><span class="n"><a id="t11" href="#t11">11</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">dotenv_loader</span> <span class="key">import</span> <span class="nam">load_env_from_working_directory</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t13" href="#t13">13</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">scenario_contract</span><span class="op">.</span><span class="nam">catalog</span> <span class="key">import</span> <span class="nam">load_built_in_scenario_catalog_unless_loaded</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t"><span class="nam">load_env_from_working_directory</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t"><span class="com"># The run-detail models build their scenario unions from the scenario catalog</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t"><span class="com"># when they are imported, so the catalog is loaded before anything from</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="com"># glossogen.server is imported.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">app_factory</span> <span class="key">import</span> <span class="nam">create_app</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">identity</span><span class="op">.</span><span class="nam">identity_provider_loader</span> <span class="key">import</span> <span class="nam">load_identity_provider</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">server_runtime_config</span> <span class="key">import</span> <span class="nam">load_server_runtime_config</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="nam">load_env_from_working_directory</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="nam">load_built_in_scenario_catalog_unless_loaded</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">app_factory</span> <span class="key">import</span> <span class="nam">create_app</span>  <span class="com"># noqa: E402</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">identity</span><span class="op">.</span><span class="nam">identity_provider_loader</span> <span class="key">import</span> <span class="nam">load_identity_provider</span>  <span class="com"># noqa: E402</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">server</span><span class="op">.</span><span class="nam">server_runtime_config</span> <span class="key">import</span> <span class="nam">load_server_runtime_config</span>  <span class="com"># noqa: E402</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t"><span class="nam">app</span> <span class="op">=</span> <span class="nam">create_app</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">    <span class="nam">identity_provider</span><span class="op">=</span><span class="nam">load_identity_provider</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t">    <span class="nam">runtime_config</span><span class="op">=</span><span class="nam">load_server_runtime_config</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t"><span class="nam">app</span> <span class="op">=</span> <span class="nam">create_app</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t">    <span class="nam">identity_provider</span><span class="op">=</span><span class="nam">load_identity_provider</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t">    <span class="nam">runtime_config</span><span class="op">=</span><span class="nam">load_server_runtime_config</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis mis2 show_mis"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -119,7 +114,7 @@
             <a class="nav" href="z_256490bedb0b19fd_app_factory_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.2">coverage.py v7.17.2</a>,
-            created at 2026-11-12 09:29 +0000
+            created at 2026-11-12 12:36 +0000
         </p>
     </div>
 </footer>
