@@ -50,6 +50,7 @@ from glossogen.cli.scenario_authoring_commands import (
 )
 from glossogen.cli.serve_command import add_serve_parser, handle_serve
 from glossogen.dotenv_loader import load_env_from_working_directory
+from glossogen.runners.pydantic_ai_banner import turn_off_pydantic_ai_banner
 from glossogen.scenario_contract.catalog import ScenarioCatalogError, ScenarioNotLoaded
 from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_contract.scenario_sources import load_configured_scenario_catalog
@@ -172,6 +173,7 @@ def main() -> None:
     """Parse the command line and dispatch to the subcommand it names."""
 
     load_env_from_working_directory()
+    turn_off_pydantic_ai_banner()
 
     log_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level_name, logging.INFO)

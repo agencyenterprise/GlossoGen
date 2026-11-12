@@ -1,11 +1,16 @@
 """The ``validate`` and ``new-scenario`` subcommands."""
 
 import argparse
+import importlib.util
 import json
+import logging
 import os
 import shlex
+import sys
+import tomllib
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
@@ -22,7 +27,13 @@ from glossogen.scenario_authoring.scenario_target import (
     resolve_check_targets,
 )
 from glossogen.scenario_contract.catalog import current_scenario_catalog
-from glossogen.scenario_contract.scenario_sources import SCENARIOS_ENV_VAR, find_project
+from glossogen.scenario_contract.scenario_sources import (
+    SCENARIOS_ENV_VAR,
+    ProjectLocation,
+    find_project,
+)
+
+logger = logging.getLogger(__name__)
 
 GLOSSOGEN_REPOSITORY = "git+https://github.com/agencyenterprise/GlossoGen.git"
 
@@ -171,20 +182,118 @@ def handle_new_scenario(args: argparse.Namespace) -> None:
             ):
                 print(line)
 
-    project_root = find_project(working_dir=working_dir).root
+    project = find_project(working_dir=working_dir)
     print()
-    print(f"Next, from {working_dir}:")
-    print("  1. Install glossogen, with its test extra, in this project's environment:")
-    print(f'       pip install "glossogen[testing] @ {GLOSSOGEN_REPOSITORY}@<tag>"')
-    print(f"     <tag> is a release tag; this glossogen is {metadata.version('glossogen')}.")
-    print(f"  2. Put your provider key in {project_root / '.env'}:")
-    print("       ANTHROPIC_API_KEY=...")
-    print(f"  3. glossogen validate {folder}")
-    print(
-        f"  4. glossogen run {args.scenario_name} --config knobs_default "
-        f"--model {SMOKE_RUN_MODEL} --provider anthropic --runs-dir ./runs round_count=1"
+    for line in next_step_lines(
+        scenario_name=args.scenario_name,
+        scenario_folder=folder,
+        test_file=_shown_path(path=written.test_path, working_dir=working_dir),
+        working_dir=working_dir,
+        project=project,
+        uses_uv=is_uv_project(project=project),
+        is_glossogen_checkout=is_glossogen_checkout(project=project),
+        environment_prefix=Path(sys.prefix),
+        has_pytest=importlib.util.find_spec("pytest") is not None,
+        glossogen_version=metadata.version("glossogen"),
+    ):
+        print(line)
+
+
+def is_uv_project(project: ProjectLocation) -> bool:
+    """Return whether the project is managed by uv: a ``uv.lock``, or a ``[tool.uv]`` table."""
+    if (project.root / "uv.lock").is_file():
+        return True
+    return "uv" in _read_pyproject(project=project).get("tool", {})
+
+
+def is_glossogen_checkout(project: ProjectLocation) -> bool:
+    """Return whether the project is glossogen itself, whose ``[project] name`` is ``glossogen``."""
+    return _read_pyproject(project=project).get("project", {}).get("name") == "glossogen"
+
+
+def _read_pyproject(project: ProjectLocation) -> dict[str, Any]:
+    """Return the project's parsed ``pyproject.toml``, or an empty table when it has none."""
+    if project.pyproject is None:
+        return {}
+    try:
+        return tomllib.loads(project.pyproject.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError:
+        logger.exception("Could not parse %s", project.pyproject)
+        return {}
+
+
+def next_step_lines(
+    scenario_name: str,
+    scenario_folder: str,
+    test_file: str,
+    working_dir: Path,
+    project: ProjectLocation,
+    uses_uv: bool,
+    is_glossogen_checkout: bool,
+    environment_prefix: Path,
+    has_pytest: bool,
+    glossogen_version: str,
+) -> list[str]:
+    """Return the printed next steps after ``new-scenario`` wrote a folder.
+
+    The install step is shown only when it applies: glossogen ran from an
+    environment outside the project (``environment_prefix`` is not under the
+    project root), or that environment lacks pytest, which the ``testing`` extra
+    brings. In a uv project the commands are spelled ``uv add`` and ``uv run``.
+    A glossogen checkout cannot depend on glossogen, so there the install step
+    is ``uv sync``, whose default development group brings pytest.
+    """
+    command_prefix = ""
+    if uses_uv:
+        command_prefix = "uv run "
+    requirement = f'"glossogen[testing] @ {GLOSSOGEN_REPOSITORY}@<tag>"'
+    install_command = f"pip install {requirement}"
+    if uses_uv:
+        install_command = f"uv add {requirement}"
+    tag_line = f"   <tag> is a release tag; this glossogen is {glossogen_version}."
+    if is_glossogen_checkout:
+        install_command = "uv sync"
+        tag_line = (
+            "   This is a glossogen checkout, so it installs its own development environment."
+        )
+    steps: list[list[str]] = []
+    outside_project = not environment_prefix.resolve().is_relative_to(project.root)
+    if outside_project:
+        steps.append(
+            [
+                f"This glossogen runs from {environment_prefix}, outside the project. "
+                "Install it, with its test extra, in the project's environment:",
+                f"     {install_command}",
+                tag_line,
+            ]
+        )
+    elif not has_pytest:
+        steps.append(
+            [
+                "Add glossogen's test extra, which brings pytest:",
+                f"     {install_command}",
+                tag_line,
+            ]
+        )
+    steps.append(
+        [
+            f"Put your provider key in {project.root / '.env'}:",
+            "     ANTHROPIC_API_KEY=...",
+        ]
     )
-    print(f"  5. pytest {_shown_path(path=written.test_path, working_dir=working_dir)}")
+    steps.append([f"{command_prefix}glossogen validate {scenario_folder}"])
+    steps.append(
+        [
+            f"{command_prefix}glossogen run {scenario_name} --config knobs_default "
+            f"--model {SMOKE_RUN_MODEL} --provider anthropic --runs-dir ./runs round_count=1"
+        ]
+    )
+    steps.append([f"{command_prefix}pytest {test_file}"])
+    lines = [f"Next, from {working_dir}:"]
+    for number, step in enumerate(steps, start=1):
+        lines.append(f"  {number}. {step[0]}")
+        lines.extend(f"  {continuation}" for continuation in step[1:])
+    return lines
 
 
 def _source_fix_lines(

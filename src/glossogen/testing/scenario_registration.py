@@ -8,11 +8,17 @@ source list that leaves the scenario out makes every command answer that the
 scenario is not loaded.
 """
 
+import os
+from collections.abc import Mapping
+from pathlib import Path
+
 from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import same_scenario_definition
 from glossogen.scenario_contract.scenario_sources import (
+    SCENARIOS_ENV_VAR,
+    find_project,
     load_configured_scenario_catalog_unless_loaded,
 )
 
@@ -33,6 +39,7 @@ def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> Non
         raise AssertionError(
             f"the configured scenario sources do not load {name!r}. Add the file or "
             "folder defining it to [tool.glossogen] scenarios in pyproject.toml."
+            f"{working_directory_hint(working_dir=Path.cwd(), environ=os.environ)}"
         )
     if not same_scenario_definition(first=resolved, second=scenario_cls):
         raise AssertionError(
@@ -51,4 +58,27 @@ def assert_scenario_is_loaded(scenario_name: str) -> None:
     """
     load_configured_scenario_catalog_unless_loaded()
     if find_scenario_class(name=scenario_name) is None:
-        raise AssertionError(current_scenario_catalog().not_loaded_message(name=scenario_name))
+        raise AssertionError(
+            current_scenario_catalog().not_loaded_message(name=scenario_name)
+            + working_directory_hint(working_dir=Path.cwd(), environ=os.environ)
+        )
+
+
+def working_directory_hint(working_dir: Path, environ: Mapping[str, str]) -> str:
+    """Return a hint for pytest started outside any project, or ``""`` otherwise.
+
+    With no ``pyproject.toml`` at or above ``working_dir`` and no
+    ``GLOSSOGEN_SCENARIOS``, the scan of the project directory covers
+    ``working_dir`` itself. Run from inside a scenario's
+    folder, that scan is the folder, which does not load the scenario the way
+    the project root does.
+    """
+    if SCENARIOS_ENV_VAR in environ:
+        return ""
+    if find_project(working_dir=working_dir).pyproject is not None:
+        return ""
+    return (
+        f"\nNo pyproject.toml is at or above {working_dir}, so the scan covered that "
+        "directory alone. Run pytest from the project root, or name the scenario's "
+        "folder in GLOSSOGEN_SCENARIOS or [tool.glossogen] scenarios."
+    )

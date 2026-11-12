@@ -71,19 +71,25 @@ module.
 No configuration is needed. With no scenario source configured, glossogen scans
 the project directory, so a folder at the root or a level down
 (`experiments/reactor_purge/`) is found. After writing, the command checks that
-the next command will load the new module. When it will not, such as a
+the next command will load the new module, counting the built-in scenarios
+package, so a folder written into `src/glossogen/scenarios/` of a glossogen
+checkout needs nothing configured. When it will not, such as a
 `[tool.glossogen] scenarios` list that leaves it out or a folder under `tests/`,
 it says so and names the setting to change. It never writes the configuration
 itself. [In this repo, or in your own package](#in-this-repo-or-in-your-own-package)
 covers the sources.
 
-It then prints the next steps for the new folder: installing glossogen, the
-key in `.env`, and the `validate`, `run` and `pytest` lines. Run pytest from the
-project root: the test looks the scenario up by name, the way `glossogen run`
-does. In a folder with no `pyproject.toml` above it, pytest run from inside the
-scenario's folder reports the scenario as not loaded. The `testing` extra
-installs `pytest-asyncio`, which runs the generated async tests with no
-configuration.
+It then prints the next steps for the new folder: the key in `.env`, and the
+`validate`, `run` and `pytest` lines, spelled `uv run ...` in a uv project (one
+with a `uv.lock` or a `[tool.uv]` table). An install step comes first only when
+it applies: when glossogen ran from an environment outside the project, or one
+without pytest, which the `testing` extra brings. In a glossogen checkout that
+step is `uv sync`, since the checkout cannot depend on glossogen. Run pytest from the project
+root: the test looks the scenario up by name, the way `glossogen run` does. In a
+folder with no `pyproject.toml` above it, pytest run from inside the scenario's
+folder reports the scenario as not loaded, and the failure says to run it from
+the project root. The generated tests are plain functions that drive the async
+harness with `asyncio.run`, so they need no pytest plugin and no configuration.
 
 The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those

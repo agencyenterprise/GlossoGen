@@ -117,3 +117,25 @@ async def test_a_swap_with_no_verdict_after_it_writes_no_measurement(
     )
 
     assert scored.report.measurements == []
+
+
+async def test_the_summary_names_the_rounds_played_after_the_swap(
+    swapped_run: MetricRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The swap is at the last round, so one round follows it, and the summary says so.
+
+    The summary once printed the manifest's stored window, which is one less than
+    the rounds played, and read `rounds_after_swap=0` beside one scored round.
+    """
+    scored = await score_metrics(
+        run=swapped_run,
+        metric_names=[METRIC],
+        judge_responses=[],
+        options=NO_OPTIONS,
+        report_path=tmp_path / "report.json",
+        monkeypatch=monkeypatch,
+    )
+
+    measurement = scored.measurement(metric_name=f"{METRIC}_round_{SWAP_ROUND}_{FIRST_AGENT_ID}")
+    assert f"post-resume rounds {SWAP_ROUND}-{SWAP_ROUND}." in measurement.summary
+    assert [o.round_number for o in measurement.per_round] == [SWAP_ROUND]

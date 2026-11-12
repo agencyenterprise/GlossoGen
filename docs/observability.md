@@ -51,16 +51,10 @@ called it, tagged by `agent_id` / `role_name` / `model` / `provider` /
 ## When tracing is on
 
 Only for `glossogen run`. The judge and probe calls in `glossogen evaluate` are
-not traced, though a run's own round judge is. With either key unset a run logs
+not traced, though a run's own round judge is. With either key unset or empty a run logs
 `Langfuse telemetry disabled` and runs untraced. With the stack down, or
-refusing the keys (empty values included), it logs one warning and runs
-untraced. Telemetry never
+refusing the keys, it logs one warning and runs untraced. Telemetry never
 blocks a simulation.
-
-Without Langfuse, a run's stdout log opens with a pydantic-ai banner reading
-`observability: off` and suggesting Logfire. That is pydantic-ai's own tracing
-product, separate from the stack here. `PYDANTIC_AI_NO_BANNER=1` in your `.env`
-hides it.
 
 The `make` targets above assume a checkout. Running the stack from an installed
 package takes one extra step, in

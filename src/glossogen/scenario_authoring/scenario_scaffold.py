@@ -146,15 +146,17 @@ class SourceReach(NamedTuple):
 
 
 def sources_reach(module_path: Path, sources: tuple[ScenarioSource, ...]) -> SourceReach:
-    """Import every configured source in ``sources`` and say whether one imports ``module_path``.
+    """Import every source in ``sources`` and say whether one imports ``module_path``.
 
     Asks the loader rather than predicting it, so every source kind and every
     rule a walk or an import applies counts the same way it will for the next
     command. Importing a source again re-reads its directory, so a module written
-    after the catalog loaded is found. The built-in sources are skipped.
+    after the catalog loaded is found. The built-in sources count too: a folder
+    written into the built-in scenarios package of a glossogen checkout is loaded
+    by them, with nothing configured.
     """
     resolved = module_path.resolve()
-    for source in configured_sources(sources=sources):
+    for source in sources:
         try:
             imported = source.import_scenario_modules()
         except ScenarioCatalogError as failure:

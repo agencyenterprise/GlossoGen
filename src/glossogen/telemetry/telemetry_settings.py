@@ -2,7 +2,8 @@
 
 Reads the Langfuse env vars once so the simulation run path can decide whether
 to initialize OpenTelemetry export. Telemetry is enabled only when both the
-public and secret keys are present.
+public and secret keys are set. A variable set to an empty or blank string
+counts as unset.
 """
 
 import os
@@ -26,7 +27,15 @@ class TelemetrySettings:
 def load_telemetry_settings() -> TelemetrySettings:
     """Read Langfuse env vars into a ``TelemetrySettings`` instance."""
     return TelemetrySettings(
-        public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
-        secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
-        host=os.environ.get("LANGFUSE_HOST"),
+        public_key=_set_value(name="LANGFUSE_PUBLIC_KEY"),
+        secret_key=_set_value(name="LANGFUSE_SECRET_KEY"),
+        host=_set_value(name="LANGFUSE_HOST"),
     )
+
+
+def _set_value(name: str) -> str | None:
+    """Return the variable's value, or None when it is unset, empty or blank."""
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return None
+    return value

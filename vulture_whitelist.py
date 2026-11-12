@@ -164,6 +164,7 @@ from_round  # unused variable (src/glossogen/run_storage/run_summary_models.py:1
 _.__signature__  # unused attribute (src/glossogen/runners/agent_tools.py:172)
 _.__annotations__  # unused attribute (src/glossogen/runners/agent_tools.py:173)
 _.before_tool_validate  # unused method (src/glossogen/runners/open_model_anti_corruption_layer.py:37)
+_.BANNER_ENABLED  # unused attribute (src/glossogen/runners/pydantic_ai_banner.py:14)
 health  # unused function (src/glossogen/runtime/simulation_server.py:59)
 stream_events  # unused function (src/glossogen/runtime/simulation_server.py:64)
 _.should_exit  # unused attribute (src/glossogen/runtime/simulation_server.py:164)

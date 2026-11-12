@@ -205,10 +205,11 @@ class DirectorySource(NamedTuple):
         walk = _ScanWalk(root=self.path, skipped_paths=self.skipped_paths)
         walk.visit_root()
         advice = _rename_advice(inside_project=self.inside_project, is_directory=True)
-        imported: list[Path] = []
+        newly_imported: list[Path] = []
         module_names: list[str] = []
         child_entries: list[str] = []
         for path in walk.found:
+            modules_before = set(sys.modules)
             if self.is_project_scan:
                 scanned_name = _import_scanned_file(
                     path=path, import_root=self.import_root, advice=advice, source=self
@@ -223,14 +224,17 @@ class DirectorySource(NamedTuple):
                 import_file(
                     path=path, module_name=module_name, import_root=self.import_root, source=self
                 )
-            imported.append(path)
+            if module_name not in modules_before:
+                newly_imported.append(path)
             module_names.append(module_name)
             child_entries.append(child_entry_for(path=path, module_name=module_name))
-        if imported:
+        # A catalog loaded again, as `validate <path>` does to add its source,
+        # imports the same files a second time; only a first import is news.
+        if newly_imported:
             logger.info(
                 "Registered scenarios from %s: %s",
                 self.describe(),
-                ", ".join(str(path) for path in imported),
+                ", ".join(str(path) for path in newly_imported),
             )
         child_import_roots: tuple[str, ...] = ()
         if module_names:

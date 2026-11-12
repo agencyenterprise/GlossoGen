@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 class ResumeAnchor(NamedTuple):
     """One swap boundary's resumed window plus its comparison baseline.
 
-    ``round_start`` and ``rounds_after_swap`` define the inclusive
-    resumed window ``[round_start, round_start + rounds_after_swap]``.
+    ``round_start`` and ``round_end`` are the first and last rounds of the
+    resumed window, both included. The manifests store the window as
+    ``rounds_after_swap = round_count - round_start``, one less than the rounds
+    played, so a reader of the anchor never sees that stored form.
     For manifest flows the baseline lives in a different run
     (``external_source_run_id`` / ``external_source_run_dir``); for
     in-run scheduled flows the baseline window is in the same run
@@ -44,7 +46,7 @@ class ResumeAnchor(NamedTuple):
     """
 
     round_start: int
-    rounds_after_swap: int
+    round_end: int
     flow_label: str
     external_source_run_id: str | None
     external_source_run_dir: str | None
@@ -69,7 +71,7 @@ def read_resume_anchors(events: list[SimulationEvent], run_dir: Path) -> list[Re
         return [
             ResumeAnchor(
                 round_start=replace.round_start,
-                rounds_after_swap=replace.rounds_after_swap,
+                round_end=replace.round_start + replace.rounds_after_swap,
                 flow_label="replace-agent",
                 external_source_run_id=replace.source_run_id,
                 external_source_run_dir=replace.source_run_dir,
@@ -82,7 +84,7 @@ def read_resume_anchors(events: list[SimulationEvent], run_dir: Path) -> list[Re
         return [
             ResumeAnchor(
                 round_start=cross_run.round_start,
-                rounds_after_swap=cross_run.rounds_after_swap,
+                round_end=cross_run.round_start + cross_run.rounds_after_swap,
                 flow_label="cross-run replace-agent",
                 external_source_run_id=cross_run.source_a_run_id,
                 external_source_run_dir=cross_run.source_a_run_dir,
@@ -110,8 +112,8 @@ def resolve_external_source_dir(source_run_dir: str) -> Path | None:
 
 
 def candidate_rounds(anchor: ResumeAnchor) -> set[int]:
-    """Inclusive ``[round_start, round_start + rounds_after_swap]`` round set."""
-    return set(range(anchor.round_start, anchor.round_start + anchor.rounds_after_swap + 1))
+    """Return the rounds of the resumed window, ``round_start`` to ``round_end`` included."""
+    return set(range(anchor.round_start, anchor.round_end + 1))
 
 
 def anchor_metric_name(base_name: str, anchor: ResumeAnchor) -> str:
@@ -151,7 +153,7 @@ def _collect_in_run_anchors(events: list[SimulationEvent]) -> list[ResumeAnchor]
             window_end = swap_rounds_sorted[next_index] - 1
         else:
             window_end = last_round
-        rounds_after_swap = max(0, window_end - swap.round_number)
+        round_end = max(swap.round_number, window_end)
 
         if index == 0:
             baseline_start = 1
@@ -167,7 +169,7 @@ def _collect_in_run_anchors(events: list[SimulationEvent]) -> list[ResumeAnchor]
         anchors.append(
             ResumeAnchor(
                 round_start=swap.round_number,
-                rounds_after_swap=rounds_after_swap,
+                round_end=round_end,
                 flow_label="in-run scheduled swap",
                 external_source_run_id=None,
                 external_source_run_dir=None,
