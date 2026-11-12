@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://agencyenterprise.github.io/GlossoGen/0.31/notebooks/">
       
       
-        <link rel="prev" href="../analysis/">
+        <link rel="prev" href="../reading-runs-from-code/">
       
       
         <link rel="next" href="../01_read_a_run/">
@@ -687,6 +687,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -700,10 +728,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" checked>
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -721,8 +749,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1297,12 +1325,14 @@
 
 <h1 id="example-notebooks">Example notebooks<a class="headerlink" href="#example-notebooks" title="Permanent link">&para;</a></h1>
 <p>Read the notebooks in order. The first three generate their own simulation with
-<code>glossogen.testing</code>; the fourth reads committed CSVs exported from a real cohort.
-None needs <strong>an API key or the network</strong>, so all four run in a fresh clone before
-you have credentials.</p>
+<code>glossogen.testing</code>. The fourth reads committed CSVs exported from a real cohort.
+None needs <strong>an API key or the network</strong>, so all four run in a fresh clone of
+the repository before you have credentials:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span>install-notebooks<span class="w">   </span><span class="c1"># jupyter, pandas, matplotlib, nbmake</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>jupyter<span class="w"> </span>lab<span class="w"> </span>notebooks/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>jupyter<span class="w"> </span>lab<span class="w"> </span>notebooks/
 </code></pre></div>
+<p><code>uv run</code> starts the Jupyter installed into the clone's environment, the one that
+can import glossogen. A <code>jupyter</code> already on your <code>PATH</code> would start without it.</p>
 <table>
 <thead>
 <tr>
@@ -1329,7 +1359,7 @@ you have credentials.</p>
 </tr>
 </tbody>
 </table>
-<p>The example CSVs under <code>data/</code> are real exports; <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/notebooks/data/README.md">data/README.md</a>
+<p>The example CSVs under <code>data/</code> are real exports. <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/notebooks/data/README.md">data/README.md</a>
 records the cohort and the commands that produced them.</p>
 
 
@@ -1366,7 +1396,7 @@ records the cohort and the commands that produced them.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../analysis/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Analysis and dashboards">
+          <a href="../reading-runs-from-code/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Reading runs from code">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1376,7 +1406,7 @@ records the cohort and the commands that produced them.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Analysis and dashboards
+                Reading runs from code
               </div>
             </div>
           </a>

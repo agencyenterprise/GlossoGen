@@ -687,6 +687,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -696,10 +724,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -717,8 +745,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1510,7 +1538,7 @@ the latest revision before the server accepts requests.</p>
 </tr>
 <tr>
 <td><code>GLOSSOGEN_SCENARIOS</code></td>
-<td>The image sets it empty, so the server loads the built-in scenarios and does not scan <code>/app</code>. Leave it empty, or list the modules of scenarios you want the server to load. See <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#scenario-sources">Scenario sources</a></td>
+<td>The image sets it empty, so the server loads the built-in scenarios and does not scan <code>/app</code>. Leave it empty, or list the modules of scenarios you want the server to load. The modules must be importable inside the image, which holds glossogen and nothing of your project, so install their package into the image. See <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/Architecture.md#scenario-sources">Scenario sources</a></td>
 </tr>
 <tr>
 <td><code>ENABLE_EVALUATIONS</code></td>

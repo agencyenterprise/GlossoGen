@@ -869,6 +869,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -878,10 +906,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -899,8 +927,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1616,10 +1644,11 @@ whose messages cost no budget. It is where teams refine their conventions
 between attempts. The <code>postmortem_enabled</code> knob turns the phase on or off per
 run. The postmortem ends when the agents go idle or its own time limit passes,
 and the clock opens the next round.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>runs
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>From a checkout, spell each command
 <code>VIRTUAL_ENV= uv run --no-sync python -m glossogen ...</code>.</p>
@@ -1888,15 +1917,14 @@ and resume runs, where a reconstructed history keeps growing, set
 <h2 id="agent-model-settings">Agent model settings<a class="headerlink" href="#agent-model-settings" title="Permanent link">&para;</a></h2>
 <p><code>agent_model_settings</code> is what every agent in a run sends with each request, unless
 its <a href="#per-agent-models"><code>model_overrides</code> entry</a> names its own <code>model_settings</code>. It
-works for every scenario, since it lives on the knobs all of them share, and no
-scenario reads it. Its settings are a subset of pydantic-ai's <code>ModelSettings</code>,
-under the same names and types, so pydantic-ai's documentation says what each one
-does and which providers honour it. More can be added as fields of
-<code>AgentModelSettings</code>. Every setting but <code>max_tokens</code> (default <code>16384</code>, reasoning
-tokens included) is unset by default, and an unset one sends nothing, leaving the
-provider's default in place. A scenario's own choices live in its presets, so a
-setting the run names wins over them like any other knob. A provider that refuses a value
-fails the call, and the run carries on with the error in its log.</p>
+is one of the knobs every scenario shares. Its settings are a subset of
+pydantic-ai's <code>ModelSettings</code>, under the same names and types, so pydantic-ai's
+documentation says what each one does and which providers honour it.</p>
+<p>Every setting but <code>max_tokens</code> (default <code>16384</code>, reasoning tokens included) is
+unset by default, and an unset one sends nothing, leaving the provider's default
+in place. A scenario's own choices live in its presets, so a setting the run
+names wins over them like any other knob. A provider that refuses a value fails
+the call, and the run carries on with the error in its log.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--provider<span class="w"> </span>openai<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
@@ -1906,14 +1934,13 @@ fails the call, and the run carries on with the error in its log.</p>
 A fork's <code>--knobs</code> replaces the source's object whole rather than merging into it,
 so name every setting the fork should keep. That includes the ones a scenario's
 presets set: signal_game's <code>parallel_tool_calls: false</code> is lost from a fork whose
-<code>--knobs</code> names <code>agent_model_settings</code> without it, and from a fork of a signal_game
-run recorded before the setting moved into the presets, since that run's config
-does not carry it.</p>
+<code>--knobs</code> names <code>agent_model_settings</code> without it.</p>
 <p><code>thinking</code> takes pydantic-ai's <code>ThinkingLevel</code>: <code>minimal</code>, <code>low</code>, <code>medium</code>,
 <code>high</code>, <code>xhigh</code> or <code>max</code>, or <code>true</code> (on, at the provider's default) and <code>false</code> (off).
 pydantic-ai turns the level into each provider's own parameter: OpenAI's
 <code>reasoning.effort</code>, and on Anthropic adaptive thinking with an <code>effort</code>, or a
-token budget on models without adaptive thinking. A level a provider never offers
+token budget on models without adaptive thinking.</p>
+<p>A level a provider never offers
 becomes the nearest one it has, and <code>false</code> to a model that cannot stop thinking,
 such as <code>claude-opus-5-5</code>, becomes the least thinking it accepts: adaptive thinking
 at <code>low</code> effort. A level the provider offers for some models only is sent as is:
@@ -1991,62 +2018,67 @@ a finished run with a different agent in one seat, see
 Give each provider its own queue: providers rate-limit independently, and a
 single queue mixing models stalls every slot of one provider while the spec at
 its head waits for a slot on the other.</p>
+<p>Save this as <code>sweep.sh</code> in your project, the directory holding <code>runs/</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="ch">#!/bin/bash</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="c1"># One queue per model, run in parallel. Each spec is &quot;&lt;source&gt; &lt;knobs&gt;&quot;.</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>--show-toplevel<span class="k">)</span><span class="s2">&quot;</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nv">LOG</span><span class="o">=</span>/tmp/sweep.log
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nv">CAP</span><span class="o">=</span><span class="m">6</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nb">declare</span><span class="w"> </span>-a<span class="w"> </span><span class="nv">GPT_SPECS</span><span class="o">=(</span><span class="s2">&quot;&lt;source_a&gt; &lt;knobs.json&gt;&quot;</span><span class="w"> </span><span class="s2">&quot;&lt;source_b&gt; &lt;knobs.json&gt;&quot;</span><span class="o">)</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nb">declare</span><span class="w"> </span>-a<span class="w"> </span><span class="nv">SONNET_SPECS</span><span class="o">=(</span><span class="s2">&quot;&lt;source_c&gt; &lt;knobs.json&gt;&quot;</span><span class="w"> </span><span class="s2">&quot;&lt;source_d&gt; &lt;knobs.json&gt;&quot;</span><span class="o">)</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>count_running_for_model<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span>pgrep<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;Python -m glossogen run veyru --model </span><span class="nv">$1</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39; &#39;</span>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="o">}</span>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>launch_one<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="nv">model</span><span class="o">=</span><span class="nv">$1</span><span class="w"> </span><span class="nv">provider</span><span class="o">=</span><span class="nv">$2</span><span class="w"> </span><span class="nv">source</span><span class="o">=</span><span class="nv">$3</span><span class="w"> </span><span class="nv">knobs</span><span class="o">=</span><span class="nv">$4</span>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="k">)</span><span class="s2"> [</span><span class="nv">$model</span><span class="s2">] launching source=</span><span class="nv">$source</span><span class="s2"> knobs=</span><span class="nv">$knobs</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">  </span><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span>--source-run-dir<span class="w"> </span><span class="s2">&quot;runs/veyru/</span><span class="nv">$source</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span>--after-round<span class="w"> </span><span class="m">14</span><span class="w"> </span>--rounds-after<span class="w"> </span><span class="m">11</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span>--replaced-agent-id<span class="w"> </span>field_observer<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span>--model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="w"> </span>--provider<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$provider</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span>--runs-dir<span class="w"> </span>runs<span class="w"> </span>--knobs<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$knobs</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
-<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">  </span>sleep<span class="w"> </span><span class="m">2</span><span class="w">  </span><span class="c1"># run directories are named by unix second</span>
-<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="o">}</span>
-<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>
-<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a>process_queue<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="nv">model</span><span class="o">=</span><span class="nv">$1</span><span class="w"> </span><span class="nv">provider</span><span class="o">=</span><span class="nv">$2</span><span class="p">;</span><span class="w"> </span><span class="nb">shift</span><span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span>spec<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">    </span><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span><span class="nb">source</span><span class="w"> </span>knobs<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$spec</span><span class="s2">&quot;</span>
-<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>count_running_for_model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>-ge<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CAP</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">30</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
-<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">    </span>launch_one<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$provider</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$source</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$knobs</span><span class="s2">&quot;</span>
-<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">  </span><span class="k">done</span>
-<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="k">)</span><span class="s2"> [</span><span class="nv">$model</span><span class="s2">] queue complete&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span>
-<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="o">}</span>
-<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a>
-<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a>process_queue<span class="w"> </span>gpt-5.4<span class="w"> </span>openai<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">GPT_SPECS</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
-<a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a>process_queue<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>anthropic<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SONNET_SPECS</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
-<a id="__codelineno-11-38" name="__codelineno-11-38" href="#__codelineno-11-38"></a><span class="nb">wait</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nv">LOG</span><span class="o">=</span>sweep.log
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nv">CAP</span><span class="o">=</span><span class="m">6</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nb">declare</span><span class="w"> </span>-a<span class="w"> </span><span class="nv">GPT_SPECS</span><span class="o">=(</span><span class="s2">&quot;&lt;source_a&gt; &lt;knobs.json&gt;&quot;</span><span class="w"> </span><span class="s2">&quot;&lt;source_b&gt; &lt;knobs.json&gt;&quot;</span><span class="o">)</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nb">declare</span><span class="w"> </span>-a<span class="w"> </span><span class="nv">SONNET_SPECS</span><span class="o">=(</span><span class="s2">&quot;&lt;source_c&gt; &lt;knobs.json&gt;&quot;</span><span class="w"> </span><span class="s2">&quot;&lt;source_d&gt; &lt;knobs.json&gt;&quot;</span><span class="o">)</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>count_running_for_model<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span>pgrep<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;/(glossogen|[Pp]ython[0-9.]* -m glossogen) run veyru --model </span><span class="nv">$1</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39; &#39;</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="o">}</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>launch_one<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="nv">model</span><span class="o">=</span><span class="nv">$1</span><span class="w"> </span><span class="nv">provider</span><span class="o">=</span><span class="nv">$2</span><span class="w"> </span><span class="nv">source</span><span class="o">=</span><span class="nv">$3</span><span class="w"> </span><span class="nv">knobs</span><span class="o">=</span><span class="nv">$4</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="k">)</span><span class="s2"> [</span><span class="nv">$model</span><span class="s2">] launching source=</span><span class="nv">$source</span><span class="s2"> knobs=</span><span class="nv">$knobs</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">  </span>glossogen<span class="w"> </span>replace-agent<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span>--source-run-dir<span class="w"> </span><span class="s2">&quot;runs/veyru/</span><span class="nv">$source</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span>--after-round<span class="w"> </span><span class="m">14</span><span class="w"> </span>--rounds-after<span class="w"> </span><span class="m">11</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span>--replaced-agent-id<span class="w"> </span>field_observer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span>--model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="w"> </span>--provider<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$provider</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span>--runs-dir<span class="w"> </span>runs<span class="w"> </span>--knobs<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$knobs</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="o">}</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>process_queue<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="nv">model</span><span class="o">=</span><span class="nv">$1</span><span class="w"> </span><span class="nv">provider</span><span class="o">=</span><span class="nv">$2</span><span class="p">;</span><span class="w"> </span><span class="nb">shift</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span>spec<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">    </span><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span><span class="nb">source</span><span class="w"> </span>knobs<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$spec</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>count_running_for_model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>-ge<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CAP</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">30</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">    </span>launch_one<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$provider</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$source</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$knobs</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">  </span><span class="k">done</span>
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="k">)</span><span class="s2"> [</span><span class="nv">$model</span><span class="s2">] queue complete&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LOG</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="o">}</span>
+<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a>
+<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a>process_queue<span class="w"> </span>gpt-5.4<span class="w"> </span>openai<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">GPT_SPECS</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a>process_queue<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>anthropic<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SONNET_SPECS</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a><span class="nb">wait</span>
 </code></pre></div>
-<p>Start it detached so it outlives your terminal, then watch the log and the live
-simulations:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>nohup<span class="w"> </span>bash<span class="w"> </span>/tmp/sweep.sh<span class="w"> </span>&gt;<span class="w"> </span>/tmp/sweep.stdout<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>tail<span class="w"> </span>-20<span class="w"> </span>/tmp/sweep.log
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>pgrep<span class="w"> </span>-af<span class="w"> </span><span class="s2">&quot;Python -m glossogen run veyru .* --resume&quot;</span>
+<p>Start it detached, from the environment where <code>glossogen</code> is on your <code>PATH</code>, so
+it outlives your terminal. Then watch the log and count the live simulations:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>nohup<span class="w"> </span>bash<span class="w"> </span>sweep.sh<span class="w"> </span>&gt;<span class="w"> </span>sweep.stdout<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>tail<span class="w"> </span>-20<span class="w"> </span>sweep.log
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>pgrep<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;/(glossogen|[Pp]ython[0-9.]* -m glossogen) run veyru&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
 </code></pre></div>
 <p>Each <code>replace-agent</code>, <code>cross-run-replace-agent</code> and <code>fork-at-round</code> call prepares
 its run directory, spawns the simulation detached, prints <code>new_run_id=</code> and
 returns. The simulation writes its own <code>&lt;scenario&gt;_stdout.log</code> in the new
 directory. A fresh <code>glossogen run</code> does not detach, so a queue of them launches
 each with <code>&amp;</code>.</p>
-<p><strong>Anchor the <code>pgrep</code> pattern on the interpreter's process name.</strong> Homebrew's
-Python on macOS runs as <code>Python</code>, capitalised, so <code>Python -m glossogen run</code>
-matches simulations only. A loose pattern such as <code>glossogen run veyru</code> also
-matches any shell whose command line quotes it, the counting shell included.
-Keep the count in a function rather than inlined into a wrapping command for the
-same reason.</p>
+<p><strong>Anchor the <code>pgrep</code> pattern on a path.</strong> A simulation shows in the process
+list in one of two forms. A fork's, or one started with <code>python -m glossogen</code>,
+is <code>&lt;interpreter&gt; -m glossogen run ...</code>, where the interpreter is a full path
+ending in <code>python</code>, <code>python3.14</code>, or <code>Python</code> on Homebrew's macOS build. One
+started as <code>glossogen run ...</code> is <code>&lt;interpreter&gt; .../bin/glossogen run ...</code>. The
+pattern <code>/(glossogen|[Pp]ython[0-9.]* -m glossogen) run</code> matches both by the <code>/</code>
+before them. It does not match a <code>uv run python -m glossogen ...</code> wrapper, whose
+<code>python</code> follows a space, so a run started through <code>uv run</code> is counted once. It
+does not match the counting shell either, whose command line holds the pattern
+itself rather than text it matches. A looser pattern such as <code>glossogen run veyru</code>
+matches both of those. Keep the count in a function rather than inlined into a
+wrapping command, so no other command line quotes the pattern.</p>
 <p><strong>Override a knob together with the knobs its validators check against it.</strong> A
 config that fails validation exits before claiming a run directory, so a
 launcher that polls for new directories loses the spec without an error. The
@@ -2099,8 +2131,8 @@ far, so cost grows faster than the round count alone suggests.</p>
 </table>
 <p>What a run itself spent is on its last event: <code>simulation_ended</code> carries
 <code>total_cost_usd</code>, its agents' spend plus its round judge's, priced from the
-<a href="https://github.com/pydantic/genai-prices">genai-prices</a> catalog (see
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/model_catalog/token_pricing.py">token_pricing.py</a>). Each agent cycle is priced
+<a href="https://github.com/pydantic/genai-prices">genai-prices</a> catalog by the token
+pricing in <code>model_catalog/</code>. Each agent cycle is priced
 at the rates in effect when it ended, and the judge's calls at the rates in effect
 when the run ended. A model that catalog does not know is not costed. The web UI
 reads it, and so does <code>grep</code>:</p>

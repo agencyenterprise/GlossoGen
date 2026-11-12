@@ -814,6 +814,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -823,10 +851,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -844,8 +872,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1501,8 +1529,10 @@ both:</p>
 </code></pre></div>
 <p>Open <a href="http://localhost:3000">http://localhost:3000</a> once it is up. <code>--ui-port</code> starts the UI from the
 published frontend container, so it needs Docker. Omit it to run the backend
-alone. The server runs in your own environment, so scenarios and metrics
-installed from other packages appear in the UI.</p>
+alone. The server runs in your own environment and loads the same scenario sources a
+command would (<code>--scenarios</code>, <code>GLOSSOGEN_SCENARIOS</code>, <code>pyproject.toml</code>, or a scan
+of the project), so your own scenarios appear in the UI. Start it from your
+project directory.</p>
 <p>The flag runs the latest published UI, wires <code>API_URL</code> to the server it just
 started, and adds the UI's origin to CORS. <code>--ui-image</code> pins an older UI, which
 an older server needs, since a current UI calls endpoints it may not serve. It
@@ -1671,7 +1701,7 @@ the group can open. See <a href="../analysis/">analysis and dashboards</a>.</p>
 <p>A run can log events this server cannot parse: its scenario is not loaded here,
 or no longer declares that event type. "All activity" shows each one in the
 timeline where it was logged, as a muted entry naming its type, which opens to the
-line as it was logged.</p>
+line's decoded JSON.</p>
 <h2 id="live-streaming">Live streaming<a class="headerlink" href="#live-streaming" title="Permanent link">&para;</a></h2>
 <p>Every <code>glossogen run</code> starts an embedded streaming server on an ephemeral port and
 writes a <code>stream.json</code> discovery file into the run directory. When the web server
@@ -1713,8 +1743,6 @@ backfilled at server startup. After that a direct file write reaches the mirror
 only when the server next reads the file (the run appearing on a listed page,
 its detail opening, or an export the run matches). Until then a label-filtered
 view can miss the run. Labels applied through the API are visible immediately.</p>
-<p><code>glossogen evaluate</code> no longer writes <code>labels.json</code>, so <code>eval:*</code> labels exist
-only on runs evaluated before that changed.</p>
 <h3 id="describing-a-label">Describing a label<a class="headerlink" href="#describing-a-label" title="Permanent link">&para;</a></h3>
 <p>A group keeps a glossary of what each label means, keyed on the exact label
 string, so a description covers every run carrying that label. The UI shows it

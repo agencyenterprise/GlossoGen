@@ -787,6 +787,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -796,10 +824,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -817,8 +845,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1449,8 +1477,8 @@
 <a href="https://arxiv.org/abs/2609.01491">Paper</a> ·
 <a href="https://emergentcomms.ai/demo">Live demo</a></p>
 <p>A platform for running controlled experiments on teams of LLM agents. A scenario
-puts several agents in a simulated task with their own roles, channels and tools;
-the platform plays it out in rounds, records every message, tool call and model
+puts several agents in a simulated task with their own roles, channels and tools.
+The platform plays it out in rounds, records every message, tool call and model
 response, and scores the run with the metrics you pick. The scenarios shipped
 here study communication under pressure: no agent holds enough information to
 succeed alone, and in most of them every character sent costs against a
@@ -1479,22 +1507,28 @@ the repository;
 <a href="installation/#working-on-glossogen-itself">Installation</a> covers it.</p>
 <p>glossogen needs Python 3.14 and is not on PyPI, so pin a tag from
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, with pip:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>init<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.14<span class="w"> </span>my-study<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>my-study<span class="w">    </span><span class="c1"># skip in an existing 3.14 project</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># or, with pip, into an active Python 3.14 environment:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
 </code></pre></div>
-<p>That brings the <code>glossogen</code> command. Create a <code>.env</code> in the project that
-installed it, holding an API key for each provider you run on. Commands read the
+<p>That installs the <code>glossogen</code> command into the project's <code>.venv</code>. Activate it
+with <code>source .venv/bin/activate</code>, or put <code>uv run</code> in front of each command.
+Create a <code>.env</code> in the project that installed it, holding an API key for each provider you run on. Commands read the
 nearest <code>.env</code> at or above the directory they run in. The examples below run
 Anthropic models, so they need <code>ANTHROPIC_API_KEY</code>. Another provider works the
 same way, with its key set and its model passed instead, as in
-<code>--model gpt-5.4 --provider openai</code>.
+<code>--model gpt-5.4 --provider openai</code>.</p>
+<p>The shipped presets judge their rounds
+with an Anthropic model, so they also need <code>ANTHROPIC_API_KEY</code> unless you
+override <code>judge_model</code> and <code>judge_provider</code>
+(<a href="installation/#configure-environment">Configure environment</a>).
 <a href="running-simulations/">Running simulations</a> covers the providers,
 mixed-provider teams and self-hosted endpoints.</p>
-<p>A scenario in your own project registers itself with <code>@scenario</code>, and glossogen
-loads it from the folder <code>[tool.glossogen] scenarios</code> in your <code>pyproject.toml</code>
-names, or finds it by scanning your project, with no change to the glossogen
-repository. A scenario's own metrics come with it.
+<p>A scenario in your own project registers itself with <code>@scenario</code>. glossogen
+finds it by scanning your project, or loads it from the sources
+<code>[tool.glossogen] scenarios</code> in your <code>pyproject.toml</code> names, with no change to
+the glossogen repository. A scenario's own metrics come with it.
 <a href="installation/#as-a-dependency">As a dependency</a> has the <code>.env</code> layout, the
 optional extras, and where to go from there.</p>
 <h2 id="run-a-simulation">Run a simulation<a class="headerlink" href="#run-a-simulation" title="Permanent link">&para;</a></h2>
@@ -1502,10 +1536,11 @@ optional extras, and where to go from there.</p>
 LLM, work the task on their own over the scenario's channels and tools. The game
 clock cuts a run into rounds, and each round opens with the scenario briefing
 each agent.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>runs
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>glossogen<span class="w"> </span>run<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--model<span class="w"> </span>claude-sonnet-4-6<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/veyru_stdout.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>From a checkout, the same command is spelled
 <code>VIRTUAL_ENV= uv run --no-sync python -m glossogen run ...</code>, here and below.</p>
@@ -1526,7 +1561,7 @@ whether rounds succeeded, how many characters the agents spent per round, and
 whether they invented shorthand. Some metrics are deterministic algorithms,
 others put an LLM judge to work.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/1742234567<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,shorthand_codes<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
 </code></pre></div>

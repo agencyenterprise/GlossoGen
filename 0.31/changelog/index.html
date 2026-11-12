@@ -685,6 +685,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -694,10 +722,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -715,8 +743,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1993,7 +2021,9 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<p>Notable changes per release. Versions follow the <code>vX.Y.Z</code> tags on <code>main</code>.</p>
+<p>Notable changes per release. Versions follow the <code>vX.Y.Z</code> tags on <code>main</code>.
+Everything since <code>v0.5.0</code> is listed under Unreleased: releases are cut from labelled
+pull requests, and nothing in the release workflow moves entries out of that section.</p>
 <p>Releases <code>v0.1.4</code> through <code>v0.2.7</code> are not itemized here: the file went unwritten
 while they were cut. Their contents are in
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a> and in
@@ -2025,7 +2055,7 @@ the commit log.</p>
 <li>Each run is parsed with the platform's events plus the events its own
   scenario returns from <code>event_types()</code>. The event logger raises
   <code>UndeclaredEventType</code> for an event class the running scenario does not return,
-  and a reader skips such lines with a warning. Two scenarios may use the same
+  and a reader keeps such a line as an <code>UnrecognizedEvent</code> (see below). Two scenarios may use the same
   <code>event_type</code>. <code>parse_event</code> and <code>parse_event_bytes</code>
   (<code>glossogen.run_storage.event_parsing</code>) take the run's <code>scenario_name</code>;
   reading a run before the catalog has loaded raises <code>ScenarioCatalogNotLoaded</code>,
@@ -2033,9 +2063,11 @@ the commit log.</p>
   <code>EventLogger</code> takes <code>allowed_event_types</code>
   (<code>glossogen.scenario_contract.event_types.loggable_event_types</code>).</li>
 <li><code>glossogen validate &lt;path&gt;</code> takes a <code>.py</code> file or a folder and checks every
-  scenario it registers. <code>glossogen new-scenario</code> writes a project with the
-  scenario in <code>scenarios/&lt;name&gt;.py</code> and <code>[tool.glossogen] scenarios =
-  ["scenarios"]</code>.</li>
+  scenario it registers.</li>
+<li>A docs page, <a href="../reading-runs-from-code/">Reading runs from your own code</a>,
+  covers loading a scenario catalog in a script and what a read returns for an
+  <code>UnrecognizedEvent</code>. <a href="../creating-a-scenario/">Creating a scenario</a> lists
+  everything the default scan skips.</li>
 <li><code>move_a_box</code> knobs <code>virtual_list_cost_fixed</code> and <code>virtual_list_cost_s</code>: on the
   virtual clock, each <code>act</code> list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
@@ -2172,11 +2204,13 @@ the commit log.</p>
   <code>runner_factory</code>, a <code>glossogen.runtime.agent_tool_specs.ToolDefinitionLister</code>:
   <code>glossogen.runners.agent_tools.list_tool_definitions</code> for the pydantic-ai runner.</p>
 <ul>
-<li><strong>A run's events of a type no loaded scenario declares are kept, not skipped.</strong>
-  <code>load_events</code> returns each as an <code>UnrecognizedEvent</code>
-  (<code>glossogen.models.event</code>), which holds the line's <code>event_type</code> and the whole
-  line as <code>payload</code> and serializes back to an equal object; <code>parse_event</code> does the
-  same. The one warning per read now says how many were read that way. Code that
+<li><strong>A run's events of a type neither the platform nor the run's scenario declares
+  are kept, not skipped.</strong> <code>load_events</code> returns each as an <code>UnrecognizedEvent</code>
+  (<code>glossogen.models.event</code>), which holds the line's <code>event_type</code> and its decoded JSON
+  object as <code>payload</code> and serializes back to an equal object; <code>parse_event</code> does the
+  same. The one warning per read now says how many were read that way. A line of
+  such a type with no <code>event_id</code> or <code>timestamp</code> cannot be kept and is skipped,
+  counted in that warning. Code that
   iterates a run's events sees them where it saw nothing before. Run detail
   returns them as <code>unrecognized_events</code>, and the run page shows each in the "all
   activity" timeline where it was logged, with the line as JSON on demand. The event logger refuses an
@@ -2204,6 +2238,7 @@ the commit log.</p>
 <li>Loading a scenario catalog fails when two scenarios read their prompts and
   presets from the same directory (<code>scenario_package_files()</code>), naming both
   scenarios, their modules and the directory; <code>validate &lt;path&gt;</code> reports the same.
+  The default project scan logs and leaves out such a scenario's module instead.
   Two scenarios in one folder would list each other's presets and share prompt
   templates with the same file name. Give each scenario a folder of its own.</li>
 <li><code>POST /runs/{scenario}/{run}/evaluate</code> on a run whose scenario the server has
@@ -2255,7 +2290,9 @@ the commit log.</p>
   - <code>glossogen.primary_channel_resolution</code> → <code>glossogen.scenario_contract.primary_channel_resolution</code></p>
 <p>A metric annotating <code>compute</code> with <code>ScenarioBase</code> imports it from
   <code>glossogen.scenario_contract.scenario_base</code>. A metric still importing an old
-  path fails to import, and evaluation logs it and skips it.
+  path fails to import. In a configured source that stops the command with
+  <code>Could not load scenarios: ... failed to import</code>; the default project scan
+  logs it and leaves the file out.
 - <code>glossogen.cli</code> no longer re-exports <code>main</code>, so importing a <code>glossogen.cli.&lt;module&gt;</code>
   does not load every subcommand. The console script's entry point is now
   <code>glossogen.cli.cli_entry:main</code>, and <code>from glossogen.cli import main</code> becomes
@@ -2450,6 +2487,28 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>glossogen new-scenario</code> counts the built-in scenarios package when it checks
+  that the new folder is loaded, so <code>--target-dir src/glossogen/scenarios</code> in a
+  checkout no longer asks for a <code>[tool.glossogen] scenarios</code> entry. Its next
+  steps drop the install step unless glossogen ran from outside the project or
+  without pytest, and use <code>uv add</code> / <code>uv run</code> in a uv project.</li>
+<li>The test <code>new-scenario</code> writes is plain functions calling the harness with
+  <code>asyncio.run</code>, with no <code>@pytest.mark.asyncio</code>. A test written by an earlier
+  version keeps working.</li>
+<li><code>assert_scenario_is_loaded</code> and <code>assert_scenario_is_registered</code>, run with no
+  <code>pyproject.toml</code> at or above the working directory, say to run pytest from the
+  project root.</li>
+<li><code>glossogen validate &lt;path&gt;</code> logs each scanned file's "Registered scenarios"
+  line once.</li>
+<li><code>round_success_after_resume</code> names the rounds it scored, <code>post-resume rounds
+  3-3</code>, where it printed the manifest's stored window, <code>rounds_after_swap=0</code>,
+  one less than the rounds played. Scores were right; only the summary and a
+  skip log line changed.</li>
+<li>glossogen's commands turn off pydantic-ai's first-run "observability: off"
+  banner, which read as a statement about Langfuse tracing.</li>
+<li>An empty or blank <code>LANGFUSE_PUBLIC_KEY</code>, <code>LANGFUSE_SECRET_KEY</code> or
+  <code>LANGFUSE_HOST</code> counts as unset, so blanking the keys disables tracing instead
+  of logging a Langfuse authentication warning on every run.</li>
 <li><code>glossogen new-scenario</code> refuses a name that is already an importable module
   (<code>signal</code>, <code>secrets</code>, an installed package, <code>glossogen</code>), before writing
   anything. Such a folder hid that module and stopped every later command.</li>

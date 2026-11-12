@@ -687,6 +687,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -696,10 +724,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -717,8 +745,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1982,11 +2010,18 @@ the order you meet them when editing a generated scenario into your own.</p>
 class; a frontend plug-in is registered in the frontend.</p>
 <h2 id="start-from-the-generator">Start from the generator<a class="headerlink" href="#start-from-the-generator" title="Permanent link">&para;</a></h2>
 <p>Generate a scenario rather than assembling one. From your project's root, with
-glossogen installed in its environment:</p>
+<code>glossogen[testing]</code> installed in its environment (see
+<a href="../installation/#as-a-dependency">Installation</a>; the extra brings pytest). In a
+uv project, prefix each command with <code>uv run</code>, or activate <code>.venv</code> first:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>reactor_purge
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>./reactor_purge
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pytest<span class="w"> </span>./reactor_purge/test_reactor_purge.py
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>glossogen<span class="w"> </span>run<span class="w"> </span>reactor_purge<span class="w"> </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="nv">round_count</span><span class="o">=</span><span class="m">1</span>
 </code></pre></div>
+<p>The run needs <code>ANTHROPIC_API_KEY</code> in a <code>.env</code> at the project root (see
+<a href="../installation/#configure-environment">Configure environment</a>). The other
+three commands need no key.</p>
 <p><code>new-scenario</code> writes one folder, <code>&lt;target-dir&gt;/&lt;name&gt;/</code>, and nothing else in
 the project. <code>--target-dir</code> defaults to the working directory. The folder:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>reactor_purge/
@@ -2002,27 +2037,33 @@ the project. <code>--target-dir</code> defaults to the working directory. The fo
 <code>validate</code> passes, the test passes, and <code>glossogen run</code> completes. Editing one
 thing at a time and watching what breaks is a faster way through this contract
 than writing it from scratch.</p>
-<p>The command refuses a destination folder that already exists, and a name a
-loaded scenario holds. Run it again with another name to add a second scenario:
-each one gets a folder of its own, because a scenario reads its prompts and
-presets from the folder holding its module (see
-<a href="#in-this-repo-or-in-your-own-package">In this repo, or in your own package</a>).</p>
+<p>The command refuses a folder that already exists, a name a loaded scenario
+holds, and a name Python can already import, such as the standard library's
+<code>signal</code> or <code>secrets</code>. It says why before writing anything. Run it again with
+another name to add a second scenario. Each one gets a folder of its own,
+because a scenario reads its prompts and presets from the folder holding its
+module.</p>
 <p>No configuration is needed. With no scenario source configured, glossogen scans
 the project directory, so a folder at the root or a level down
-(<code>experiments/reactor_purge/</code>) is found. After writing, the command imports the
-sources the working directory configures, the way the next command will, and
-checks that they load the new module. When they do not, such as a
+(<code>experiments/reactor_purge/</code>) is found. After writing, the command checks that
+the next command will load the new module, counting the built-in scenarios
+package, so a folder written into <code>src/glossogen/scenarios/</code> of a glossogen
+checkout needs nothing configured. When it will not, such as a
 <code>[tool.glossogen] scenarios</code> list that leaves it out or a folder under <code>tests/</code>,
-it says so and names the fix where those sources come from: <code>--scenarios</code>,
-<code>GLOSSOGEN_SCENARIOS</code>, or <code>[tool.glossogen] scenarios</code>, with a line for pytest
-where it needs one. It never writes the configuration itself.</p>
-<p>After writing, it prints the next steps: install glossogen in the project's
-environment, put <code>ANTHROPIC_API_KEY</code> in a <code>.env</code> at the project root, then the
-<code>validate</code>, <code>glossogen run</code> and <code>pytest</code> lines for the new folder. The generated
-test needs no pytest configuration: its async tests are marked
-<code>@pytest.mark.asyncio</code>, which the <code>testing</code> extra's <code>pytest-asyncio</code> runs. Run
-pytest from the project root; the test looks the scenario up by name, the way
-<code>glossogen run</code> does.</p>
+it says so and names the setting to change. It never writes the configuration
+itself. <a href="#in-this-repo-or-in-your-own-package">In this repo, or in your own package</a>
+covers the sources.</p>
+<p>It then prints the next steps for the new folder: the key in <code>.env</code>, and the
+<code>validate</code>, <code>run</code> and <code>pytest</code> lines, spelled <code>uv run ...</code> in a uv project (one
+with a <code>uv.lock</code> or a <code>[tool.uv]</code> table). An install step comes first only when
+it applies: when glossogen ran from an environment outside the project, or one
+without pytest, which the <code>testing</code> extra brings. In a glossogen checkout that
+step is <code>uv sync</code>, since the checkout cannot depend on glossogen. Run pytest from the project
+root: the test looks the scenario up by name, the way <code>glossogen run</code> does. In a
+folder with no <code>pyproject.toml</code> above it, pytest run from inside the scenario's
+folder reports the scenario as not loaded, and the failure says to run it from
+the project root. The generated tests are plain functions that drive the async
+harness with <code>asyncio.run</code>, so they need no pytest plugin and no configuration.</p>
 <p>The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those
 files; in a project of your own, split them whenever the module grows.</p>
@@ -2136,9 +2177,9 @@ every one of them (see <a href="#in-this-repo-or-in-your-own-package">In this re
 A run is read back with the platform's events plus the ones its scenario returns
 there, and nothing else. The event logger raises when the scenario logs a class
 it does not return, so a forgotten one fails the first test run rather than
-vanishing from every later read. <code>validate</code> reports an event class defined in
-your package that <code>event_types()</code> leaves out. You never edit
-<code>glossogen/models/event.py</code>.</p>
+reading back as an <code>UnrecognizedEvent</code>. <code>validate</code> reports an event class defined in
+your package that <code>event_types()</code> leaves out. You never edit the platform's
+events.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventBase</span>
@@ -2152,10 +2193,9 @@ your package that <code>event_types()</code> leaves out. You never edit
 <h3 id="team_declarationpy"><code>team_declaration.py</code><a class="headerlink" href="#team_declarationpy" title="Permanent link">&para;</a></h3>
 <p>Export one function taking your knobs and returning <code>tuple[TeamSpec, ...]</code>, one
 entry per isolated group of agents. The engine meters, judges and reports each
-team independently.
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/team_declaration.py"><code>team_declaration.py</code></a> defines the
-types. <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/team_structure.py"><code>team_structure.py</code></a> turns
-them into what the platform asks for.</p>
+team independently. The types (<code>TeamSpec</code>, <code>RoleSpec</code>, <code>TaskChannel</code>,
+<code>Debrief</code>) come from <code>glossogen.engine.team_declaration</code>, and
+<code>glossogen.engine.team_structure</code> turns them into what the platform asks for.</p>
 <table>
 <thead>
 <tr>
@@ -2203,10 +2243,9 @@ has no <code>team_declaration.py</code>: its two opponents share one channel wit
 budget, which is not a team in any useful sense, so it builds its agents
 directly in <code>scenario.py</code>. Every other shipped scenario declares.</p>
 <h3 id="worldpy"><code>world.py</code><a class="headerlink" href="#worldpy" title="Permanent link">&para;</a></h3>
-<p>Subclass <code>RoundWorld</code>
-(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/round_world.py">round_world.py</a>) when the scenario
-meters a per-round budget, which almost all do. Plain <code>ScenarioWorld</code>
-(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/scenario_world.py">scenario_world.py</a>) only when it
+<p>Subclass <code>RoundWorld</code>, from <a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/engine"><code>glossogen.engine</code></a>, when the scenario
+meters a per-round budget, which almost all do. Plain <code>ScenarioWorld</code>, from the
+<a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenario_contract">scenario contract</a>, only when it
 meters nothing. The world mutates state synchronously in <code>on_message</code>, reacts
 asynchronously in <code>on_message_async</code> (pushing notifications through
 <code>context.send_update_to_channel</code>), and holds the state the round verdict reads.
@@ -2243,9 +2282,9 @@ for a single tool,
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/container_yard_stacking/world.py">ContainerYardWorld</a>
 for sequenced multi-tool state.</p>
 <h3 id="scenariopy"><code>scenario.py</code><a class="headerlink" href="#scenariopy" title="Permanent link">&para;</a></h3>
-<p>The <code>SimulationScenario</code> subclass is what the registry hands the CLI, the MCP
-<code>start_run</code> tool and the run-detail UI. The full contract is
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/protocol.py">scenario_contract/protocol.py</a>. The base class
+<p>The <code>SimulationScenario</code> subclass is what the catalog hands the CLI, the MCP
+<code>start_run</code> tool and the run-detail UI. Its docstrings in the
+<a href="https://github.com/agencyenterprise/GlossoGen/tree/main/src/glossogen/scenario_contract">scenario contract</a> are the full contract. The base class
 derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code>,
 <code>get_scenario_config</code>, ...) from <code>knobs_model()</code> and <code>get_knobs()</code>.</p>
 <table>
@@ -2258,7 +2297,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 <tbody>
 <tr>
 <td><code>name()</code>, <code>scenario_description()</code></td>
-<td>The name given to <code>@scenario</code>; a one-line description read from <code>prompts/description.jinja</code></td>
+<td>The name given to <code>@scenario</code>; the markdown description the run list and run page show. The shipped scenarios render it from <code>prompts/description.jinja</code></td>
 </tr>
 <tr>
 <td><code>knobs_model()</code>, <code>get_knobs()</code>, <code>create_from_config(config)</code></td>
@@ -2274,7 +2313,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>get_world()</code>, <code>get_tools()</code></td>
-<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/scenario_tool.py"><code>ScenarioTool</code></a> per scenario tool. An executor takes <code>agent_id</code> first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising <code>ValueError</code>, and the agent reads its message as the tool's error; any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
+<td>Construct the world from the same specs; one <code>ScenarioTool</code> per scenario tool. An executor takes <code>agent_id</code> first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising <code>ValueError</code>, and the agent reads its message as the tool's error; any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
 </tr>
 <tr>
 <td><code>get_injection(round_number, agent_id)</code></td>
@@ -2290,7 +2329,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>on_round_ended(round_number, trigger)</code></td>
-<td>Settle round-end state. <code>trigger</code> is a <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/models/round_end_trigger.py"><code>RoundEndTrigger</code></a> value when the clock ended the round, or your own early-end string; compare against the enum's members</td>
+<td>Settle round-end state. <code>trigger</code> is a <code>RoundEndTrigger</code> value when the clock ended the round, or your own early-end string; compare against the enum's members</td>
 </tr>
 <tr>
 <td><code>validate_outgoing_message(...)</code>, <code>transform_outgoing_message(...)</code></td>
@@ -2522,8 +2561,9 @@ scenario that delivers messages inside tool results and so has no use for
 <code>read_channel</code>. <code>read_notifications</code> cannot be hidden.</p>
 <p>A replacement posts through <code>self.runtime.publish_message(agent_id, channel_id,
 text, force)</code>, which applies <code>validate_outgoing_message</code> and
-<code>transform_outgoing_message</code>, logs the message and notifies the other members;
-<code>force=True</code> skips the unread-messages check. <code>self.runtime.direct_channel_for(agent_id,
+<code>transform_outgoing_message</code>, logs the message and notifies the other members.
+<code>force=True</code> skips the unread-messages check.</p>
+<p><code>self.runtime.direct_channel_for(agent_id,
 recipient_agent_ids)</code> returns the channel whose members are exactly the sender and
 those recipients: a primary channel with those members, or else
 <code>dm:&lt;sorted ids joined by +&gt;</code>, created the first time and logged as
@@ -2628,9 +2668,8 @@ live answer with the one from a rebuilt history.</p>
 <h3 id="simulated-time">Simulated time<a class="headerlink" href="#simulated-time" title="Permanent link">&para;</a></h3>
 <p>A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. <code>schedule_wait_timeout</code> and <code>clock_now_s</code>
-default to the wall clock, <code>scenario_tool_timeout_s</code> to
-<code>SCENARIO_TOOL_TIMEOUT_SECONDS</code> from <code>scenario_contract/scenario_tool.py</code>, and the rest to
-doing nothing.</p>
+default to the wall clock, <code>scenario_tool_timeout_s</code> to the contract's
+<code>SCENARIO_TOOL_TIMEOUT_SECONDS</code>, and the rest to doing nothing.</p>
 <table>
 <thead>
 <tr>
@@ -2673,7 +2712,7 @@ doing nothing.</p>
 </tr>
 </tbody>
 </table>
-<p><a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/virtual_clock.py"><code>runtime/virtual_clock.py</code></a> is a clock these
+<p><code>VirtualClock</code> (<code>glossogen.runtime.virtual_clock</code>) is a clock these
 hooks can drive: each request costs a fixed overhead plus its output tokens at a fixed rate,
 and responses are released in that order.
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/textcraft_shared_workspace/scenario.py">textcraft_shared_workspace</a>
@@ -2700,15 +2739,15 @@ events on the run-detail API. The scenario class returns the extension:</p>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_detail_extension</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScenarioRunDetailExtension</span><span class="p">:</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">return</span> <span class="n">VeyruRunDetailExtension</span><span class="p">()</span>
 </code></pre></div>
-<p>The contract is
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/run_detail_extension.py">scenario_contract/run_detail_extension.py</a>
-and the canonical example
+<p>The contract is <code>ScenarioRunDetailExtension</code> and <code>ScenarioRunExtrasBase</code>, and
+the canonical example
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/run_detail_extension.py">veyru/run_detail_extension.py</a>,
 though the module can be named anything. Declare an extras model whose
 <code>scenario_name</code> is a <code>Literal</code> of your scenario's name (<code>validate</code> checks it), a
 <code>ScenarioRunDetailExtension</code> subclass naming that model, and a <code>build_extras</code> that
-walks the events. Then regenerate the frontend types so the discriminated union
-picks up your variant:</p>
+walks the events. The extras then appear as <code>scenario_extras</code> in the run-detail
+API response. In this repo, also regenerate the frontend types so the
+discriminated union picks up your variant:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>make<span class="w"> </span>gen-api-types
 </code></pre></div>
 <h3 id="frontend-plug-in">Frontend plug-in<a class="headerlink" href="#frontend-plug-in" title="Permanent link">&para;</a></h3>
@@ -2717,8 +2756,7 @@ timeline markers, or the chip for a <code>read_notifications</code> result your
 <code>read_notifications</code> hook renders, ship a <code>ScenarioPlugin</code> at
 <code>frontend/src/features/runs/&lt;your_scenario&gt;/plugin.tsx</code> and register it in
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/scenario-registry.ts">scenario-registry.ts</a>. The
-contract is
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/scenario-plugin.ts">scenario-plugin.ts</a>, the
+contract is the <code>ScenarioPlugin</code> interface beside the registry, the
 canonical example
 <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/frontend/src/features/runs/veyru/plugin.tsx">veyru/plugin.tsx</a>, and every
 slot is optional. A round-detail panel receives the round's <code>round_results</code>
@@ -2757,22 +2795,80 @@ directory you run from, with paths relative to that file:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[tool.glossogen]</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">scenarios</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;scenarios&quot;</span><span class="p">]</span><span class="w">            </span><span class="c1"># a folder, a .py file, or a module name</span>
 </code></pre></div>
-<p>A source is a folder, a <code>.py</code> file or a module name. A folder is searched for
-files that use <code>@scenario</code>, and only those are imported, so scripts and helpers
-beside them never run. Files are imported by module name relative to the project
-directory, so <code>experiments/reactor_purge/reactor_purge.py</code> is
-<code>experiments.reactor_purge.reactor_purge</code> and relative imports inside your
-package work. A module name that is a package, such
-as an installed scenario pack, has its directory searched the same way.</p>
-<p>With none of the three set, glossogen scans the project directory, the one
-holding that <code>pyproject.toml</code>, skipping environments (<code>.venv</code>, <code>venv</code>, <code>env</code>,
-<code>site-packages</code>, <code>node_modules</code>), <code>tests</code>, <code>build</code>, <code>dist</code>, hidden and
-<code>_</code>-prefixed folders, and the runs directory. <code>scenarios = []</code> turns the scan
-off. A file the scan finds that fails to import, or registers a name another
-scenario holds, is skipped with a warning naming the file and the error; a
-source you name fails the command instead. The scan stops after a few thousand
-<code>.py</code> files, with a warning. Naming the folders keeps what glossogen imports
-explicit.</p>
+<p><code>--scenarios</code> is an option of <code>glossogen</code> itself, so it goes before the subcommand
+(<code>glossogen --scenarios ./reactor_purge validate reactor_purge</code>). After the
+subcommand, every command rejects it as an unrecognized argument. A blank value
+is ignored, so <code>--scenarios ""</code> loads the built-in scenarios only.</p>
+<p>A folder source is searched for files that use <code>@scenario</code>, and only those are
+imported, so scripts and helpers beside them never run. Files are imported by
+module name relative to the project directory:
+<code>experiments/reactor_purge/reactor_purge.py</code> is
+<code>experiments.reactor_purge.reactor_purge</code>, and relative imports inside your
+package work.</p>
+<p>A module source that is a package, such as an installed scenario pack, has its
+directory searched the same way. The search descends only through subpackages
+(folders with an <code>__init__.py</code>) whose names do not start with <code>.</code> or <code>_</code>. It
+has no skip list and no file limit, and does not enter a namespace folder.</p>
+<p>If you keep scenarios in an installed package with a <code>src/</code> layout, name it as a
+module source (<code>scenarios = ["my_scenarios"]</code>). The project scan would import
+the same files as <code>src.my_scenarios...</code>, a second name beside the one your
+tests and installed code use. The two names do not conflict, because the
+registry treats one file under two names as one definition, but the module
+source keeps the name the same everywhere.</p>
+<p>With none of the three set, glossogen scans the project directory: the one
+holding the nearest <code>pyproject.toml</code>, or the working directory when there is none.
+<code>scenarios = []</code> in the <code>[tool.glossogen]</code> table, an empty <code>GLOSSOGEN_SCENARIOS</code>
+and <code>--scenarios ""</code> each turn the scan off, leaving the built-in scenarios only.
+Naming the folders keeps what glossogen imports explicit.</p>
+<p>What the default scan leaves alone:</p>
+<table>
+<thead>
+<tr>
+<th>Skipped</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Folders and <code>.py</code> files whose name is not a Python identifier (<code>my-experiments</code>, <code>2024_runs</code>, <code>class.py</code>)</td>
+<td>They cannot be imported by module name. The scan logs at INFO a folder it skipped for this when a file within two levels under it uses <code>@scenario</code>; a scenario deeper down is skipped silently. Rename the folder to load it</td>
+</tr>
+<tr>
+<td>Hidden and <code>_</code>-prefixed folders, <code>venv</code>, <code>.venv</code>, <code>env</code>, <code>node_modules</code>, <code>site-packages</code>, <code>__pycache__</code>, <code>tests</code>, <code>build</code>, <code>dist</code></td>
+<td>Environments, caches and copies of your own modules. These names are skipped below the folder the scan starts at, so a project folder called <code>tests</code> is still read</td>
+</tr>
+<tr>
+<td>Symlinked folders and files</td>
+<td>The scan does not follow links</td>
+</tr>
+<tr>
+<td>The runs directories: <code>./runs</code>, every <code>--runs-dir</code>, and <code>GLOSSOGEN_RUNS_DIR</code>, each read from the working directory and from the project root</td>
+<td>A run directory holds files a bundle import wrote, and no code is imported from one</td>
+</tr>
+<tr>
+<td>Any run directory, recognised by its <code>&lt;scenario&gt;.jsonl</code> event log</td>
+<td>The same, wherever it sits</td>
+</tr>
+<tr>
+<td>The installed glossogen package</td>
+<td>A glossogen checkout under your project would register the built-ins twice</td>
+</tr>
+<tr>
+<td>Files that do not use <code>@scenario</code></td>
+<td>Only a file whose syntax tree has the decorator is imported, so scripts and helpers beside a scenario never run</td>
+</tr>
+</tbody>
+</table>
+<p>A walk stops after a few thousand <code>.py</code> files, with a warning that names
+<code>[tool.glossogen] scenarios</code> as the way to say where scenarios live, and the
+files it did not reach load nothing. With no <code>pyproject.toml</code> the scan starts at
+the working directory, which may be a home directory, and a warning says so
+before it walks.</p>
+<p>The default scan is forgiving; a source you name is not. A file the scan finds
+that fails to import, registers a name another scenario holds, or defines a
+scenario the catalog refuses is skipped with a warning naming the file and the
+error, so one broken draft under the project does not stop <code>glossogen --help</code>.
+The same failure in a source you configured fails the command.</p>
 <p>What differs from an in-repo scenario:</p>
 <ul>
 <li><strong>A name another loaded scenario holds is an error</strong>, naming both modules,
@@ -2795,8 +2891,10 @@ explicit.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[tool.setuptools.package-data]</span>
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="s2">&quot;*&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;**/*.jinja&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;**/*.json&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><code>glossogen validate &lt;path&gt;</code> checks this when the project's <code>pyproject.toml</code> has
-  a <code>[build-system]</code>.
+<p><code>glossogen validate &lt;path&gt;</code> checks this when the project's <code>pyproject.toml</code>
+  builds with setuptools. With another build backend, such as the <code>uv_build</code>
+  that <code>uv init --package</code> writes, it prints a note and you check the wheel
+  yourself.
 - <strong>No frontend plug-in.</strong> The platform UI renders everything it derives from
   your knobs schema and event log.
 - <strong>Configuration is read from your project</strong>: the <code>.env</code> sits beside your
@@ -2828,21 +2926,26 @@ scripted round loop (<code>run_rounds</code>) that exercises what <code>validate
 world's state machine, the postmortem phase, and the round verdict, with no LLM
 and no waiting.</p>
 <p>Then one short real run, end to end:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>runs
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>Pass criteria:</p>
 <ol>
-<li>The log ends with <code>Simulation complete. Run directory: runs/your_scenario/&lt;timestamp&gt;</code>.</li>
-<li>The JSONL holds your <code>&lt;Scenario&gt;CaseStarted</code> event once per round and one
-   <code>RoundResultRecorded</code> per round (per team per round when multi-team).</li>
-<li>With a run-detail extension, the round-timeline modal shows your data under
-   <code>make dev</code> + <code>make dev-frontend</code>.</li>
+<li>The log ends with <code>Simulation complete. Run directory: runs/your_scenario/&lt;timestamp&gt;</code>.
+   The timestamp is a Unix time, such as <code>1794504106</code>.</li>
+<li>The run's <code>your_scenario.jsonl</code> holds your round-start event once per round
+   (<code>reactor_purge_round_opened</code> in the generated scenario) and one
+   <code>round_result_recorded</code> per round, per team when there are several.</li>
+<li>With a run-detail extension, <code>GET /api/g/local/runs/your_scenario/&lt;timestamp&gt;</code>
+   on <a href="#viewing-your-runs-in-the-web-ui"><code>glossogen serve</code></a> carries your data
+   under <code>scenario_extras</code>. A panel showing it on the run page needs a
+   <a href="#frontend-plug-in">frontend plug-in</a>, which only an in-repo scenario has.</li>
 </ol>
-<p>Then evaluate it:</p>
+<p>Once the log shows <code>Simulation complete</code>, evaluate it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
@@ -2867,7 +2970,7 @@ and no waiting.</p>
 <li>[ ] <code>judge_round_result</code> returns at least one <code>RoundResult</code> per round, and
       <code>get_primary_channels()</code> returns one entry per independently metered
       channel (teams sharing a link get one pooled entry, not one each).</li>
-<li>[ ] With a run-detail extension: <code>make gen-api-types</code> re-run.</li>
+<li>[ ] In this repo, with a run-detail extension: <code>make gen-api-types</code> re-run.</li>
 <li>[ ] <code>make lint</code> is clean. Regenerate the vulture whitelist if Pydantic fields
       or classes nothing imports by name get flagged.</li>
 <li>[ ] One end-to-end smoke run completes and <code>round_success</code> returns a non-empty

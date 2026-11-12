@@ -789,6 +789,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -798,10 +826,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -819,8 +847,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1452,17 +1480,22 @@ a study uses.</p>
 <p>Read <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/README.md">the README</a> first for what the platform is for. This page
 assumes only that.</p>
 <h2 id="1-install">1. Install<a class="headerlink" href="#1-install" title="Permanent link">&para;</a></h2>
-<p>Both installation types work here. Needs Python 3.14. As a dependency, in a
-project of your own:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<p>In a new project of your own, with <code>&lt;tag&gt;</code> a release from
+<a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>init<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.14<span class="w"> </span>my-study<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>my-study
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;ANTHROPIC_API_KEY=&lt;your key&gt;&#39;</span><span class="w"> </span>&gt;<span class="w"> </span>.env
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>mkdir<span class="w"> </span>runs
 </code></pre></div>
-<p>with a <code>.env</code> in that project holding an API key for your provider. This
-walkthrough runs Anthropic models, so it needs <code>ANTHROPIC_API_KEY</code>. Another
-provider works the same way, with its key set and <code>--model</code> / <code>--provider</code>
-swapped in the commands below. <a href="../running-simulations/">Running simulations</a>
-lists the providers. Working from a clone
-of this repository instead: <code>make install</code>, then <code>cp .env.example .env</code>, and each
-<code>glossogen ...</code> command below is spelled
+<p>glossogen needs Python 3.14, which <code>uv init --python 3.14</code> sets. Activating the
+environment puts <code>glossogen</code> on your <code>PATH</code>. Without it, write <code>uv run glossogen</code>
+wherever this page writes <code>glossogen</code>. This walkthrough runs Anthropic models,
+so <code>.env</code> holds <code>ANTHROPIC_API_KEY</code>. Another provider works the same way, with
+its key set and <code>--model</code> / <code>--provider</code> swapped in the commands below.
+<a href="../running-simulations/#providers">Running simulations</a> lists the providers.</p>
+<p>Working from a clone of this repository instead: <code>make install</code>, then
+<code>cp .env.example .env</code>, and each <code>glossogen ...</code> command below is spelled
 <code>VIRTUAL_ENV= uv run --no-sync python -m glossogen ...</code>.
 <a href="../installation/">Installation</a> has both paths in full, including the optional
 extras.</p>
@@ -1503,8 +1536,10 @@ a free debrief channel between rounds.</p>
 </tbody>
 </table>
 <p>If your environment has no key for the provider you named, the run is refused at
-the command line rather than starting and failing once the clock has run out.</p>
-<p>Wait for the run to finish before scoring it:</p>
+the command line rather than starting and failing once the clock has run out.
+The launch log, <code>./runs/quickstart.log</code>, says why. Three rounds of this preset
+took under two minutes and $0.28 on <code>claude-haiku-4-5-20251001</code>.</p>
+<p>Wait for the run to finish before scoring it. This prints <code>1</code> once it has:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>grep<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;&quot;simulation_ended&quot;&#39;</span><span class="w"> </span>./runs/warehouse_robot_recovery/*/warehouse_robot_recovery.jsonl
 </code></pre></div>
 <p>Wait for that event. <code>round_advanced</code> to round N fires when round N <em>starts</em>, so
@@ -1517,9 +1552,11 @@ rewinds a finished run.</p>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="s2">import collections, json, sys</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s2">kinds = collections.Counter(json.loads(l)[&#39;event_type&#39;] for l in open(sys.argv[1]) if l.strip())</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s2">for kind, count in kinds.most_common(8): print(f&#39;{count:5} {kind}&#39;)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s2">for kind, count in kinds.most_common(): print(f&#39;{count:5} {kind}&#39;)</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RUN</span><span class="s2">/warehouse_robot_recovery.jsonl&quot;</span>
 </code></pre></div>
+<p>That counts the events by type. Most of them are the agents' own model calls,
+tool calls and waits. These are the ones that describe the game:</p>
 <table>
 <thead>
 <tr>
@@ -1570,8 +1607,8 @@ agents were still talking when it ended, so the character count shows the time
 limit rather than how much they had to say.</p>
 <p>The platform's own metrics are generic: a scenario opts into one by implementing
 the hook the metric reads, so the same measurement works across scenarios. A
-scenario can also carry metrics that apply only to it, and another installed
-package can ship its own. Adding <code>shorthand_codes</code> or <code>language_repetition</code> to
+scenario can also carry metrics that apply only to it, declared by its
+<code>scenario_metrics()</code>. Adding <code>shorthand_codes</code> or <code>language_repetition</code> to
 that list
 puts a judge model to work and spends real money.
 <a href="../evaluation/">Evaluation</a> has the full catalogue and which hook each metric reads.</p>

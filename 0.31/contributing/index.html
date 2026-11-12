@@ -687,6 +687,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -696,10 +724,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -717,8 +745,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1554,7 +1582,7 @@ same on your machine as in CI.</p>
 <code>src/glossogen/testing/</code> and ships in the package behind the <code>testing</code> extra, so a
 scenario in another distribution tests itself the same way the built-ins do. See
 <a href="../testing-a-scenario/">Testing a scenario</a>.</p>
-<p>The conformance suite is parametrized over the scenario registry and every knobs
+<p>The conformance suite is parametrized over the built-in scenarios and every knobs
 preset in the tree, so a new scenario is covered the moment it is registered.
 Adding a rule there applies it to every existing scenario at once, which is the
 cheapest place to catch the mistakes that only show up minutes into a run.</p>
@@ -1612,8 +1640,8 @@ literals in scenario Python are reported as advisory.</p>
 <p><strong>No inline imports</strong> and <strong>no <code>TYPE_CHECKING</code></strong> blocks, both enforced by
 custom linters in <code>linter/</code>. If you hit a circular import, restructure rather than
 working around it. Conditional loading of an optional dependency goes through
-<code>importlib.import_module</code>, as in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/optional_ml_backend.py">optional_ml_backend.py</a>.</p>
+<code>importlib.import_module</code>, as the shared metric helpers in
+<code>evaluation/metric_core/</code> do for their optional ML backends.</p>
 <p><strong>LLM output is parsed through a schema.</strong> Define a Pydantic model, pass it to
 <code>generate_structured()</code>, use the validated instance. Never parse free text.</p>
 <p><strong>Docs describe the current state.</strong> No "this now uses X instead of Y": the
@@ -1621,7 +1649,14 @@ reader does not know what Y was and does not care.</p>
 <h2 id="adding-a-scenario">Adding a scenario<a class="headerlink" href="#adding-a-scenario" title="Permanent link">&para;</a></h2>
 <p>Open a pull request with the scenario rather than an issue proposing one. A
 scenario is self-contained, with its own package under
-<code>src/glossogen/scenarios/&lt;name&gt;/</code>, touching no shared code.</p>
+<code>src/glossogen/scenarios/&lt;name&gt;/</code>, touching no shared code. Generate it there:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">VIRTUAL_ENV</span><span class="o">=</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>glossogen<span class="w"> </span>new-scenario<span class="w"> </span>&lt;name&gt;<span class="w"> </span>--target-dir<span class="w"> </span>src/glossogen/scenarios
+</code></pre></div>
+<p>The command then says the configured sources do not load the folder. That
+check does not know about the built-in catalog, which does load it:
+<code>glossogen run --help</code> lists it. Move the generated <code>test_&lt;name&gt;.py</code> to <code>tests/scenarios/</code>, where the repo's
+scenario tests live. It passes there unchanged. The conformance suite covers
+the new scenario without any edit.</p>
 <p><a href="../creating-a-scenario/">docs/creating-a-scenario.md</a> is the step-by-step
 guide.</p>
 <h2 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h2>

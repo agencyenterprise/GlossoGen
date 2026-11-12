@@ -687,6 +687,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -696,10 +724,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -717,8 +745,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1439,9 +1467,8 @@ loads. On the frontend it is an auth adapter compiled into the UI image.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.identity_provider.v1&quot;</span><span class="k">]</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">my_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_auth.identity_provider:MyIdentityProvider&quot;</span>
 </code></pre></div>
-<p>It implements <code>IdentityProvider</code>
-(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/identity_provider.py">src/glossogen/server/identity/identity_provider.py</a>),
-whose members are:</p>
+<p>It implements <code>IdentityProvider</code>, imported from
+<code>glossogen.server.identity.identity_provider</code>, whose members are:</p>
 <table>
 <thead>
 <tr>
@@ -1484,8 +1511,7 @@ because running unauthenticated while an operator believes a provider is
 installed is worse than not starting.</p>
 <h2 id="what-the-platform-offers-a-provider">What the platform offers a provider<a class="headerlink" href="#what-the-platform-offers-a-provider" title="Permanent link">&para;</a></h2>
 <p>The contract above is one direction. A provider also needs things <em>from</em> the
-platform, and those live in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/server/identity/provider_services.py"><code>identity/provider_services.py</code></a>:</p>
+platform, and those are imported from <code>glossogen.server.identity.provider_services</code>:</p>
 <table>
 <thead>
 <tr>
@@ -1516,7 +1542,7 @@ platform, and those live in
 foreign keys stay valid. The retained row continues to reserve its slug, so a
 new external organization cannot reuse that slug.</p>
 <h2 id="the-frontend-contract">The frontend contract<a class="headerlink" href="#the-frontend-contract" title="Permanent link">&para;</a></h2>
-<p><code>frontend/src/features/auth/auth-adapter.ts</code> is the contract;
+<p>The <code>@/features/auth/auth-adapter</code> module is the contract;
 <code>frontend/src/features/auth/adapter/</code> is the implementation, and the copy in this
 repository answers "no provider configured" to every slot. A deployment replaces that
 directory. Four modules, one per runtime that imports them:</p>

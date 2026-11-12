@@ -687,6 +687,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -696,10 +724,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -717,8 +745,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1486,25 +1514,43 @@
 <p><code>glossogen.testing</code> runs a scenario the way the platform runs it, with the LLM
 replaced by a script. It ships in the package, so a scenario in your own
 project is tested the same way the built-in ones are.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, with pip:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
 </code></pre></div>
-<p>The extra installs <code>pytest-asyncio</code>. Mark each async test
-<code>@pytest.mark.asyncio</code>, as the test <code>new-scenario</code> writes does, or set
+<p><code>&lt;tag&gt;</code> is a release, as in <a href="../installation/#as-a-dependency">Installation</a>.
+Run pytest from the project root, where <code>glossogen run</code> would find your
+scenario. In a folder with no <code>pyproject.toml</code> above it, pytest run from inside
+the scenario's folder reports the scenario as not loaded, and says to run it from
+the project root.</p>
+<p>The harness is async. The test <code>new-scenario</code> writes calls it from plain test
+functions with <code>asyncio.run</code>, which needs no plugin. For async tests of your own,
+the extra installs <code>pytest-asyncio</code>: mark each one <code>@pytest.mark.asyncio</code>, or set
 <code>asyncio_mode = "auto"</code> in your pytest configuration. An unmarked async test
 without that setting errors with "async def functions are not natively
-supported".</p>
+supported". With no pytest configuration at all, an installed <code>pytest-asyncio</code>
+prints a <code>PytestDeprecationWarning</code> about <code>asyncio_default_fixture_loop_scope</code>
+when pytest starts, whichever tests then run, the generated ones included. It is
+harmless, and this in <code>pyproject.toml</code> silences it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[tool.pytest.ini_options]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">asyncio_default_fixture_loop_scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;function&quot;</span>
+</code></pre></div>
 <h2 id="the-contract-check-glossogen-validate">The contract check: <code>glossogen validate</code><a class="headerlink" href="#the-contract-check-glossogen-validate" title="Permanent link">&para;</a></h2>
 <p>Run this before writing any test. It reports every failure rather than the
 first and exits non-zero, so it belongs in your CI whether or not you write
 tests.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>./reactor_purge<span class="w">    </span><span class="c1"># a file or folder: loaded as one more source</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>reactor_purge<span class="w">      </span><span class="c1"># a scenario your sources load, by name</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>./reactor_purge<span class="w">    </span><span class="c1"># a file or folder: loaded as one more source</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>glossogen<span class="w"> </span>validate<span class="w"> </span>reactor_purge<span class="w">      </span><span class="c1"># a scenario your sources load, by name</span>
 </code></pre></div>
 <p>A name resolves through the scenarios this process loaded from its configured
 sources. A path is loaded as one more source on top of those, and every scenario
-it registers is checked, which is what to use while editing. The two cannot be
-confused: a scenario name is a bare lowercase identifier, so anything holding a
-dot or a slash is a path.</p>
+it registers is checked, which is what to use while editing.</p>
+<p>An argument that
+holds a dot or a slash is always a path. A bare identifier is read as a loaded
+scenario's name first, and as a path only when no loaded scenario has that name.
+With the layout <code>new-scenario</code> writes, <code>reactor_purge</code> is both a scenario and a
+folder, so <code>validate reactor_purge</code> checks the loaded scenario and prints a note;
+write <code>./reactor_purge</code> to check the folder.</p>
 <p>It builds the scenario from every preset it ships and checks what Python cannot.
 Each check catches a failure that is silent at the time it happens:</p>
 <table>
@@ -1529,7 +1575,7 @@ Each check catches a failure that is silent at the time it happens:</p>
 </tr>
 <tr>
 <td>Every event class defined in the scenario's module or package is returned by <code>event_types()</code></td>
-<td>The event logger refuses an undeclared class mid-run, and a reader skips its lines</td>
+<td>The event logger refuses an undeclared class mid-run, and a reader reads its lines as <code>UnrecognizedEvent</code></td>
 </tr>
 <tr>
 <td>A probe or explanation config points at files that exist</td>
@@ -1540,7 +1586,7 @@ Each check catches a failure that is silent at the time it happens:</p>
 <td>The launch check asks it which credentials a run needs</td>
 </tr>
 <tr>
-<td>Path form only, when the project's <code>pyproject.toml</code> has a <code>[build-system]</code>: setuptools <code>package-data</code> covers prompts and presets</td>
+<td>Path form only, when the project's <code>pyproject.toml</code> builds with setuptools: <code>package-data</code> covers prompts and presets. Another build backend gets a note instead</td>
 <td>The source tree works and the wheel you hand out renders nothing</td>
 </tr>
 </tbody>
@@ -1558,17 +1604,20 @@ Two rounds are enough, because round two has a round one behind it.</p>
 project's scenario sources would load it. These check the catalog those sources
 load instead, from the directory pytest runs in. By name, which is what the test
 <code>new-scenario</code> writes uses, so it imports nothing from the scenario's folder:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">assert_scenario_is_loaded</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_scenario_sources_load_this_scenario</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">assert_scenario_is_loaded</span><span class="p">(</span><span class="n">scenario_name</span><span class="o">=</span><span class="s2">&quot;reactor_purge&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">assert_scenario_is_loaded</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_scenario_sources_load_this_scenario</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">assert_scenario_is_loaded</span><span class="p">(</span><span class="n">scenario_name</span><span class="o">=</span><span class="s2">&quot;reactor_purge&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>It fails with the message a command gives for a scenario that is not loaded,
-listing the sources that were. <code>assert_scenario_is_registered(scenario_cls=...)</code>
-checks a class you imported instead: that the name resolves to that exact class.
-It fails, saying to add the file or folder to <code>[tool.glossogen] scenarios</code>, when
-the sources leave the class out.</p>
+listing the sources that were.</p>
+<p><code>assert_scenario_is_registered(scenario_cls=...)</code> checks a class you imported
+instead: that its name resolves to that class. When the sources leave the class
+out, it fails and says to add the file or folder to <code>[tool.glossogen] scenarios</code>.
+The same file imported under another module name counts as the same class, so a
+test may import <code>mypack.reactor_purge.reactor_purge</code> while the project scan
+loaded it as <code>src.mypack.reactor_purge.reactor_purge</code>.</p>
 <h2 id="the-prompt-linter">The prompt linter<a class="headerlink" href="#the-prompt-linter" title="Permanent link">&para;</a></h2>
 <p><code>make lint-server</code> runs <code>linter/check_prompt_templates.py</code> over every template in
 the repository. It applies to a repository clone only, for scenarios developed
@@ -1608,25 +1657,25 @@ scenario Python are reported as advisory and do not fail the build.</p>
 <p><code>validate</code> proves a scenario builds. It never starts the game clock. <code>run_rounds</code>
 closes that: tool dispatch, runtime, clock, event logger and your world are all
 real, and only the model is scripted.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">assert_no_agent_crashed</span><span class="p">,</span> <span class="n">assert_round_loop_completed</span><span class="p">,</span> <span class="n">run_rounds</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">asyncio</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">test_the_round_loop_runs</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">monkeypatch</span><span class="p">:</span> <span class="n">pytest</span><span class="o">.</span><span class="n">MonkeyPatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">run_rounds</span><span class="p">(</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">scenario_name</span><span class="o">=</span><span class="s2">&quot;reactor_purge&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="n">preset_name</span><span class="o">=</span><span class="s2">&quot;knobs_default&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="n">round_count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>        <span class="n">overrides</span><span class="o">=</span><span class="p">{},</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        <span class="n">tmp_path</span><span class="o">=</span><span class="n">tmp_path</span><span class="p">,</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="n">monkeypatch</span><span class="o">=</span><span class="n">monkeypatch</span><span class="p">,</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="p">)</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="n">assert_round_loop_completed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">,</span> <span class="n">round_count</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="n">assert_no_agent_crashed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">assert_no_agent_crashed</span><span class="p">,</span> <span class="n">assert_round_loop_completed</span><span class="p">,</span> <span class="n">run_rounds</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">asyncio</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">test_the_round_loop_runs</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">monkeypatch</span><span class="p">:</span> <span class="n">pytest</span><span class="o">.</span><span class="n">MonkeyPatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">run_rounds</span><span class="p">(</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="n">scenario_name</span><span class="o">=</span><span class="s2">&quot;reactor_purge&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="n">preset_name</span><span class="o">=</span><span class="s2">&quot;knobs_default&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="n">round_count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="n">overrides</span><span class="o">=</span><span class="p">{},</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="n">tmp_path</span><span class="o">=</span><span class="n">tmp_path</span><span class="p">,</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        <span class="n">monkeypatch</span><span class="o">=</span><span class="n">monkeypatch</span><span class="p">,</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="p">)</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">assert_round_loop_completed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">,</span> <span class="n">round_count</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">assert_no_agent_crashed</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="n">result</span><span class="p">)</span>
 </code></pre></div>
 <p>The preset is required for the same reason <code>--config</code> is required on <code>run</code>: the
 test exercises a configuration you actually ship. Each agent is routed to a primary channel it
@@ -1684,6 +1733,8 @@ get a <code>StubLLMProvider</code> whose answers the test chose. The interesting
 is usually about what the judge was shown, since the answers were chosen.
 <code>SmokeScenario</code> is a two-agent, one-channel scenario to score against when your
 metric is not tied to a domain of your own.</p>
+<p>Next: <a href="../creating-a-metric/">Creating a metric</a> for a score of your own, or
+<a href="../running-simulations/">Running simulations</a> once the tests pass.</p>
 
 
 

@@ -902,6 +902,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -911,10 +939,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -932,8 +960,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1723,7 +1751,7 @@ pandas against a real cohort, see
 <p>Every table is wide in metrics: a metric is a column, never a value in a
 <code>metric_name</code> column. A round row carries every metric measured on that round
 side by side, so a model can be fitted to it directly.</p>
-<p>Over REST and from the modal, one table comes back as a bare CSV. Two or more
+<p>Over REST and from the Export dialog, one table comes back as a bare CSV. Two or more
 come back as a zip with a <code>columns.csv</code> legend naming each column's family, its
 unit where it has one, and how many runs filled it. <code>glossogen export</code> writes the
 legend beside the tables in <code>--out</code> whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
@@ -1894,19 +1922,17 @@ that opened its postmortem. This is the per-round prompt: read beside
 said. The columns are the roster, so a sheet reads one agent's briefings down a
 column instead of pivoting.</p>
 <p>It stays separate from <code>round_level.csv</code> even though both are keyed on
-<code>(run, round)</code>. These cells are the largest text in the export, and a table
-people join to and filter on should not carry them: in the exporter this mirrors,
-repeating the briefings was ~86% of a file. Join on <code>run_id</code> + <code>round_number</code>.</p>
+<code>(run, round)</code>. These cells are the largest text in the export, so they stay out of the table
+people join to and filter on. Join on <code>run_id</code> + <code>round_number</code>.</p>
 <h3 id="how-the-event-log-tables-read">How the event-log tables read<a class="headerlink" href="#how-the-event-log-tables-read" title="Permanent link">&para;</a></h3>
 <p><code>message_level.csv</code> and <code>round_context.csv</code> read every selected run's event log,
 which is why neither is in the default set. Runs are read one at a time, so
 memory does not grow with the selection. Asking for both reads each log twice.</p>
 <p>Only <code>message_sent</code>, <code>tool_result_received</code>, <code>injection_delivered</code> and
 <code>channel_created</code> are parsed. The round number and the postmortem phase are
-tracked from <code>round_advanced</code> and <code>postmortem_started</code>. Parsing every line
-would fail the export on an event these tables discard, the moment a run predates
-a required field some scenario event gained. A line that fails anyway is skipped
-and counted in the log, so one damaged run costs its own rows and not the export.</p>
+tracked from <code>round_advanced</code> and <code>postmortem_started</code>. A line that fails to
+parse is skipped and counted in the log, so one damaged run costs its own rows
+and not the export.</p>
 <p><code>is_primary_channel</code> and <code>team_id</code> come from rebuilding the scenario from the
 run's recorded config. A config predating a newer required knob is backfilled
 from the scenario's shipped presets, the run's own values always winning. When no
@@ -2102,7 +2128,7 @@ exactly what the download produces.</p>
 the preview does not offer for it, with a 422. Over the run ceiling it answers
 413. An explicit id that no longer resolves shows up on the preview, and a
 download refuses it with a 404. Refusing is the safer failure: a table with one row fewer
-than asked for looks exactly like a correct one. The export modal drops such ids
+than asked for looks exactly like a correct one. The Export dialog drops such ids
 from the request and reports how many, leaving the 404 for a run deleted between
 preview and download.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
@@ -2155,13 +2181,13 @@ value the endpoint enforces. The archive is built into a temporary file under
 reproduces the layout. A <code>manifest.csv</code> at the root names what went in.</p>
 <p>Logs (<code>*_debug.jsonl</code>, <code>*_stdout.log</code>, <code>*_start.log</code>, <code>eval_stdout.log</code>) are
 left out by default, since a run's <code>_debug.jsonl</code> is routinely larger than the
-event log. <code>--include-logs</code> or the modal checkbox puts them back.
+event log. <code>--include-logs</code> or the Export dialog's checkbox puts them back.
 <code>stream.json</code> and <code>eval_in_progress.json</code> are always left out: they describe work
 in flight, so a re-imported run carrying them reads as still running.
 <code>run_summary_cache.json</code> is always left out too, since it names no run and an
 importing server would trust it for the wrong one.</p>
 <p>An <code>atif/</code> folder in each run holds one <a href="../atif-export/">ATIF trajectory</a> per
-agent, generated from the event log while the zip is written. The modal's ATIF
+agent, generated from the event log while the zip is written. The Export dialog's ATIF
 checkbox starts ticked. The CLI adds it with <code>--include-atif</code>, and the REST body
 with <code>include_atif</code>. A single run's zip download always includes it.</p>
 <p>A run still being written is safe to export. Members are streamed into the

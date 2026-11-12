@@ -839,6 +839,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -848,10 +876,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -869,8 +897,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1552,16 +1580,22 @@ glossogen as a dependency. To work on the platform itself, clone the repository
 and start at <a href="#working-on-glossogen-itself">Working on glossogen itself</a>.</p>
 <h2 id="as-a-dependency">As a dependency<a class="headerlink" href="#as-a-dependency" title="Permanent link">&para;</a></h2>
 <p>glossogen needs Python 3.14, and the project you install it into has to allow
-that: a <code>requires-python</code> of at least 3.14, and in a uv project
+that. A new uv project gets it from <code>uv init --python 3.14</code>. An existing one
+needs a <code>requires-python</code> of at least 3.14 and, in a uv project,
 <code>uv python pin 3.14</code>. On a project pinned lower, the install fails with a
 resolution error naming the conflict.</p>
 <p>glossogen is not published to PyPI, so install from the repository, pinning a tag.
 Replace <code>&lt;tag&gt;</code> with a release from
 <a href="https://github.com/agencyenterprise/GlossoGen/releases">the releases page</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, with pip:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>init<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.14<span class="w"> </span>my-study<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>my-study<span class="w">    </span><span class="c1"># skip in an existing project</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># or, with pip, into an active Python 3.14 environment:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/agencyenterprise/GlossoGen.git@&lt;tag&gt;&quot;</span>
 </code></pre></div>
+<p><code>uv add</code> installs into the project's <code>.venv</code>. Activate it with
+<code>source .venv/bin/activate</code> so <code>glossogen</code> is on your <code>PATH</code>, or put <code>uv run</code> in
+front of each command (<code>uv run glossogen run ...</code>). The pages here write the
+bare <code>glossogen</code>.</p>
 <p>In a <code>pyproject.toml</code>, the same thing as a PEP 508 direct reference:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[project]</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
@@ -1574,10 +1608,9 @@ what a scenario has to change when you move the pin.</p>
 <p>Two extras matter here: <code>glossogen[testing]</code> adds the pytest harness
 <a href="../testing-a-scenario/">Testing a scenario</a> uses, and <code>glossogen[metrics-ml]</code>
 adds the torch backend behind <code>perplexity</code> and the n-gram surprisal metrics.</p>
-<p>Installing brings the <code>glossogen</code> command, so <code>glossogen run ...</code> and
-<code>glossogen evaluate ...</code> work without <code>python -m</code>. The web UI comes from the same
-command: <code>glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000</code> serves the
-API and starts the published frontend image against it, which needs Docker but no
+<p>The web UI comes from the same <code>glossogen</code> command:
+<code>glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000</code> serves the API and
+starts the published frontend image against it, which needs Docker but no
 checkout. See <a href="../web-ui/">Web UI</a>.</p>
 <h2 id="configure-environment">Configure environment<a class="headerlink" href="#configure-environment" title="Permanent link">&para;</a></h2>
 <p>The <code>.env</code> goes in the project you run commands from. From a clone, copy the
@@ -1599,8 +1632,9 @@ shipped presets use an Anthropic judge wherever a scenario has one, so those nee
 <code>ANTHROPIC_API_KEY</code>.
 <code>.env.example</code> documents every variable (provider keys, authentication, CORS,
 runs directory, log level) and pre-fills the local Langfuse keys, so a clone that copies it as-is
-traces once <code>make langfuse-up</code> runs. Blank both <code>LANGFUSE_*</code> keys to disable
-telemetry.</p>
+traces once <code>make langfuse-up</code> runs. Delete, comment out or blank the
+<code>LANGFUSE_PUBLIC_KEY</code> and <code>LANGFUSE_SECRET_KEY</code> lines to disable telemetry: an
+empty key counts as unset.</p>
 <p>Keep <code>DATABASE_URL</code> unset unless you want the Postgres-backed runs index, because
 with it set the run list is a database table rather than the directory
 <code>--runs-dir</code> points at. A variable already set in the environment wins over the

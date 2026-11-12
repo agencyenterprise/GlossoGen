@@ -901,6 +901,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -910,10 +938,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -931,8 +959,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1695,14 +1723,40 @@ one:</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nv">channel_noise_level</span><span class="o">=</span><span class="m">0</span>.1<span class="w"> </span><span class="nv">noise_replacement_mode</span><span class="o">=</span>mask
 </code></pre></div>
-<p>The budget is a knob (<code>round_time_budget_seconds</code>), and the rows from
-<code>hospital_bed_assignment_privacy</code> down do without it. <code>spot_the_difference</code> and
-<code>spot_the_intersection</code> let the team that spent fewest characters win instead,
-<code>hospital_bed_assignment_privacy</code> gets its pressure from an eavesdropper on the
-channel, <code>prisoners_dilemma</code> has no such knob, and <code>textcraft_shared_workspace</code>
-leaves it unlimited in its presets and budgets the team's actions and tokens.
-<code>signal_game</code> has no channel to meter. The column is each scenario's own default
-preset.</p>
+<p>The budget is the <code>round_time_budget_seconds</code> knob: each character sent on the
+task channel costs one simulated second. The table gives each scenario's
+default preset. The scenarios from <code>hospital_bed_assignment_privacy</code> down do
+without a cap and get their pressure elsewhere:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Pressure instead of a cap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hospital_bed_assignment_privacy</code></td>
+<td>An eavesdropper on the channel</td>
+</tr>
+<tr>
+<td><code>spot_the_difference</code>, <code>spot_the_intersection</code></td>
+<td>Characters are counted, and the team that spent fewest wins</td>
+</tr>
+<tr>
+<td><code>textcraft_shared_workspace</code></td>
+<td>A budget on the team's actions and tokens</td>
+</tr>
+<tr>
+<td><code>prisoners_dilemma</code></td>
+<td>The payoff matrix; it has no budget knob</td>
+</tr>
+<tr>
+<td><code>signal_game</code>, <code>move_a_box</code></td>
+<td>No channel to meter</td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -1868,20 +1922,21 @@ the other says. Characters are counted but not capped by default
 one that spent fewest wins. Set the knob positive to add the wall back.</p>
 <h2 id="spot-the-intersection">Spot the intersection<a class="headerlink" href="#spot-the-intersection" title="Permanent link">&para;</a></h2>
 <p>Finding the one object every viewer holds. Each viewer has a private board of
-shapes and colors on a shared grid; exactly one object is on every board of a
-team, and the rest are on some boards but not all. <code>team_size</code> sets the viewers
-per team, from 2 to 12. The presets' 6×6 grid fits 3 or 4 as shipped, and 2 with
-decoys off (<code>decoy_count_values: [0]</code> and <code>decoy_count_weights: [1]</code>); larger
-teams need a larger <code>grid_size</code>. With <code>near_misses</code> on (the default),
-certification requires that leaving out any one board leaves at least two
-candidates, so every viewer is needed, and every member must submit the common
-object for the team to be right.
-Two teams play the same boards, and among correct teams the one that said least
+shapes and colors on a shared grid. Exactly one object is on every board of a
+team, and the rest are on some boards but not all. With <code>near_misses</code> on (the
+default), leaving out any one board leaves at least two candidates, so every
+viewer is needed. Every member must submit the common object for the team to be
+right.</p>
+<p><code>team_size</code> sets the viewers per team, from 2 to 12. The presets' 6×6 grid fits
+3 or 4 as shipped. The broadcast presets fit 2 with decoys off
+(<code>decoy_count_values: [0]</code> and <code>decoy_count_weights: [1]</code>); the one-to-one
+preset needs at least 3. Larger teams need a larger <code>grid_size</code>.</p>
+<p>Two teams play the same boards, and among correct teams the one that said least
 wins. <code>simulated_opponent_ratio</code> replaces Team B with a simulated team that is
 always right in a share of Team A's characters, fixed or drawn each round from a
-range, while Team A reads exactly what it would against a real team. Every round is certified from the lines the
-viewers read before it is played, and recorded runs can be audited against what
-each viewer was sent.</p>
+range. Team A reads exactly what it would against a real team. Every round is
+certified from the lines the viewers read before it is played, and recorded
+runs can be audited against what each viewer was sent.</p>
 <h2 id="prisoners-dilemma">Prisoners' dilemma<a class="headerlink" href="#prisoners-dilemma" title="Permanent link">&para;</a></h2>
 <p>Iterated prisoners' dilemma. Two players talk freely on a shared link, then each
 locks in <code>cooperate</code> or <code>defect</code>, and the round resolves as soon as both are in.
@@ -1941,11 +1996,13 @@ operators read an operator's readings while its list of actions is still running
 else, since all three carrying methods cover one square and an operator with no
 use for the reading picks one and keeps it.</p>
 <h2 id="working-with-scenarios">Working with scenarios<a class="headerlink" href="#working-with-scenarios" title="Permanent link">&para;</a></h2>
-<p>Which scenarios exist is read from the environment: <code>glossogen run --help</code>
-prints the installed ones, and so do
+<p>Which scenarios exist is decided by the process: <code>glossogen run --help</code>
+prints the ones it loaded, and so do
 <a href="../mcp-integration/"><code>list_scenarios</code></a> over MCP and
-<code>GET /api/g/{slug}/scenarios</code> over REST. A scenario installed from another package
-appears in all three.</p>
+<code>GET /api/g/{slug}/scenarios</code> over REST. Those are the built-in scenarios plus any
+the process loaded from its scenario sources, so a scenario of your own appears in
+all three once a source points at it. See
+<a href="../creating-a-scenario/#in-this-repo-or-in-your-own-package">Creating a scenario</a>.</p>
 <p>Presets ship next to each scenario as <code>knobs_*.json</code>, and every scenario publishes
 a JSON Schema for its knobs. See
 <a href="../running-simulations/#configuration">Running simulations</a>.</p>

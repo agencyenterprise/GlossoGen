@@ -830,6 +830,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../reading-runs-from-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading runs from code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -839,10 +867,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
         
           
-          <label class="md-nav__link" for="__nav_4_11" id="__nav_4_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
             
   
   
@@ -860,8 +888,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_11">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1779,11 +1807,10 @@ history came from B and was not contaminated by A.</p>
 whether a <code>signature_recorded</code>. Those are what the provider needs to take the
 part back as its own reasoning (OpenAI's reasoning item id and encrypted
 content, Anthropic's block signature), and the run records them per part on
-every <code>llm_response_received</code> event as <code>thinking_parts</code>. A run recorded before
-that holds its reasoning as text only, and a history rebuilt from it carries no
-thinking at all: pydantic-ai would otherwise send the text as a tagged assistant
-message, a form no live request uses, so a fork of such a run differs from its
-source in what the model remembers of its own reasoning either way.</p>
+every <code>llm_response_received</code> event as <code>thinking_parts</code>.</p>
+<p>A run that recorded its reasoning as text only, without <code>thinking_parts</code>,
+rebuilds into a history with no thinking at all. A fork of such a run
+differs from its source in what the model remembers of its own reasoning.</p>
 
 
 
