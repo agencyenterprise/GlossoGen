@@ -65,6 +65,9 @@ the commit log.
   | `glossogen.runtime.communication_tools` (`SEND_MESSAGE_TOOL_NAME`, `READ_CHANNEL_TOOL_NAME`, `LIST_CHANNELS_TOOL_NAME`, `GET_CHANNEL_MEMBERS_TOOL_NAME`, `BASE_TOOL_NAMES`) | `glossogen.models.communication_tool_names` |
   | `glossogen.runners.communication_protocol` | `glossogen.scenario_contract.platform_runner_prompts` |
 
+  The platform's runner prompt templates move with it, from
+  `glossogen/runners/prompts/*.jinja` to `glossogen/scenario_contract/runner_prompts/*.jinja`.
+
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`
   (`glossogen.models.event`), which holds the line's `event_type` and the whole
