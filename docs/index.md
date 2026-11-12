@@ -5,8 +5,8 @@
 [Live demo](https://emergentcomms.ai/demo)
 
 A platform for running controlled experiments on teams of LLM agents. A scenario
-puts several agents in a simulated task with their own roles, channels and tools;
-the platform plays it out in rounds, records every message, tool call and model
+puts several agents in a simulated task with their own roles, channels and tools.
+The platform plays it out in rounds, records every message, tool call and model
 response, and scores the run with the metrics you pick. The scenarios shipped
 here study communication under pressure: no agent holds enough information to
 succeed alone, and in most of them every character sent costs against a
@@ -44,13 +44,15 @@ glossogen needs Python 3.14 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
+uv init --python 3.14 my-study && cd my-study    # skip in an existing 3.14 project
 uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-# or, with pip:
+# or, with pip, into an active Python 3.14 environment:
 pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-That brings the `glossogen` command. Create a `.env` in the project that
-installed it, holding an API key for each provider you run on. Commands read the
+That installs the `glossogen` command into the project's `.venv`. Activate it
+with `source .venv/bin/activate`, or put `uv run` in front of each command.
+Create a `.env` in the project that installed it, holding an API key for each provider you run on. Commands read the
 nearest `.env` at or above the directory they run in. The examples below run
 Anthropic models, so they need `ANTHROPIC_API_KEY`. Another provider works the
 same way, with its key set and its model passed instead, as in
@@ -58,10 +60,10 @@ same way, with its key set and its model passed instead, as in
 [Running simulations](running-simulations.md) covers the providers,
 mixed-provider teams and self-hosted endpoints.
 
-A scenario in your own project registers itself with `@scenario`, and glossogen
-loads it from the folder `[tool.glossogen] scenarios` in your `pyproject.toml`
-names, or finds it by scanning your project, with no change to the glossogen
-repository. A scenario's own metrics come with it.
+A scenario in your own project registers itself with `@scenario`. glossogen
+finds it by scanning your project, or loads it from the sources
+`[tool.glossogen] scenarios` in your `pyproject.toml` names, with no change to
+the glossogen repository. A scenario's own metrics come with it.
 [As a dependency](installation.md#as-a-dependency) has the `.env` layout, the
 optional extras, and where to go from there.
 
@@ -73,6 +75,7 @@ clock cuts a run into rounds, and each round opens with the scenario briefing
 each agent.
 
 ```bash
+mkdir -p runs
 glossogen run veyru \
   --model claude-sonnet-4-6 --provider anthropic --runs-dir ./runs \
   --config knobs_default \
@@ -105,7 +108,7 @@ others put an LLM judge to work.
 
 ```bash
 glossogen evaluate veyru \
-  --run-dir ./runs/veyru/1742234567 \
+  --run-dir ./runs/veyru/<timestamp> \
   --metrics round_success,mean_chars_per_round,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
