@@ -5,7 +5,7 @@ requested the same way and land in the same report.
 
 ```bash
 glossogen evaluate veyru \
-  --run-dir ./runs/veyru/1742234567 \
+  --run-dir ./runs/veyru/<timestamp> \
   --metrics round_success,mean_chars_per_round,shorthand_codes \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
@@ -268,7 +268,7 @@ stderr to capture exactly what the judge saw and returned.
 
 ```bash
 LOG_LEVEL=DEBUG glossogen evaluate veyru \
-  --run-dir ./runs/veyru/1742234567 \
+  --run-dir ./runs/veyru/<timestamp> \
   --metrics communication_open_coding \
   --model claude-haiku-4-5-20251001 --provider anthropic \
   2> /tmp/veyru_eval_debug.log
@@ -328,7 +328,7 @@ glossogen evaluate <scenario> \
 
 # 2. Consolidation: one LLM call across N runs of one scenario, producing a
 #    versioned taxonomy under runs/<scenario>/_ontology/<version>.json
-VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py \
+python consolidate_communication_ontology.py \
   --scenario-name <scenario> \
   --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
   --runs-dir ./runs \
@@ -342,6 +342,17 @@ glossogen evaluate <scenario> \
   --metrics communication_feature_presence \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
+
+Step 2 is a script in the repository's `scripts/`, which an installed package
+does not carry. Fetch it pinned to the tag you installed, and run it with the
+environment's Python (`uv run python ...` without an activated environment):
+
+```bash
+curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/scripts/consolidate_communication_ontology.py
+```
+
+From a checkout, run `scripts/consolidate_communication_ontology.py` as
+`VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py`.
 
 Step 3 resolves the most recently modified ontology under
 `runs/<scenario>/_ontology/` on its own. `--ontology-path` pins a specific one.
@@ -372,7 +383,7 @@ outside the platform.
 
 ```bash
 glossogen export-thread veyru \
-  --run-dir ./runs/veyru/1742234567 \
+  --run-dir ./runs/veyru/<timestamp> \
   --agent-id field_observer \
   --round 12 \
   --out /tmp/thread.json
