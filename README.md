@@ -256,13 +256,13 @@
 | src/glossogen/runners/communication\_protocol.py                                                       |       26 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       36 |      136 |       24 |     87% |97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      414 |       37 |      136 |       25 |     87% |89, 97-98, 181, 186, 190, 275-\>274, 278-284, 336, 408-416, 463, 493, 523-524, 703-706, 768-769, 941-942, 1006, 1090-\>exit, 1106-\>1109, 1110, 1111-\>1120, 1115, 1120-\>1122, 1122-\>exit, 1127, 1128-\>exit, 1135, 1184-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       61 |        1 |       10 |        2 |     96% |67-\>66, 70 |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/activity\_notification.py                                                        |       18 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/runtime/agent\_session.py                                                                |       61 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runtime/agent\_swap.py                                                                   |       96 |       20 |       10 |        4 |     77% |80, 83, 97, 203-221, 257, 290-291 |
-| src/glossogen/runtime/autonomous\_supervisor.py                                                        |      221 |       24 |       64 |        9 |     87% |111, 117, 161-166, 177-181, 228, 233-238, 243-244, 252-253, 270, 327, 364-\>356, 459-\>457, 545-548, 573-574 |
+| src/glossogen/runtime/autonomous\_supervisor.py                                                        |      221 |       23 |       64 |        8 |     88% |111, 117, 161-166, 177-181, 228, 233-238, 243-244, 252-253, 270, 364-\>356, 459-\>457, 545-548, 573-574 |
 | src/glossogen/runtime/channel\_router.py                                                               |       98 |        1 |       34 |        1 |     98% |        89 |
 | src/glossogen/runtime/communication\_tools.py                                                          |       34 |        2 |        4 |        2 |     89% |   51, 107 |
 | src/glossogen/runtime/elapsed\_time.py                                                                 |        9 |        1 |        4 |        2 |     77% |26-\>25, 28 |
@@ -363,7 +363,7 @@
 | src/glossogen/scenarios/move\_a\_box/knobs.py                                                          |       67 |        6 |       40 |        6 |     89% |181, 183, 228, 230, 234, 240 |
 | src/glossogen/scenarios/move\_a\_box/planned\_action.py                                                |       30 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/run\_detail\_extension.py                                         |      115 |        2 |       46 |        6 |     95% |206-\>205, 208, 290-\>293, 319, 365-\>367, 386-\>389 |
-| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      741 |       43 |      268 |       25 |     93% |189, 196, 450, 541-542, 663, 669-670, 672, 745, 771-772, 954, 955-\>958, 983, 1119, 1124, 1127, 1130, 1153, 1162, 1165, 1168, 1184-1194, 1235, 1241, 1259-1262, 1272-\>1281, 1283, 1319, 1376, 1415, 1454, 1491, 1510, 1659, 1682, 1720-1721, 1730, 1924, 1984 |
+| src/glossogen/scenarios/move\_a\_box/scenario.py                                                       |      741 |       42 |      268 |       24 |     93% |189, 196, 450, 541-542, 663, 669-670, 672, 745, 771-772, 954, 955-\>958, 983, 1119, 1124, 1127, 1130, 1153, 1162, 1165, 1168, 1184-1194, 1235, 1241, 1259-1262, 1272-\>1281, 1283, 1319, 1376, 1415, 1454, 1491, 1510, 1659, 1682, 1720-1721, 1924, 1984 |
 | src/glossogen/scenarios/move\_a\_box/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/move\_a\_box/world.py                                                          |      214 |       15 |       60 |       15 |     89% |153, 187, 243, 250, 279, 288, 296, 320, 336, 377, 383, 390, 408, 415, 457 |
 | src/glossogen/scenarios/orbital\_anomaly/\_\_init\_\_.py                                               |        0 |        0 |        0 |        0 |    100% |           |
@@ -405,7 +405,7 @@
 | src/glossogen/scenarios/signal\_game/ids.py                                                            |       31 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/knobs.py                                                          |       26 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/run\_detail\_extension.py                                         |      128 |        3 |       52 |        5 |     96% |143, 151, 282, 324-\>326, 326-\>328 |
-| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      271 |       16 |       68 |        9 |     91% |142, 289-290, 379, 388, 445, 474, 476, 497, 503-518, 720, 725, 730 |
+| src/glossogen/scenarios/signal\_game/scenario.py                                                       |      271 |       18 |       68 |       11 |     90% |142, 289-290, 377, 379, 388, 445, 474, 476, 497, 503-518, 683, 720, 725, 730 |
 | src/glossogen/scenarios/signal\_game/wake\_package.py                                                  |        3 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/word\_list.py                                                     |        1 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/signal\_game/world.py                                                          |      101 |        8 |       20 |        7 |     88% |80, 114, 128, 141, 166, 179, 186, 218 |
@@ -447,25 +447,26 @@
 | src/glossogen/scenarios/spot\_the\_intersection/board\_model.py                                        |       19 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/board\_rendering.py                                    |       27 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/evaluation/\_\_init\_\_.py                             |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/spot\_the\_intersection/evaluation/build\_communication\_rounds.py             |       22 |       13 |        6 |        0 |     32% | 40, 45-63 |
+| src/glossogen/scenarios/spot\_the\_intersection/evaluation/build\_communication\_rounds.py             |       24 |        0 |        6 |        1 |     97% |   65-\>72 |
 | src/glossogen/scenarios/spot\_the\_intersection/events.py                                              |       10 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/ids.py                                                 |       25 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenarios/spot\_the\_intersection/injection\_rendering.py                                |       20 |        2 |        6 |        2 |     85% |    58, 62 |
-| src/glossogen/scenarios/spot\_the\_intersection/knobs.py                                               |       53 |        7 |       22 |        7 |     81% |70, 72, 77, 79, 85, 113, 123 |
-| src/glossogen/scenarios/spot\_the\_intersection/outcome\_reconstruction.py                             |       64 |        2 |       26 |        3 |     94% |100, 103, 143-\>134 |
+| src/glossogen/scenarios/spot\_the\_intersection/injection\_rendering.py                                |       21 |        2 |        6 |        2 |     85% |    74, 78 |
+| src/glossogen/scenarios/spot\_the\_intersection/knobs.py                                               |       60 |        7 |       24 |        7 |     83% |81, 83, 88, 90, 96, 134, 144 |
+| src/glossogen/scenarios/spot\_the\_intersection/messaging.py                                           |       17 |        0 |        4 |        0 |    100% |           |
+| src/glossogen/scenarios/spot\_the\_intersection/outcome\_reconstruction.py                             |       65 |        2 |       26 |        3 |     95% |112, 115, 157-\>145 |
 | src/glossogen/scenarios/spot\_the\_intersection/recorded\_board\_audit.py                              |       72 |        0 |       22 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/round\_event\_conversion.py                            |       18 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/run\_detail\_extension.py                              |       45 |        1 |        8 |        1 |     96% |       127 |
-| src/glossogen/scenarios/spot\_the\_intersection/scenario.py                                            |      153 |        4 |       34 |        4 |     96% |199, 215, 234, 250 |
+| src/glossogen/scenarios/spot\_the\_intersection/scenario.py                                            |      186 |        4 |       50 |        4 |     97% |220, 238, 258, 274 |
 | src/glossogen/scenarios/spot\_the\_intersection/scripts/\_\_init\_\_.py                                |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/scripts/audit\_recorded\_boards.py                     |       34 |       34 |       12 |        0 |      0% |     15-62 |
-| src/glossogen/scenarios/spot\_the\_intersection/scripts/certify\_boards.py                             |       87 |       87 |       32 |        0 |      0% |    20-204 |
-| src/glossogen/scenarios/spot\_the\_intersection/seats.py                                               |       36 |        0 |       12 |        0 |    100% |           |
+| src/glossogen/scenarios/spot\_the\_intersection/scripts/certify\_boards.py                             |       89 |       89 |       32 |        0 |      0% |    20-207 |
+| src/glossogen/scenarios/spot\_the\_intersection/seats.py                                               |       42 |        1 |       16 |        1 |     97% |       104 |
 | src/glossogen/scenarios/spot\_the\_intersection/single\_board\_guessers.py                             |       75 |        1 |       10 |        1 |     98% |        58 |
 | src/glossogen/scenarios/spot\_the\_intersection/team\_declaration.py                                   |       18 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/scenarios/spot\_the\_intersection/tools.py                                               |       41 |        6 |       18 |        6 |     80% |54, 56, 58, 60, 63, 109 |
-| src/glossogen/scenarios/spot\_the\_intersection/world.py                                               |      154 |       15 |       60 |        9 |     86% |128, 163, 193, 231-232, 235-241, 260, 264, 303-\>exit, 337-342 |
-| src/glossogen/scenarios/spot\_the\_intersection/world\_state.py                                        |       90 |        2 |       32 |        2 |     97% |  260, 289 |
+| src/glossogen/scenarios/spot\_the\_intersection/world.py                                               |      177 |       16 |       68 |       10 |     87% |143, 178, 205, 247-248, 251-257, 276, 280, 329-\>exit, 341, 392-397 |
+| src/glossogen/scenarios/spot\_the\_intersection/world\_state.py                                        |      113 |        3 |       42 |        3 |     96% |47, 313, 342 |
 | src/glossogen/scenarios/textcraft\_shared\_workspace/\_\_init\_\_.py                                   |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/textcraft\_shared\_workspace/events.py                                         |       22 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenarios/textcraft\_shared\_workspace/knobs.py                                          |       41 |        3 |       16 |        3 |     89% |76, 78, 95 |
@@ -595,7 +596,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **29083** | **3965** | **8320** | **1155** | **84%** |           |
+| **TOTAL**                                                                                              | **29198** | **3958** | **8364** | **1160** | **84%** |           |
 
 
 ## Setup coverage badge
