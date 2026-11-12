@@ -1,14 +1,17 @@
 # Example notebooks
 
 Read the notebooks in order. The first three generate their own simulation with
-`glossogen.testing`; the fourth reads committed CSVs exported from a real cohort.
-None needs **an API key or the network**, so all four run in a fresh clone before
-you have credentials.
+`glossogen.testing`. The fourth reads committed CSVs exported from a real cohort.
+None needs **an API key or the network**, so all four run in a fresh clone of
+the repository before you have credentials:
 
 ```bash
 make install-notebooks   # jupyter, pandas, matplotlib, nbmake
-jupyter lab notebooks/
+VIRTUAL_ENV= uv run --no-sync jupyter lab notebooks/
 ```
+
+`uv run` starts the Jupyter installed into the clone's environment, the one that
+can import glossogen. A `jupyter` already on your `PATH` would start without it.
 
 | | |
 |---|---|
@@ -17,5 +20,5 @@ jupyter lab notebooks/
 | [03_compare_runs.ipynb](03_compare_runs.ipynb) | Two runs differing in one knob, scored the same way, read side by side |
 | [04_analyze_an_export.ipynb](04_analyze_an_export.ipynb) | The export CSVs read in pandas: a real 40-run budget sweep, one plot per table, the empty-versus-zero rule in the data |
 
-The example CSVs under `data/` are real exports; [data/README.md](data/README.md)
+The example CSVs under `data/` are real exports. [data/README.md](data/README.md)
 records the cohort and the commands that produced them.
