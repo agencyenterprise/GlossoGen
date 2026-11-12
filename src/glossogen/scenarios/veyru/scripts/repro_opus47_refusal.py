@@ -103,7 +103,7 @@ INJECTION_FULL = (
     "Rotate and repeat for each face.\n"
     "\n"
     "The field technician will describe symptoms. "
-    "Match them to a motif above and give the technician the exact procedure verbatim."
+    "Match them to a motif above and give the technician that motif's procedure."
 )
 
 
