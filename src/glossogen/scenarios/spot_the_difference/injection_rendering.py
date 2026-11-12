@@ -31,6 +31,7 @@ def render_round_injection(
     case: DiffCase,
     previous_outcome: DiffOutcome | None,
     two_teams: bool,
+    score_characters: bool,
     renderer: TemplateRenderer,
 ) -> str | None:
     """Return the per-round injection for one viewer, or None for non-viewers."""
@@ -52,6 +53,7 @@ def render_round_injection(
             "my_objects": render_scene_relational(scene=my_scene, grid_size=case.grid_size),
             "previous_outcome": previous_outcome,
             "two_teams": two_teams,
+            "score_characters": score_characters,
         },
     )
     if not rendered:
@@ -62,6 +64,7 @@ def render_round_injection(
 def render_postmortem_injection(
     round_number: int,
     previous_outcome: DiffOutcome | None,
+    score_characters: bool,
     renderer: TemplateRenderer,
 ) -> str | None:
     """Render the postmortem injection for one team's discussion channel."""
@@ -70,6 +73,7 @@ def render_postmortem_injection(
         template_variables={
             "round_number": round_number,
             "previous_outcome": previous_outcome,
+            "score_characters": score_characters,
         },
     )
     if not rendered:

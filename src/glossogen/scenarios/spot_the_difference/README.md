@@ -55,6 +55,16 @@ than a serialize-and-diff dump:
 - `two_teams: true` (default preset) — two isolated teams (`link_a` / `link_b`)
   on the identical seeded scenes each round.
 - `two_teams: false` (`knobs_single_team.json`) — one team; no rival.
+- `score_characters: false` (`knobs_no_character_score.json`, single team only, no
+  budget) — no text an agent receives mentions characters, brevity or shorthand.
+  The system prompt drops the score, the "as terse as you like" line, the
+  shorthand warning in the submitting rules and the word "short" from "one short
+  description per difference". The round results drop the character count, the
+  tool asks for "a list of strings" rather than "short strings", and the
+  discussion phase asks the pair to talk about the round that just ended instead
+  of developing shorthand. The run still records
+  every character count. The protocol-probe and protocol-explanation metrics are
+  off in this mode, because their prompts assume a character-saving protocol.
 - `shared_link: true` (two-team only) — both teams share ONE link channel (all
   four viewers are members) instead of `link_a` / `link_b`, so each team can read
   the other's link messages; the `postmortem_a` / `postmortem_b` channels stay

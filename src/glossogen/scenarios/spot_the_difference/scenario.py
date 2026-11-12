@@ -191,6 +191,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             two_teams=knobs.two_teams,
             shared_link=knobs.shared_link,
             all_must_submit=knobs.all_must_submit,
+            score_characters=knobs.score_characters,
         )
 
     def scenario_description(self) -> str:
@@ -200,6 +201,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             template_variables={
                 "round_count": self._knobs.round_count,
                 "two_teams": self._knobs.two_teams,
+                "score_characters": self._knobs.score_characters,
             },
         )
 
@@ -215,6 +217,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
                 "two_teams": self._knobs.two_teams,
                 "shared_link": self._knobs.shared_link,
                 "all_must_submit": self._knobs.all_must_submit,
+                "score_characters": self._knobs.score_characters,
                 "round_time_budget_seconds": self._knobs.round_time_budget_seconds,
                 "grid_size": self._knobs.grid_size,
                 "difference_kinds": self._knobs.difference_kinds,
@@ -254,6 +257,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
             case=self._cases[round_number - 1],
             previous_outcome=self._previous_outcome(team_id=team_id),
             two_teams=self._knobs.two_teams,
+            score_characters=self._knobs.score_characters,
             renderer=self._renderer,
         )
 
@@ -269,6 +273,7 @@ class SpotTheDifferenceScenario(SimulationScenario):
         return render_postmortem_injection(
             round_number=round_number,
             previous_outcome=self._previous_outcome(team_id=team_id),
+            score_characters=self._knobs.score_characters,
             renderer=self._renderer,
         )
 
@@ -388,7 +393,12 @@ class SpotTheDifferenceScenario(SimulationScenario):
         return build_communication_rounds(events=events)
 
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
-        """Opt into the protocol-probe metric family with one symmetric viewer role group."""
+        """Opt into the protocol-probe metric family with one symmetric viewer role group.
+
+        None without ``score_characters``: the probe asks for the most efficient opening message.
+        """
+        if not self._knobs.score_characters:
+            return None
         scenario_root = Path(__file__).resolve().parent
         return ProtocolProbeConfig(
             questions_path=scenario_root / "protocol_probe_questions.json",
@@ -398,7 +408,12 @@ class SpotTheDifferenceScenario(SimulationScenario):
         )
 
     def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
-        """Tailor the protocol-explanation metric with the viewer describe template."""
+        """Tailor the protocol-explanation metric with the viewer describe template.
+
+        None without ``score_characters``: the debrief tells the agent it saved characters.
+        """
+        if not self._knobs.score_characters:
+            return None
         scenario_root = Path(__file__).resolve().parent
         return ProtocolExplanationConfig(
             prompts_dir=scenario_root / "prompts" / "describe",

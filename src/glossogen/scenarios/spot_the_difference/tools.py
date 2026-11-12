@@ -85,17 +85,26 @@ def build_tools(
     return [
         ScenarioTool(
             name=SUBMIT_DIFFERENCES_TOOL,
-            description=_tool_description(all_must_submit=world.all_must_submit),
+            description=_tool_description(
+                all_must_submit=world.all_must_submit, score_characters=world.score_characters
+            ),
             executor=submit_differences,
         ),
     ]
 
 
-def _tool_description(all_must_submit: bool) -> str:
-    """Build the tool description, noting the both-must-submit rule when enabled."""
+def _tool_description(all_must_submit: bool, score_characters: bool) -> str:
+    """Build the tool description, noting the both-must-submit rule when enabled.
+
+    Without ``score_characters`` the strings are not asked to be short.
+    """
+    if score_characters:
+        item_shape = "a list of short strings"
+    else:
+        item_shape = "a list of strings"
     base = (
         "Submit your team's final list of the differences between the two scenes. "
-        "Args: differences (a list of short strings, one per difference, each naming the "
+        f"Args: differences ({item_shape}, one per difference, each naming the "
         "object involved and how it differs). You must find every difference with no "
         "incorrect guesses to win."
     )
