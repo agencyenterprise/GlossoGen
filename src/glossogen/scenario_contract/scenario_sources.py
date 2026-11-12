@@ -16,9 +16,10 @@ A source is a path when it names an existing file or directory, and a module
 name otherwise. Nothing here reads a run's data: what a process imports comes
 only from its own command line, environment and project file.
 
-A child ``glossogen`` process gets ``GLOSSOGEN_SCENARIOS`` set to what its parent
-loaded (:func:`child_process_environment`), so it loads the same set whatever its
-working directory, without scanning.
+A child ``glossogen`` process gets ``GLOSSOGEN_SCENARIOS`` set to the modules its
+parent loaded, and ``PYTHONPATH`` extended with the directories they import from
+(:func:`child_process_environment`), so it imports the same modules under the
+same names whatever its working directory, without scanning.
 """
 
 import os
@@ -45,6 +46,7 @@ from glossogen.scenario_contract.scenario_source_kinds import (
 )
 
 SCENARIOS_ENV_VAR = "GLOSSOGEN_SCENARIOS"
+PYTHON_PATH_ENV_VAR = "PYTHONPATH"
 RUNS_DIR_ENV_VAR = "GLOSSOGEN_RUNS_DIR"
 PYPROJECT_NAME = "pyproject.toml"
 
@@ -151,14 +153,23 @@ def load_configured_scenario_catalog_unless_loaded() -> None:
 
 
 def child_process_environment() -> dict[str, str]:
-    """Return this process's environment with ``GLOSSOGEN_SCENARIOS`` set for a child.
+    """Return this process's environment, set up for a ``glossogen`` child.
 
-    The value lists what the current catalog loaded beyond the built-ins, as
-    module names and absolute file paths, so a ``glossogen`` child loads the same
-    scenarios without resolving or scanning anything.
+    ``GLOSSOGEN_SCENARIOS`` lists the modules the current catalog loaded beyond
+    the built-ins, by name, and ``PYTHONPATH`` starts with the directories the
+    file and directory sources imported them from. The child imports the same
+    modules under the same names, so a relative import inside a scenario package
+    works there too, without resolving or scanning anything.
     """
+    catalog = current_scenario_catalog()
     environment = dict(os.environ)
-    environment[SCENARIOS_ENV_VAR] = current_scenario_catalog().child_scenario_sources()
+    environment[SCENARIOS_ENV_VAR] = catalog.child_scenario_sources()
+    python_path = catalog.child_import_roots()
+    existing = environment.get(PYTHON_PATH_ENV_VAR)
+    if existing:
+        python_path.append(existing)
+    if python_path:
+        environment[PYTHON_PATH_ENV_VAR] = os.pathsep.join(python_path)
     return environment
 
 

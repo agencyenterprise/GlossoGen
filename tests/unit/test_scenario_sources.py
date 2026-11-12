@@ -6,6 +6,9 @@ restored afterwards, so module names can repeat across tests.
 """
 
 import logging
+import os
+import subprocess
+import sys
 import textwrap
 from pathlib import Path
 
@@ -19,7 +22,10 @@ from glossogen.scenario_contract.catalog import (
     ScenarioNotLoaded,
     load_scenario_catalog,
 )
-from glossogen.scenario_contract.scenario_source_kinds import DirectorySource
+from glossogen.scenario_contract.scenario_source_kinds import (
+    DirectorySource,
+    skipped_directory_reason,
+)
 from glossogen.scenario_contract.scenario_sources import (
     SCENARIOS_ENV_VAR,
     child_process_environment,
@@ -137,22 +143,38 @@ def test_a_scenario_file_inside_a_run_directory_is_never_imported(tmp_path: Path
     """Bundle import extracts any file into a run directory, so the scan must not read one.
 
     The run directory sits in a folder no command names as its runs directory,
-    so only its event log marks it as a run.
+    and its name is a valid module name, so only its event log marks it as a run.
     """
-    run_dir = tmp_path / "sweep_output" / "reactor" / "20261111_101500"
+    run_dir = tmp_path / "sweep_output" / "reactor" / "saved_run"
     write(
         root=tmp_path,
         files={
             "pyproject.toml": "",
-            "sweep_output/reactor/20261111_101500/reactor.jsonl": "",
-            "sweep_output/reactor/20261111_101500/planted.py": decorated_module(name="planted"),
+            "sweep_output/reactor/saved_run/reactor.jsonl": "",
+            "sweep_output/reactor/saved_run/planted.py": decorated_module(name="planted"),
         },
     )
-    assert run_dir.is_dir()
 
     loaded = load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
 
     assert loaded.find(name="planted") is None
+    reason = skipped_directory_reason(directory=run_dir.resolve(), skipped_paths=frozenset())
+    assert reason == "a run directory"
+
+
+def test_the_same_directory_without_an_event_log_is_scanned(tmp_path: Path) -> None:
+    """The control for the test above: the event log is what keeps the file out."""
+    write(
+        root=tmp_path,
+        files={
+            "pyproject.toml": "",
+            "sweep_output/reactor/saved_run/planted.py": decorated_module(name="planted"),
+        },
+    )
+
+    loaded = load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
+
+    assert loaded.find(name="planted") is not None
 
 
 @pytest.mark.parametrize("configured_by", ["flag", "env", "default"])
@@ -282,28 +304,74 @@ def test_a_file_outside_the_project_imports_as_its_own_stem(tmp_path: Path) -> N
     assert loaded.get(name="lone").__module__ == "lone_scenario"
 
 
-def test_a_child_loads_the_same_scenarios_from_its_parents_list(
+def test_a_child_gets_module_names_and_their_import_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The child gets absolute file paths, so it needs no scan and no particular cwd."""
+    """The child imports the same modules under the same names, with no scan."""
     write(
         root=tmp_path,
         files={"pyproject.toml": "", "experiments/reactor.py": decorated_module(name="reactor")},
     )
     parent = load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
     monkeypatch.setenv(SCENARIOS_ENV_VAR, "ignored by the child")
+    monkeypatch.setenv("PYTHONPATH", "/already/there")
 
-    child_value = child_process_environment()[SCENARIOS_ENV_VAR]
+    environment = child_process_environment()
 
-    assert child_value == str(tmp_path.resolve() / "experiments" / "reactor.py")
+    assert environment[SCENARIOS_ENV_VAR] == "experiments.reactor"
+    assert environment["PYTHONPATH"] == os.pathsep.join([str(tmp_path.resolve()), "/already/there"])
     child = load(
         working_dir=tmp_path,
         cli_sources=(),
-        environ={SCENARIOS_ENV_VAR: child_value},
+        environ={SCENARIOS_ENV_VAR: environment[SCENARIOS_ENV_VAR]},
         runs_dirs=(),
     )
-    assert child.names() == parent.names()
     assert child.get(name="reactor") is parent.get(name="reactor")
+
+
+def test_a_fresh_child_in_another_directory_keeps_the_package_context(tmp_path: Path) -> None:
+    """A package outside the project, using a relative import, loads in a real child process.
+
+    The child runs in a different working directory from the parent's project,
+    as a server-launched run may.
+    """
+    write(root=tmp_path, files={"project/pyproject.toml": "", "elsewhere/.keep": ""})
+    write(
+        root=tmp_path / "outside",
+        files={
+            "pack/helper.py": "NAME = 'relative_child'\n",
+            "pack/reactor.py": decorated_module(name="placeholder").replace(
+                "@scenario(name='placeholder')",
+                "from .helper import NAME\n\n\n@scenario(name=NAME)",
+            ),
+        },
+    )
+    load(
+        working_dir=tmp_path / "project",
+        cli_sources=(str(tmp_path / "outside" / "pack"),),
+        environ={},
+        runs_dirs=(),
+    )
+    environment = child_process_environment()
+
+    child = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from glossogen.scenario_contract.scenario_sources import "
+            "load_configured_scenario_catalog\n"
+            "loaded = load_configured_scenario_catalog(cli_sources=(), runs_dirs=())\n"
+            "print(loaded.get(name='relative_child').__module__)\n",
+        ],
+        cwd=tmp_path / "elsewhere",
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert child.returncode == 0, child.stderr
+    assert child.stdout.strip() == "pack.reactor"
 
 
 def test_a_child_of_a_built_in_only_parent_scans_nothing(tmp_path: Path) -> None:

@@ -61,12 +61,15 @@ class SourceImport(NamedTuple):
 
     ``module_names`` are the modules whose registered classes belong to the
     source. ``child_entries`` are the ``GLOSSOGEN_SCENARIOS`` entries that make a
-    child process import the same modules without resolving anything again: a
-    module name, or an absolute file path.
+    child process import the same modules without resolving anything again, as
+    module names. ``child_import_roots`` are the directories those names import
+    from, which a child gets on its ``PYTHONPATH``, so each module keeps the name
+    and package it had in the parent.
     """
 
     module_names: tuple[str, ...]
     child_entries: tuple[str, ...]
+    child_import_roots: tuple[str, ...]
 
 
 class ScenarioSource(Protocol):
@@ -87,6 +90,7 @@ class LoadedSource(NamedTuple):
     source: ScenarioSource
     scenario_names: tuple[str, ...]
     child_entries: tuple[str, ...]
+    child_import_roots: tuple[str, ...]
 
 
 class PackageScanSource(NamedTuple):
@@ -115,6 +119,7 @@ class PackageScanSource(NamedTuple):
         return SourceImport(
             module_names=tuple(import_package_scenario_modules(package=self.package)),
             child_entries=(),
+            child_import_roots=(),
         )
 
 
@@ -172,6 +177,18 @@ class ScenarioCatalog:
         return os.pathsep.join(
             entry for loaded in self._loaded_sources for entry in loaded.child_entries
         )
+
+    def child_import_roots(self) -> list[str]:
+        """Return the directories a child needs on ``sys.path`` to import this catalog's modules.
+
+        In load order, each once.
+        """
+        roots: list[str] = []
+        for loaded in self._loaded_sources:
+            for root in loaded.child_import_roots:
+                if root not in roots:
+                    roots.append(root)
+        return roots
 
     def not_loaded_message(self, name: str) -> str:
         """Explain that ``name`` is not loaded, listing where this catalog came from."""
@@ -249,6 +266,7 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
                 source=source,
                 scenario_names=tuple(sorted(from_source)),
                 child_entries=imported.child_entries,
+                child_import_roots=imported.child_import_roots,
             )
         )
     for name, scenario_cls in scenarios.items():

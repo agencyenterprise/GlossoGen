@@ -287,7 +287,9 @@ def test_loading_a_catalog_installs_its_event_types_for_the_run_readers(
     )
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
-    loaded = load_scenario_catalog(sources=(PackageScanSource(package="events_pkg", origin="test"),))
+    loaded = load_scenario_catalog(
+        sources=(PackageScanSource(package="events_pkg", origin="test"),)
+    )
 
     declared = loaded.event_types_of(name="with_events")
     assert declared is not None

@@ -79,7 +79,9 @@ class ModuleSource(NamedTuple):
                 f"Scenario source {self.describe()} failed to import: "
                 f"{type(exc).__name__}: {exc}"
             ) from exc
-        return SourceImport(module_names=tuple(imported), child_entries=(self.module,))
+        return SourceImport(
+            module_names=tuple(imported), child_entries=(self.module,), child_import_roots=()
+        )
 
 
 class FileSource(NamedTuple):
@@ -97,7 +99,11 @@ class FileSource(NamedTuple):
     def import_scenario_modules(self) -> SourceImport:
         """Import the file by its module name under the import root."""
         module_name = import_file(path=self.path, import_root=self.import_root, source=self)
-        return SourceImport(module_names=(module_name,), child_entries=(str(self.path),))
+        return SourceImport(
+            module_names=(module_name,),
+            child_entries=(module_name,),
+            child_import_roots=(str(self.import_root),),
+        )
 
 
 class DirectorySource(NamedTuple):
@@ -120,8 +126,9 @@ class DirectorySource(NamedTuple):
     def import_scenario_modules(self) -> SourceImport:
         """Import every file under the directory that registers a scenario.
 
-        A child process gets the files themselves, so it imports the same ones
-        without walking the directory again.
+        A child process gets the modules by name, with the import root on its
+        path, so it imports the same ones under the same names without walking
+        the directory again.
         """
         walk = _ScanWalk(skipped_paths=self.skipped_paths)
         walk.visit(directory=self.path)
@@ -142,8 +149,13 @@ class DirectorySource(NamedTuple):
                 self.describe(),
                 ", ".join(str(path) for path in walk.found),
             )
+        child_import_roots: tuple[str, ...] = ()
+        if module_names:
+            child_import_roots = (str(self.import_root),)
         return SourceImport(
-            module_names=module_names, child_entries=tuple(str(path) for path in walk.found)
+            module_names=module_names,
+            child_entries=module_names,
+            child_import_roots=child_import_roots,
         )
 
 
