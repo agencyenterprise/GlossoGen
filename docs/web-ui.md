@@ -10,8 +10,9 @@ glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000
 Open <http://localhost:3000> once it is up. `--ui-port` starts the UI from the
 published frontend container, so it needs Docker. Omit it to run the backend
 alone. The server runs in your own environment and loads the same scenario sources a
-command would (`--scenarios`, `GLOSSOGEN_SCENARIOS` or `pyproject.toml`), so
-your own scenarios appear in the UI.
+command would (`--scenarios`, `GLOSSOGEN_SCENARIOS`, `pyproject.toml`, or a scan
+of the project), so your own scenarios appear in the UI. Start it from your
+project directory.
 
 The flag runs the latest published UI, wires `API_URL` to the server it just
 started, and adds the UI's origin to CORS. `--ui-image` pins an older UI, which
@@ -142,9 +143,6 @@ backfilled at server startup. After that a direct file write reaches the mirror
 only when the server next reads the file (the run appearing on a listed page,
 its detail opening, or an export the run matches). Until then a label-filtered
 view can miss the run. Labels applied through the API are visible immediately.
-
-`glossogen evaluate` no longer writes `labels.json`, so `eval:*` labels exist
-only on runs evaluated before that changed.
 
 ### Describing a label
 
