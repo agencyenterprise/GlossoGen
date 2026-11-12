@@ -7,8 +7,8 @@
 [Live demo](https://emergentcomms.ai/demo)
 
 A platform for running controlled experiments on teams of LLM agents. A scenario
-puts several agents in a simulated task with their own roles, channels and tools;
-the platform plays it out in rounds, records every message, tool call and model
+puts several agents in a simulated task with their own roles, channels and tools.
+The platform plays it out in rounds, records every message, tool call and model
 response, and scores the run with the metrics you pick. The scenarios shipped
 here study communication under pressure: no agent holds enough information to
 succeed alone, and in most of them every character sent costs against a
@@ -28,8 +28,9 @@ glossogen needs Python 3.14 and is not on PyPI, so pin a tag from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
+uv init --python 3.14 my-study && cd my-study    # skip in an existing 3.14 project
 uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-# or, with pip:
+# or, with pip, into an active Python 3.14 environment:
 pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
