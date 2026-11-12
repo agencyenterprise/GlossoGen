@@ -10,6 +10,7 @@ import sys
 import tomllib
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
@@ -190,6 +191,7 @@ def handle_new_scenario(args: argparse.Namespace) -> None:
         working_dir=working_dir,
         project=project,
         uses_uv=is_uv_project(project=project),
+        is_glossogen_checkout=is_glossogen_checkout(project=project),
         environment_prefix=Path(sys.prefix),
         has_pytest=importlib.util.find_spec("pytest") is not None,
         glossogen_version=metadata.version("glossogen"),
@@ -201,14 +203,23 @@ def is_uv_project(project: ProjectLocation) -> bool:
     """Return whether the project is managed by uv: a ``uv.lock``, or a ``[tool.uv]`` table."""
     if (project.root / "uv.lock").is_file():
         return True
+    return "uv" in _read_pyproject(project=project).get("tool", {})
+
+
+def is_glossogen_checkout(project: ProjectLocation) -> bool:
+    """Return whether the project is glossogen itself, whose ``[project] name`` is ``glossogen``."""
+    return _read_pyproject(project=project).get("project", {}).get("name") == "glossogen"
+
+
+def _read_pyproject(project: ProjectLocation) -> dict[str, Any]:
+    """Return the project's parsed ``pyproject.toml``, or an empty table when it has none."""
     if project.pyproject is None:
-        return False
+        return {}
     try:
-        pyproject = tomllib.loads(project.pyproject.read_text(encoding="utf-8"))
+        return tomllib.loads(project.pyproject.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError:
         logger.exception("Could not parse %s", project.pyproject)
-        return False
-    return "uv" in pyproject.get("tool", {})
+        return {}
 
 
 def next_step_lines(
@@ -218,6 +229,7 @@ def next_step_lines(
     working_dir: Path,
     project: ProjectLocation,
     uses_uv: bool,
+    is_glossogen_checkout: bool,
     environment_prefix: Path,
     has_pytest: bool,
     glossogen_version: str,
@@ -228,6 +240,8 @@ def next_step_lines(
     environment outside the project (``environment_prefix`` is not under the
     project root), or that environment lacks pytest, which the ``testing`` extra
     brings. In a uv project the commands are spelled ``uv add`` and ``uv run``.
+    A glossogen checkout cannot depend on glossogen, so there the install step
+    is ``uv sync``, whose default development group brings pytest.
     """
     command_prefix = ""
     if uses_uv:
@@ -236,6 +250,12 @@ def next_step_lines(
     install_command = f"pip install {requirement}"
     if uses_uv:
         install_command = f"uv add {requirement}"
+    tag_line = f"   <tag> is a release tag; this glossogen is {glossogen_version}."
+    if is_glossogen_checkout:
+        install_command = "uv sync"
+        tag_line = (
+            "   This is a glossogen checkout, so it installs its own development environment."
+        )
     steps: list[list[str]] = []
     outside_project = not environment_prefix.resolve().is_relative_to(project.root)
     if outside_project:
@@ -244,7 +264,7 @@ def next_step_lines(
                 f"This glossogen runs from {environment_prefix}, outside the project. "
                 "Install it, with its test extra, in the project's environment:",
                 f"     {install_command}",
-                f"   <tag> is a release tag; this glossogen is {glossogen_version}.",
+                tag_line,
             ]
         )
     elif not has_pytest:
@@ -252,7 +272,7 @@ def next_step_lines(
             [
                 "Add glossogen's test extra, which brings pytest:",
                 f"     {install_command}",
-                f"   <tag> is a release tag; this glossogen is {glossogen_version}.",
+                tag_line,
             ]
         )
     steps.append(

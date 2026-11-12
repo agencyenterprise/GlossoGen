@@ -83,7 +83,8 @@ It then prints the next steps for the new folder: the key in `.env`, and the
 `validate`, `run` and `pytest` lines, spelled `uv run ...` in a uv project (one
 with a `uv.lock` or a `[tool.uv]` table). An install step comes first only when
 it applies: when glossogen ran from an environment outside the project, or one
-without pytest, which the `testing` extra brings. Run pytest from the project
+without pytest, which the `testing` extra brings. In a glossogen checkout that
+step is `uv sync`, since the checkout cannot depend on glossogen. Run pytest from the project
 root: the test looks the scenario up by name, the way `glossogen run` does. In a
 folder with no `pyproject.toml` above it, pytest run from inside the scenario's
 folder reports the scenario as not loaded, and the failure says to run it from

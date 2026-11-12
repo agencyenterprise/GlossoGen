@@ -39,7 +39,7 @@ def test_the_scenario_sources_load_this_scenario() -> None:
 def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every round reaches a recorded verdict, and no agent dies on the way."""
     result = asyncio.run(
-        run_rounds(
+        main=run_rounds(
             scenario_name=SCENARIO,
             preset_name=PRESET,
             round_count=2,
@@ -63,7 +63,7 @@ def test_relaying_the_code_word_wins_the_round(
     round fails. Script the relay to send the round's word and it passes.
     """
     result = asyncio.run(
-        run_rounds(
+        main=run_rounds(
             scenario_name=SCENARIO,
             preset_name=PRESET,
             round_count=1,

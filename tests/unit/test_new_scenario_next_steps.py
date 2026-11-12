@@ -7,12 +7,20 @@ outside the project or without its test extra. A uv project gets `uv add` and
 
 from pathlib import Path
 
-from glossogen.cli.scenario_authoring_commands import is_uv_project, next_step_lines
+from glossogen.cli.scenario_authoring_commands import (
+    is_glossogen_checkout,
+    is_uv_project,
+    next_step_lines,
+)
 from glossogen.scenario_contract.scenario_sources import ProjectLocation
 
 
 def steps(
-    project_root: Path, environment_prefix: Path, uses_uv: bool, has_pytest: bool
+    project_root: Path,
+    environment_prefix: Path,
+    uses_uv: bool,
+    has_pytest: bool,
+    is_glossogen_checkout: bool,
 ) -> list[str]:
     """Return the printed lines for a scenario `drill` in ``project_root``."""
     return next_step_lines(
@@ -22,6 +30,7 @@ def steps(
         working_dir=project_root,
         project=ProjectLocation(root=project_root, pyproject=project_root / "pyproject.toml"),
         uses_uv=uses_uv,
+        is_glossogen_checkout=is_glossogen_checkout,
         environment_prefix=environment_prefix,
         has_pytest=has_pytest,
         glossogen_version="0.0.0",
@@ -37,6 +46,7 @@ def test_no_install_step_when_glossogen_runs_from_the_project_environment(
         environment_prefix=tmp_path / ".venv",
         uses_uv=False,
         has_pytest=True,
+        is_glossogen_checkout=False,
     )
 
     assert not any("pip install" in line or "uv add" in line for line in lines)
@@ -51,6 +61,7 @@ def test_a_uv_project_gets_uv_run_commands(tmp_path: Path) -> None:
         environment_prefix=tmp_path / ".venv",
         uses_uv=True,
         has_pytest=True,
+        is_glossogen_checkout=False,
     )
 
     assert "  2. uv run glossogen validate ./drill" in lines
@@ -67,12 +78,14 @@ def test_glossogen_from_outside_the_project_gets_the_install_step(tmp_path: Path
         environment_prefix=tmp_path / "elsewhere",
         uses_uv=False,
         has_pytest=True,
+        is_glossogen_checkout=False,
     )
     uv_lines = steps(
         project_root=project,
         environment_prefix=tmp_path / "elsewhere",
         uses_uv=True,
         has_pytest=True,
+        is_glossogen_checkout=False,
     )
 
     assert any(line.strip().startswith('pip install "glossogen[testing]') for line in pip_lines)
@@ -86,6 +99,7 @@ def test_a_missing_pytest_gets_the_test_extra(tmp_path: Path) -> None:
         environment_prefix=tmp_path / ".venv",
         uses_uv=False,
         has_pytest=False,
+        is_glossogen_checkout=False,
     )
 
     assert "  1. Add glossogen's test extra, which brings pytest:" in lines
@@ -104,3 +118,28 @@ def test_a_uv_project_is_recognised_by_its_lock_or_its_table(tmp_path: Path) -> 
     pyproject.write_text('[project]\nname = "x"\nversion = "0"\n')
     (tmp_path / "uv.lock").write_text("")
     assert is_uv_project(project=project)
+
+
+def test_a_glossogen_checkout_is_told_to_sync_not_to_add_itself(tmp_path: Path) -> None:
+    """`uv add glossogen` inside glossogen is a self-dependency, which uv refuses."""
+    lines = steps(
+        project_root=tmp_path,
+        environment_prefix=tmp_path / ".venv",
+        uses_uv=True,
+        has_pytest=False,
+        is_glossogen_checkout=True,
+    )
+
+    assert "       uv sync" in lines
+    assert not any("uv add" in line or "pip install" in line for line in lines)
+
+
+def test_a_checkout_is_recognised_by_its_project_name(tmp_path: Path) -> None:
+    """The `[project] name` is what makes `uv add glossogen` a self-dependency."""
+    pyproject = tmp_path / "pyproject.toml"
+    project = ProjectLocation(root=tmp_path, pyproject=pyproject)
+    pyproject.write_text('[project]\nname = "glossogen"\nversion = "0"\n')
+    assert is_glossogen_checkout(project=project)
+
+    pyproject.write_text('[project]\nname = "reactor-lab"\nversion = "0"\n')
+    assert not is_glossogen_checkout(project=project)

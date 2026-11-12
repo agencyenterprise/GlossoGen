@@ -10,6 +10,9 @@ through the same two gates the command's next steps tell its author to run.
 Nothing is installed, no LLM is called, and no clock is waited on.
 """
 
+import asyncio
+import os
+import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -147,3 +150,40 @@ async def test_the_generated_event_reaches_the_log(
     opened = result.of_type(event_type=round_opened)
     assert len(opened) == 1
     assert getattr(opened[0], "code_word")
+
+
+async def test_the_generated_test_file_passes_under_plain_pytest(tmp_path: Path) -> None:
+    """The file `new-scenario` writes passes in a project with no pytest configuration.
+
+    It runs in a pytest process of its own, from the project root, with plugin
+    autoloading off, so pytest-asyncio is not loaded and the repository's
+    `asyncio_mode = "auto"` does not apply. A generated async test, or a broken
+    call inside a sync one, fails here.
+    """
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "drill-lab"\nversion = "0"\n')
+    written = write_scenario_folder(scenario_name=SCENARIO_NAME, target_dir=tmp_path)
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in ("GLOSSOGEN_SCENARIOS", "PYTEST_ADDOPTS")
+        and not name.startswith("PYTEST_XDIST")
+    }
+    environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        str(written.test_path.relative_to(tmp_path)),
+        cwd=tmp_path,
+        env=environment,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    output, _ = await process.communicate()
+
+    assert process.returncode == 0, output.decode()
+    assert b"3 passed" in output, output.decode()

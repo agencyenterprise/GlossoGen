@@ -205,7 +205,6 @@ class DirectorySource(NamedTuple):
         walk = _ScanWalk(root=self.path, skipped_paths=self.skipped_paths)
         walk.visit_root()
         advice = _rename_advice(inside_project=self.inside_project, is_directory=True)
-        imported: list[Path] = []
         newly_imported: list[Path] = []
         module_names: list[str] = []
         child_entries: list[str] = []
@@ -225,7 +224,6 @@ class DirectorySource(NamedTuple):
                 import_file(
                     path=path, module_name=module_name, import_root=self.import_root, source=self
                 )
-            imported.append(path)
             if module_name not in modules_before:
                 newly_imported.append(path)
             module_names.append(module_name)

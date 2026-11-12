@@ -96,7 +96,7 @@ def test_the_generated_test_needs_no_pytest_plugin(tmp_path: Path) -> None:
 
     assert "async def test_" not in test_source
     assert "pytest.mark.asyncio" not in test_source
-    assert "asyncio.run(" in test_source
+    assert "main=run_rounds(" in test_source
     assert f"from {SCENARIO}" not in test_source, "the test looks the scenario up by name"
 
 
