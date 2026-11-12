@@ -390,6 +390,28 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- `glossogen new-scenario` counts the built-in scenarios package when it checks
+  that the new folder is loaded, so `--target-dir src/glossogen/scenarios` in a
+  checkout no longer asks for a `[tool.glossogen] scenarios` entry. Its next
+  steps drop the install step unless glossogen ran from outside the project or
+  without pytest, and use `uv add` / `uv run` in a uv project.
+- The test `new-scenario` writes is plain functions calling the harness with
+  `asyncio.run`, with no `@pytest.mark.asyncio`. A test written by an earlier
+  version keeps working.
+- `assert_scenario_is_loaded` and `assert_scenario_is_registered`, run with no
+  `pyproject.toml` at or above the working directory, say to run pytest from the
+  project root.
+- `glossogen validate <path>` logs each scanned file's "Registered scenarios"
+  line once.
+- `round_success_after_resume` names the rounds it scored, `post-resume rounds
+  3-3`, where it printed the manifest's stored window, `rounds_after_swap=0`,
+  one less than the rounds played. Scores were right; only the summary and a
+  skip log line changed.
+- glossogen's commands turn off pydantic-ai's first-run "observability: off"
+  banner, which read as a statement about Langfuse tracing.
+- An empty or blank `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` or
+  `LANGFUSE_HOST` counts as unset, so blanking the keys disables tracing instead
+  of logging a Langfuse authentication warning on every run.
 - `glossogen new-scenario` refuses a name that is already an importable module
   (`signal`, `secrets`, an installed package, `glossogen`), before writing
   anything. Such a folder hid that module and stopped every later command.

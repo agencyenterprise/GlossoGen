@@ -13,14 +13,17 @@ pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/Glosso
 `<tag>` is a release, as in [Installation](installation.md#as-a-dependency).
 Run pytest from the project root, where `glossogen run` would find your
 scenario. In a folder with no `pyproject.toml` above it, pytest run from inside
-the scenario's folder reports the scenario as not loaded.
+the scenario's folder reports the scenario as not loaded, and says to run it from
+the project root.
 
-The extra installs `pytest-asyncio`. Mark each async test
-`@pytest.mark.asyncio`, as the test `new-scenario` writes does, or set
+The harness is async. The test `new-scenario` writes calls it from plain test
+functions with `asyncio.run`, which needs no plugin. For async tests of your own,
+the extra installs `pytest-asyncio`: mark each one `@pytest.mark.asyncio`, or set
 `asyncio_mode = "auto"` in your pytest configuration. An unmarked async test
 without that setting errors with "async def functions are not natively
-supported". With no pytest configuration at all, `pytest-asyncio` also prints a
-`PytestDeprecationWarning` about `asyncio_default_fixture_loop_scope`. It is
+supported". With no pytest configuration at all, an installed `pytest-asyncio`
+prints a `PytestDeprecationWarning` about `asyncio_default_fixture_loop_scope`
+when pytest starts, whichever tests then run, the generated ones included. It is
 harmless, and this in `pyproject.toml` silences it:
 
 ```toml

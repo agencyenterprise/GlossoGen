@@ -2,16 +2,20 @@
 
 The on-disk ``replace_manifest.json`` fields (``round_start``,
 ``rounds_after_swap``) are frozen: every previously recorded run carries them.
-The metric layer reads them raw, the API layer translates them to
-``after_round`` / ``rounds_after``, and the resume preflight reads the entry
-round. These tests pin that the readers all describe the same played rounds,
-for a manifest written before the fork-at-round rename and for one the new
-prepare flow writes.
+The metric layer translates them to an inclusive ``round_start`` to
+``round_end`` window, the API layer to ``after_round`` / ``rounds_after``, and
+the resume preflight reads the entry round. These tests pin that the readers
+all describe the same played rounds, for a manifest written before the
+fork-at-round rename and for one the new prepare flow writes.
 """
 
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.resume_anchors import ResumeAnchor, candidate_rounds
+from glossogen.evaluation.metric_core.resume_anchors import (
+    ResumeAnchor,
+    candidate_rounds,
+    read_resume_anchors,
+)
 from glossogen.models.event import RoundAdvanced
 from glossogen.run_replay.resume_state_loader import resume_first_round
 from glossogen.run_storage.derivation_manifest_reader import read_fork_at_round_source
@@ -47,7 +51,7 @@ def test_the_metric_window_and_the_api_translation_cover_the_same_rounds(
 
     anchor = ResumeAnchor(
         round_start=15,
-        rounds_after_swap=10,
+        round_end=25,
         flow_label="fork-at-round",
         external_source_run_id="smoke/1",
         external_source_run_dir="/runs/smoke/1",
@@ -100,3 +104,17 @@ def test_preflight_reads_the_entry_round_from_the_manifest_after_a_final_round_f
 def test_preflight_answers_one_for_a_fresh_run() -> None:
     """No resume directory means the run opens at round 1."""
     assert resume_first_round(resume_dir=None, scenario_name="smoke") == 1
+
+
+def test_a_fork_after_the_second_of_three_rounds_plays_one_round(tmp_path: Path) -> None:
+    """`replace-agent --after-round 2` on a 3-round run stores ``rounds_after_swap=0``.
+
+    The stored window is one less than the rounds played, so the anchor the metric
+    reads ends at round 3, and the one played round is its whole window.
+    """
+    _write_manifest(run_dir=tmp_path, round_start=3, rounds_after_swap=0)
+
+    [anchor] = read_resume_anchors(events=[], run_dir=tmp_path)
+
+    assert (anchor.round_start, anchor.round_end) == (3, 3)
+    assert candidate_rounds(anchor=anchor) == {3}

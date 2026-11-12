@@ -7,6 +7,7 @@ not reach it. That the folder also *runs* is a separate test, in
 tests/integration.
 """
 
+import logging
 import os
 import shlex
 import sys
@@ -15,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.cli.cli_entry import main
+from glossogen.scenario_authoring import scenario_scaffold
 from glossogen.scenario_authoring.scenario_scaffold import (
     ScaffoldError,
     SourceReach,
@@ -25,6 +27,7 @@ from glossogen.scenario_authoring.scenario_scaffold import (
 )
 from glossogen.scenario_contract import catalog
 from glossogen.scenario_contract.catalog import (
+    PackageScanSource,
     ScenarioSource,
     current_scenario_catalog,
 )
@@ -81,13 +84,19 @@ def test_the_module_registers_the_scenario_under_its_name(tmp_path: Path) -> Non
     assert "def event_types(cls)" in module
 
 
-def test_the_generated_test_needs_no_pytest_configuration(tmp_path: Path) -> None:
-    """A project without `asyncio_mode = "auto"` would error on an unmarked async test."""
+def test_the_generated_test_needs_no_pytest_plugin(tmp_path: Path) -> None:
+    """The tests are sync and drive the harness with `asyncio.run`.
+
+    An async test needs pytest-asyncio and, unmarked, `asyncio_mode = "auto"`;
+    a sync one runs under plain pytest in a project with no pytest configuration.
+    """
     test_source = (
         generate(target=tmp_path, scenario_name=SCENARIO) / f"test_{SCENARIO}.py"
     ).read_text()
 
-    assert test_source.count("async def test_") == test_source.count("@pytest.mark.asyncio")
+    assert "async def test_" not in test_source
+    assert "pytest.mark.asyncio" not in test_source
+    assert "asyncio.run(" in test_source
     assert f"from {SCENARIO}" not in test_source, "the test looks the scenario up by name"
 
 
@@ -208,6 +217,47 @@ def test_a_package_named_as_a_module_source_reaches_a_folder_inside_it(
     )
 
     assert reach == SourceReach(reached=True, failure=None)
+
+
+@pytest.mark.usefixtures("isolated_scenario_imports")
+def test_the_built_in_source_reaches_a_folder_written_into_its_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A folder written into the built-in package is loaded with nothing configured.
+
+    That is `--target-dir src/glossogen/scenarios` in a glossogen checkout.
+
+    A package on a temporary path stands in for the built-in one, since no test
+    writes into the package the repo ships. The check once skipped the built-in
+    sources and told the user to configure a folder that was already loaded.
+    """
+    package = tmp_path / "built_in_stand_in"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+    built_in = PackageScanSource(package="built_in_stand_in", origin="built-in")
+    monkeypatch.setattr(scenario_scaffold, "built_in_scenario_sources", lambda: (built_in,))
+    written = write_scenario_folder(scenario_name=SCENARIO, target_dir=package)
+
+    reach = sources_reach(module_path=written.module_path, sources=(built_in,))
+
+    assert reach == SourceReach(reached=True, failure=None)
+
+
+@pytest.mark.usefixtures("isolated_scenario_imports")
+def test_importing_a_source_again_logs_its_registrations_once(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """`validate <path>` loads the catalog a second time; the scan's line is not repeated."""
+    generate(target=tmp_path, scenario_name=SCENARIO)
+    [scan] = configured_sources(sources=sources_from(working_dir=tmp_path))
+
+    with caplog.at_level(logging.INFO):
+        scan.import_scenario_modules()
+        scan.import_scenario_modules()
+
+    registered = [r for r in caplog.records if r.getMessage().startswith("Registered scenarios")]
+    assert len(registered) == 1
 
 
 def assert_loaded_by_a_fresh_catalog(monkeypatch: pytest.MonkeyPatch) -> None:

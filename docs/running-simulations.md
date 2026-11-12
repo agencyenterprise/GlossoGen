@@ -349,7 +349,7 @@ declare -a GPT_SPECS=("<source_a> <knobs.json>" "<source_b> <knobs.json>")
 declare -a SONNET_SPECS=("<source_c> <knobs.json>" "<source_d> <knobs.json>")
 
 count_running_for_model() {
-  pgrep -f "[Pp]ython[0-9.]* -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "/(glossogen|[Pp]ython[0-9.]* -m glossogen) run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 launch_one() {
@@ -384,7 +384,7 @@ it outlives your terminal. Then watch the log and count the live simulations:
 ```bash
 nohup bash sweep.sh > sweep.stdout 2>&1 &
 tail -20 sweep.log
-pgrep -f "[Pp]ython[0-9.]* -m glossogen run veyru" | wc -l
+pgrep -f "/(glossogen|[Pp]ython[0-9.]* -m glossogen) run veyru" | wc -l
 ```
 
 Each `replace-agent`, `cross-run-replace-agent` and `fork-at-round` call prepares
@@ -393,15 +393,18 @@ returns. The simulation writes its own `<scenario>_stdout.log` in the new
 directory. A fresh `glossogen run` does not detach, so a queue of them launches
 each with `&`.
 
-**Anchor the `pgrep` pattern on the interpreter.** A fork's simulation runs as
-`<interpreter> -m glossogen run ...`, under the interpreter that launched it:
-`python`, `python3.14`, or `Python` on Homebrew's macOS build. The pattern
-`[Pp]ython[0-9.]* -m glossogen run` matches each of them. A loose
-pattern such as `glossogen run veyru` also matches any shell whose command line
-quotes it, the counting shell included. Keep the count in a function rather
-than inlined into a wrapping command for the same reason. A `glossogen run` you
-launched yourself shows as `.../bin/glossogen run ...` instead, so count those
-with `bin/glossogen run`.
+**Anchor the `pgrep` pattern on a path.** A simulation shows in the process
+list in one of two forms. A fork's, or one started with `python -m glossogen`,
+is `<interpreter> -m glossogen run ...`, where the interpreter is a full path
+ending in `python`, `python3.14`, or `Python` on Homebrew's macOS build. One
+started as `glossogen run ...` is `<interpreter> .../bin/glossogen run ...`. The
+pattern `/(glossogen|[Pp]ython[0-9.]* -m glossogen) run` matches both by the `/`
+before them. It does not match a `uv run python -m glossogen ...` wrapper, whose
+`python` follows a space, so a run started through `uv run` is counted once. It
+does not match the counting shell either, whose command line holds the pattern
+itself rather than text it matches. A looser pattern such as `glossogen run veyru`
+matches both of those. Keep the count in a function rather than inlined into a
+wrapping command, so no other command line quotes the pattern.
 
 **Override a knob together with the knobs its validators check against it.** A
 config that fails validation exits before claiming a run directory, so a

@@ -123,12 +123,11 @@ class RoundSuccessAfterResumeMetric(Metric):
             # No post-swap verdict is no measurement: a zero would read as a
             # window where every round failed.
             logger.info(
-                "%s: skipping %s, which recorded no verdict after its swap "
-                "(round_start=%d, rounds_after_swap=%d)",
+                "%s: skipping %s, which recorded no verdict after its swap " "(rounds %d-%d)",
                 anchor_metric_name(base_name=self.name, anchor=anchor),
                 anchor.flow_label,
                 anchor.round_start,
-                anchor.rounds_after_swap,
+                anchor.round_end,
             )
             return []
         resumed_sides = _score_window(
@@ -257,8 +256,7 @@ def _build_side_measurement(
     pct = round(score * 100)
     headline = (
         f"Resumed: {resumed_side.won}/{resumed_side.total} ({pct}%) won "
-        f"in post-resume rounds (round_start={anchor.round_start}, "
-        f"rounds_after_swap={anchor.rounds_after_swap})."
+        f"in post-resume rounds {anchor.round_start}-{anchor.round_end}."
     )
     summary_parts = [headline]
     baseline_descriptor = _baseline_descriptor(anchor=anchor)

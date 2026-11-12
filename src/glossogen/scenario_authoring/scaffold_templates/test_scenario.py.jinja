@@ -7,10 +7,14 @@ starts, and a check that the project's scenario sources load the scenario.
 No LLM, no network, and no waiting on a clock: the agents are scripted, so the
 harness knows when they have finished rather than guessing.
 
+The harness is async; each test drives it with `asyncio.run`, so the tests need
+no pytest plugin and no pytest configuration.
+
 The scenario is looked up by name rather than imported, so these tests find it
 the way `glossogen run` does. Run pytest from the project root.
 """
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -32,24 +36,24 @@ def test_the_scenario_sources_load_this_scenario() -> None:
     assert_scenario_is_loaded(scenario_name=SCENARIO)
 
 
-@pytest.mark.asyncio
-async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every round reaches a recorded verdict, and no agent dies on the way."""
-    result = await run_rounds(
-        scenario_name=SCENARIO,
-        preset_name=PRESET,
-        round_count=2,
-        overrides={},
-        tmp_path=tmp_path,
-        monkeypatch=monkeypatch,
+    result = asyncio.run(
+        run_rounds(
+            scenario_name=SCENARIO,
+            preset_name=PRESET,
+            round_count=2,
+            overrides={},
+            tmp_path=tmp_path,
+            monkeypatch=monkeypatch,
+        )
     )
 
     assert_round_loop_completed(result=result, round_count=2)
     assert_no_agent_crashed(result=result)
 
 
-@pytest.mark.asyncio
-async def test_relaying_the_code_word_wins_the_round(
+def test_relaying_the_code_word_wins_the_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The scoring rule, driven end to end rather than called directly.
@@ -58,13 +62,15 @@ async def test_relaying_the_code_word_wins_the_round(
     The scripted agents above only chat, so the word is never relayed and the
     round fails. Script the relay to send the round's word and it passes.
     """
-    result = await run_rounds(
-        scenario_name=SCENARIO,
-        preset_name=PRESET,
-        round_count=1,
-        overrides={},
-        tmp_path=tmp_path,
-        monkeypatch=monkeypatch,
+    result = asyncio.run(
+        run_rounds(
+            scenario_name=SCENARIO,
+            preset_name=PRESET,
+            round_count=1,
+            overrides={},
+            tmp_path=tmp_path,
+            monkeypatch=monkeypatch,
+        )
     )
 
     verdicts = result.of_type(event_type=RoundResultRecorded)
