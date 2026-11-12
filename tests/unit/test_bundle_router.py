@@ -323,3 +323,20 @@ def test_a_bundle_with_long_names_and_long_links_still_reads() -> None:
     with BundleTarFile.open(fileobj=buffer, mode="r:gz") as tar:
         _validate_tar_members(tar=tar)
         assert len(tar.getnames()) == 3
+
+
+async def test_a_run_of_a_scenario_this_server_has_not_loaded_imports(tmp_path: Path) -> None:
+    """Its first event is a platform event, so it reads without the scenario's code."""
+    runs_dir = tmp_path / "runs"
+    bundle = _bundle_with_event(
+        _started(scenario_name="not_loaded_here"),
+        manifest_scenario_name="not_loaded_here",
+    )
+
+    response = await import_run_bundle(
+        file=UploadFile(file=io.BytesIO(bundle), filename="run.tar.gz"),
+        request=_request(runs_dir=runs_dir),
+    )
+
+    assert response.run_id == ORIGIN_RUN_ID
+    assert Path(response.run_dir).parent == runs_dir / "not_loaded_here"

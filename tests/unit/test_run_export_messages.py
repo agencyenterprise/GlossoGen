@@ -103,10 +103,24 @@ def send_result_event(message_id: str, pristine_text: str) -> dict[str, object]:
     }
 
 
+START_EVENT: dict[str, object] = {
+    "event_id": "start",
+    "event_type": "simulation_started",
+    "timestamp": "2026-05-04T18:53:43+00:00",
+    "round_number": 0,
+    "run_id": RUN_ID,
+    "scenario_name": SCENARIO,
+    "scenario_description": "",
+    "channel_ids": ["link"],
+    "scenario_config": {},
+    "provider": "anthropic",
+}
+
+
 def write_log(run_dir: Path, lines: list[dict[str, object]]) -> None:
-    """Write a JSONL event log from raw event dicts."""
+    """Write a JSONL event log from raw event dicts, after the start event naming the scenario."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    payload = b"\n".join(orjson.dumps(line) for line in lines) + b"\n"
+    payload = b"\n".join(orjson.dumps(line) for line in [START_EVENT, *lines]) + b"\n"
     (run_dir / f"{SCENARIO}.jsonl").write_bytes(payload)
 
 
@@ -252,7 +266,9 @@ def test_a_truncated_final_line_is_skipped(tmp_path: Path) -> None:
             text="hello",
         )
     )
-    (run_dir / f"{SCENARIO}.jsonl").write_bytes(good + b'\n{"event_type": "message_se')
+    (run_dir / f"{SCENARIO}.jsonl").write_bytes(
+        orjson.dumps(START_EVENT) + b"\n" + good + b'\n{"event_type": "message_se'
+    )
     scan = scan_message_events(log_path=run_dir / f"{SCENARIO}.jsonl")
 
     assert [event.message.message_id for event in scan.messages] == ["m1"]
@@ -688,6 +704,7 @@ def test_a_stale_scenario_event_does_not_lose_the_injections(run_dir: Path) -> N
         b"\n".join(
             orjson.dumps(line)
             for line in [
+                START_EVENT,
                 STALE_CASE_EVENT,
                 injection_event(round_number=1, agent_id="yard_lead", text="brief"),
             ]

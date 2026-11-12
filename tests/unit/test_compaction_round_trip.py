@@ -12,6 +12,7 @@ from glossogen.models.event import (
     SimulationEvent,
     SimulationStarted,
     StopReason,
+    core_event_types,
 )
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
@@ -39,18 +40,23 @@ def _stamp(events: list[SimulationEvent]) -> list[SimulationEvent]:
     ]
 
 
+def _started() -> SimulationStarted:
+    """The first line of every log here: it names the scenario the log is read with."""
+    return SimulationStarted(
+        round_number=0,
+        run_id="smoke/1",
+        scenario_name="smoke",
+        scenario_description="",
+        channel_ids=[],
+        scenario_config={},
+        provider="openai",
+    )
+
+
 def _events() -> list[SimulationEvent]:
     return _stamp(
         [
-            SimulationStarted(
-                round_number=0,
-                run_id="smoke/1",
-                scenario_name="smoke",
-                scenario_description="",
-                channel_ids=[],
-                scenario_config={},
-                provider="openai",
-            ),
+            _started(),
             ContextCompacted(
                 round_number=1,
                 agent_id=_AGENT,
@@ -128,9 +134,12 @@ async def test_stream_logging_records_compaction_identifiers_and_details(tmp_pat
         telemetry_enabled=False,
     )
     event_logger = EventLogger(
-        log_path=tmp_path / "smoke.jsonl", event_bus=EventBus(max_queue_size=8)
+        log_path=tmp_path / "smoke.jsonl",
+        event_bus=EventBus(max_queue_size=8),
+        allowed_event_types=frozenset(core_event_types()),
     )
     await event_logger.open()
+    await event_logger.log(event=_started())
     state = _StreamingState()
     for event in [
         PartStartEvent(
@@ -174,9 +183,12 @@ async def test_compaction_is_logged_after_the_response_that_preceded_it(
         telemetry_enabled=False,
     )
     event_logger = EventLogger(
-        log_path=tmp_path / "smoke.jsonl", event_bus=EventBus(max_queue_size=8)
+        log_path=tmp_path / "smoke.jsonl",
+        event_bus=EventBus(max_queue_size=8),
+        allowed_event_types=frozenset(core_event_types()),
     )
     await event_logger.open()
+    await event_logger.log(event=_started())
     state = _StreamingState()
     state.accumulated_tool_calls.append(
         ToolCallRequest(call_id="call-1", tool_name="read_channel", arguments={})
@@ -202,7 +214,7 @@ async def test_compaction_is_logged_after_the_response_that_preceded_it(
     await asyncio.gather(*state.background_tasks)
     await event_logger.close()
 
-    logged = await load_events(log_path=tmp_path / "smoke.jsonl")
+    _, *logged = await load_events(log_path=tmp_path / "smoke.jsonl")
 
     assert isinstance(logged[0], LLMResponseReceived)
     assert isinstance(logged[1], ContextCompacted)

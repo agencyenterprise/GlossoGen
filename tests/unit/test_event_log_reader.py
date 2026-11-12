@@ -48,6 +48,20 @@ def base_row(*, event_id: str, event_type: str, **extra: Any) -> dict[str, Any]:
     return {"event_id": event_id, "event_type": event_type, "timestamp": FIXED_TIME, **extra}
 
 
+def start_row(*, scenario_name: str) -> dict[str, Any]:
+    """The `simulation_started` row every log opens with, naming the run's scenario."""
+    return base_row(
+        event_id="start",
+        event_type="simulation_started",
+        run_id=f"{scenario_name}/1780000000",
+        scenario_name=scenario_name,
+        scenario_description="d",
+        scenario_config={},
+        channel_ids=["link"],
+        provider="anthropic",
+    )
+
+
 def message_row(*, event_id: str, text: str) -> dict[str, Any]:
     """A `message_sent` row whose nested message also lacks a round."""
     return base_row(
@@ -104,16 +118,7 @@ async def test_events_before_the_first_round_belong_to_round_zero(tmp_path: Path
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
-            base_row(
-                event_id="start",
-                event_type="simulation_started",
-                run_id="smoke/1780000000",
-                scenario_name="smoke",
-                scenario_description="d",
-                scenario_config={},
-                channel_ids=["link"],
-                provider="anthropic",
-            ),
+            start_row(scenario_name="smoke"),
             registration_row(agent_id="agent_a", model="claude-sonnet-4-6"),
         ],
     )
@@ -126,6 +131,7 @@ async def test_a_missing_round_is_inferred_from_the_last_advance(tmp_path: Path)
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             base_row(event_id="adv1", event_type="round_advanced", round_number=1, trigger="start"),
             message_row(event_id="m1", text="first"),
             base_row(event_id="adv2", event_type="round_advanced", round_number=2, trigger="idle"),
@@ -134,7 +140,7 @@ async def test_a_missing_round_is_inferred_from_the_last_advance(tmp_path: Path)
         ],
     )
     events = await load_events(log_path=path)
-    assert [event.round_number for event in events] == [1, 1, 2, 2, 2]
+    assert [event.round_number for event in events] == [0, 1, 1, 2, 2, 2]
 
 
 async def test_the_nested_message_gets_the_round_too(tmp_path: Path) -> None:
@@ -146,12 +152,13 @@ async def test_the_nested_message_gets_the_round_too(tmp_path: Path) -> None:
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             base_row(event_id="adv1", event_type="round_advanced", round_number=4, trigger="idle"),
             message_row(event_id="m1", text="in round four"),
         ],
     )
     events = await load_events(log_path=path)
-    sent = events[1]
+    sent = events[2]
     assert isinstance(sent, MessageSent)
     assert sent.round_number == 4
     assert sent.message.round_number == 4
@@ -162,26 +169,29 @@ async def test_an_explicit_round_is_left_alone(tmp_path: Path) -> None:
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             base_row(event_id="adv1", event_type="round_advanced", round_number=3, trigger="idle"),
             message_row(event_id="m1", text="tagged") | {"round_number": 99},
         ],
     )
     events = await load_events(log_path=path)
-    assert events[1].round_number == 99
+    assert events[2].round_number == 99
 
 
 async def test_blank_lines_are_skipped(tmp_path: Path) -> None:
     """A trailing newline is normal and must not fail the read."""
     path = tmp_path / "run.jsonl"
     path.write_bytes(
-        orjson.dumps(
+        orjson.dumps(start_row(scenario_name="smoke"))
+        + b"\n\n"
+        + orjson.dumps(
             base_row(event_id="adv1", event_type="round_advanced", round_number=1, trigger="start")
         )
         + b"\n\n"
     )
     events = await load_events(log_path=path)
-    assert len(events) == 1
-    assert isinstance(events[0], RoundAdvanced)
+    assert len(events) == 2
+    assert isinstance(events[1], RoundAdvanced)
 
 
 async def test_a_response_logged_before_reasoning_tokens_reads_as_none_spent(
@@ -195,6 +205,7 @@ async def test_a_response_logged_before_reasoning_tokens_reads_as_none_spent(
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             response_row(
                 event_id="r1",
                 usage={
@@ -203,11 +214,11 @@ async def test_a_response_logged_before_reasoning_tokens_reads_as_none_spent(
                     "cache_read_input_tokens": 0,
                     "cache_creation_input_tokens": 0,
                 },
-            )
+            ),
         ],
     )
     events = await load_events(log_path=path)
-    response = events[0]
+    response = events[1]
     assert isinstance(response, LLMResponseReceived)
     assert response.usage.reasoning_tokens == 0
     assert response.usage.output_tokens == 40
@@ -218,6 +229,7 @@ async def test_a_response_logged_with_reasoning_tokens_keeps_them(tmp_path: Path
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             response_row(
                 event_id="r1",
                 usage={
@@ -227,11 +239,11 @@ async def test_a_response_logged_with_reasoning_tokens_keeps_them(tmp_path: Path
                     "cache_read_input_tokens": 0,
                     "cache_creation_input_tokens": 0,
                 },
-            )
+            ),
         ],
     )
     events = await load_events(log_path=path)
-    response = events[0]
+    response = events[1]
     assert isinstance(response, LLMResponseReceived)
     assert response.usage.reasoning_tokens == 808
 
@@ -241,6 +253,7 @@ async def test_agent_configs_are_rebuilt_from_their_registrations(tmp_path: Path
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             registration_row(agent_id="agent_a", model="claude-sonnet-4-6"),
             registration_row(agent_id="agent_b", model="gpt-5.4"),
             message_row(event_id="m1", text="hello"),
@@ -261,7 +274,10 @@ async def test_rebuilt_configs_report_the_default_compaction(tmp_path: Path) -> 
     """
     path = write_log(
         path=tmp_path / "run.jsonl",
-        rows=[registration_row(agent_id="agent_a", model="claude-sonnet-4-6")],
+        rows=[
+            start_row(scenario_name="smoke"),
+            registration_row(agent_id="agent_a", model="claude-sonnet-4-6"),
+        ],
     )
     configs = extract_agent_configs(events=await load_events(log_path=path))
     assert configs[0].compaction.enabled is False
@@ -291,16 +307,25 @@ async def test_the_simulation_id_and_config_come_off_the_start_event(tmp_path: P
 
 
 async def test_a_log_with_no_start_event_raises(tmp_path: Path) -> None:
-    """A truncated or hand-edited log fails loudly rather than defaulting."""
+    """A truncated or hand-edited log fails loudly rather than defaulting.
+
+    Its first line is what names the scenario the rest is parsed with, so the
+    read itself raises.
+    """
     path = write_log(
         path=tmp_path / "run.jsonl",
         rows=[message_row(event_id="m1", text="orphan")],
     )
-    events = await load_events(log_path=path)
+    with pytest.raises(ValueError, match="First event is not SimulationStarted"):
+        await load_events(log_path=path)
+
+
+def test_extracting_from_events_with_no_start_event_raises() -> None:
+    """The extractors refuse a list without the event they read from."""
     with pytest.raises(ValueError):
-        extract_simulation_id(events=events)
+        extract_simulation_id(events=[])
     with pytest.raises(ValueError):
-        extract_scenario_config(events=events)
+        extract_scenario_config(events=[])
 
 
 async def test_an_event_no_class_declares_is_skipped_and_counted(
@@ -316,6 +341,7 @@ async def test_an_event_no_class_declares_is_skipped_and_counted(
     log = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             base_row(event_id="a", event_type="round_advanced", round_number=1, trigger="start"),
             base_row(event_id="b", event_type="a_scenario_that_is_not_installed"),
             base_row(event_id="c", event_type="an_event_renamed_since_the_run"),
@@ -327,7 +353,7 @@ async def test_an_event_no_class_declares_is_skipped_and_counted(
     with caplog.at_level(logging.WARNING):
         events = await load_events(log_path=log)
 
-    assert [event.event_id for event in events] == ["a", "e"]
+    assert [event.event_id for event in events] == ["start", "a", "e"]
     assert "a_scenario_that_is_not_installed" in caplog.text
     assert "an_event_renamed_since_the_run" in caplog.text
 
@@ -342,6 +368,7 @@ async def test_a_skipped_event_still_advances_the_round_backfill(tmp_path: Path)
     log = write_log(
         path=tmp_path / "run.jsonl",
         rows=[
+            start_row(scenario_name="smoke"),
             base_row(event_id="a", event_type="round_advanced", round_number=4, trigger="idle"),
             base_row(event_id="b", event_type="no_class_declares_this"),
             message_row(event_id="m1", text="after the skipped row"),

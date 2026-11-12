@@ -11,17 +11,12 @@ built-in catalog itself.
 
 from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.scenario_contract.catalog import load_built_in_scenario_catalog_unless_loaded
+from glossogen.server.app_factory import create_app
+from glossogen.server.identity.identity_provider_loader import load_identity_provider
+from glossogen.server.server_runtime_config import load_server_runtime_config
 
 load_env_from_working_directory()
-# The run-detail models build their scenario unions from the scenario catalog
-# when they are imported, so the catalog is loaded before anything from
-# glossogen.server is imported.
 load_built_in_scenario_catalog_unless_loaded()
-
-from glossogen.server.app_factory import create_app  # noqa: E402
-from glossogen.server.identity.identity_provider_loader import load_identity_provider  # noqa: E402
-from glossogen.server.server_runtime_config import load_server_runtime_config  # noqa: E402
-
 app = create_app(
     identity_provider=load_identity_provider(),
     runtime_config=load_server_runtime_config(),

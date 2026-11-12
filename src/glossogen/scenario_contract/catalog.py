@@ -5,7 +5,10 @@ A source says which modules to import. Importing a module runs the
 and the catalog keeps the classes registered from the modules its sources
 imported. :func:`load_scenario_catalog` builds the catalog and makes it the
 process's current one; :func:`current_scenario_catalog` answers every lookup
-after that and raises :class:`ScenarioCatalogNotLoaded` before it.
+after that and raises :class:`ScenarioCatalogNotLoaded` before it. The current
+catalog also answers which event types each scenario declares, for the run
+readers in :mod:`glossogen.run_storage.event_parsing`: it installs that lookup
+there whenever it becomes current.
 
 The only source kind here is :class:`PackageScanSource`, which scans an importable
 package's directory. A source is anything with the :class:`ScenarioSource`
@@ -21,6 +24,14 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple, Protocol, Self
 
+from pydantic import PydanticUserError
+
+from glossogen.models.event import core_event_types, fixed_event_type, parser_for
+from glossogen.models.event_base import EventBase
+from glossogen.run_storage.event_parsing import (
+    ScenarioCatalogNotLoaded,
+    install_scenario_event_types,
+)
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import registered_scenarios
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
@@ -32,10 +43,6 @@ BUILT_IN_SCENARIOS_PACKAGE = "glossogen.scenarios"
 _REGISTRATION_MODULE = "glossogen.scenario_contract.registration"
 _REGISTRATION_PACKAGE, _, _REGISTRATION_SUBMODULE = _REGISTRATION_MODULE.rpartition(".")
 _DECORATOR_NAME = "scenario"
-
-
-class ScenarioCatalogNotLoaded(RuntimeError):
-    """Raised by a scenario lookup made before this process loaded its catalog."""
 
 
 class ScenarioCatalogError(Exception):
@@ -117,6 +124,13 @@ class ScenarioCatalog:
         """Return the scenario class called ``name``, or None if the catalog has none."""
         return self._scenarios.get(name)
 
+    def event_types_of(self, name: str) -> tuple[type[EventBase], ...] | None:
+        """Return the event types scenario ``name`` declares, or None if the catalog has none."""
+        scenario_cls = self._scenarios.get(name)
+        if scenario_cls is None:
+            return None
+        return scenario_cls.event_types()
+
     def including(self, name: str, scenario_cls: type[SimulationScenario]) -> Self:
         """Return a copy of this catalog with ``scenario_cls`` under ``name``, replacing any."""
         return type(self)(scenarios={**self._scenarios, name: scenario_cls}, sources=self._sources)
@@ -182,19 +196,22 @@ def current_scenario_catalog() -> ScenarioCatalog:
 @contextmanager
 def scenario_catalog_installed(catalog: ScenarioCatalog) -> Generator[None]:
     """Make ``catalog`` the current one for the duration of the block, then restore."""
-    global _current
     previous = _current
-    _current = catalog
+    _install(catalog=catalog)
     try:
         yield
     finally:
-        _current = previous
+        _install(catalog=previous)
 
 
-def _install(catalog: ScenarioCatalog) -> None:
-    """Make ``catalog`` the process's current catalog."""
+def _install(catalog: ScenarioCatalog | None) -> None:
+    """Make ``catalog`` the process's current catalog, and the run readers' event-type lookup."""
     global _current
     _current = catalog
+    if catalog is None:
+        install_scenario_event_types(lookup=None)
+        return
+    install_scenario_event_types(lookup=catalog.event_types_of)
 
 
 def _check_registered_class(name: str, scenario_cls: type[SimulationScenario]) -> None:
@@ -213,6 +230,37 @@ def _check_registered_class(name: str, scenario_cls: type[SimulationScenario]) -
             "directories are named after name(), and every later command looks a run "
             "up by the name it was registered under; remove the name() override."
         )
+    _check_declared_event_types(where=where, event_types=scenario_cls.event_types())
+
+
+def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], ...]) -> None:
+    """Refuse event types a run's parser could not dispatch alongside the platform's.
+
+    Each needs a fixed ``event_type`` that no platform event and no other of the
+    scenario's own events uses. Building the parser the scenario's runs are read
+    with is the last check: pydantic refuses a union it cannot dispatch.
+    """
+    taken = {fixed_event_type(event_cls=cls): cls.__name__ for cls in core_event_types()}
+    for event_cls in event_types:
+        discriminator = fixed_event_type(event_cls=event_cls)
+        if discriminator is None:
+            raise ScenarioCatalogError(
+                f"{where} declares {event_cls.__name__}, which has no fixed event_type; "
+                'declare it as Literal["..."] with that value as its default'
+            )
+        if discriminator in taken:
+            raise ScenarioCatalogError(
+                f"{where} declares {event_cls.__name__} with event_type {discriminator!r}, "
+                f"which {taken[discriminator]} already uses"
+            )
+        taken[discriminator] = event_cls.__name__
+    try:
+        parser_for(event_types=(*core_event_types(), *event_types))
+    except PydanticUserError as exc:
+        logger.exception("The parser for %s's runs could not be built", where)
+        raise ScenarioCatalogError(
+            f"{where}'s runs cannot be parsed with the event types it declares: {exc}"
+        ) from exc
 
 
 def _scenario_modules_under(directory: Path, module_prefix: str) -> list[str]:

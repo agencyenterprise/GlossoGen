@@ -43,6 +43,7 @@ from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import minimum_duration_elapsed, wall_clock_phase_timeout
 from glossogen.runtime.logging_format import EventBusLogHandler, JsonLineFormatter
 from glossogen.runtime.simulation_server import start_simulation_server, stop_simulation_server
+from glossogen.scenario_contract.event_types import loggable_event_types
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.telemetry.telemetry_bootstrap import flush_telemetry, init_langfuse_telemetry
 from glossogen.telemetry.telemetry_settings import load_telemetry_settings
@@ -304,7 +305,11 @@ async def _run_simulation(
     log_path = event_log_path(run_dir=run_dir, scenario_name=scenario.name())
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
 
-    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
+    event_logger = EventLogger(
+        log_path=log_path,
+        event_bus=event_bus,
+        allowed_event_types=loggable_event_types(scenario_cls=type(scenario)),
+    )
 
     resume_state: RewindState | None = None
     recorded_spend_usd = 0.0

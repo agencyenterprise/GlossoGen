@@ -2,11 +2,12 @@
 
 A scenario returns one :class:`ScenarioRunDetailExtension` from
 :meth:`glossogen.scenario_contract.protocol.SimulationScenario.run_detail_extension`. The
-server builds the ``scenario_extras`` discriminated union on ``RunDetailResponse``
-from each extension's ``extras_model_cls``, and calls ``build_extras`` after the
-generic event walk. :func:`pair_with_tool_calls` is the walk the scenarios that
-log a verdict per tool call share to key that verdict by the call's ``call_id``,
-and :func:`mirror_events` the walk that copies each event of one class into the
+server calls ``build_extras`` after the generic event walk and returns the
+result as ``RunDetailResponse.scenario_extras``, and publishes each extension's
+``extras_model_cls`` and ``sse_event_classes`` in its API schema.
+:func:`pair_with_tool_calls` is the walk the scenarios that log a verdict per
+tool call share to key that verdict by the call's ``call_id``, and
+:func:`mirror_events` the walk that copies each event of one class into the
 response model that mirrors it.
 
 Kept out of :mod:`glossogen.server` because the scenario contract imports it.
@@ -26,8 +27,11 @@ class ScenarioRunExtrasBase(BaseModel):
     """Abstract base for the polymorphic payload attached to ``RunDetailResponse.scenario_extras``.
 
     Each subclass declares ``scenario_name: Literal["<name>"]`` as the
-    discriminator field. Pydantic dispatches between subclasses on that field
-    when validating the discriminated union.
+    discriminator field. The server does not validate extras against a union:
+    ``RunDetailResponse.scenario_extras`` is typed as this base and serializes as
+    the subclass ``build_extras`` returned. The API schema publishes the
+    discriminated union of every loaded scenario's subclass on ``scenario_name``,
+    which is what the frontend's types are generated from.
     """
 
 
@@ -36,9 +40,9 @@ class ScenarioRunDetailExtension(ABC):
 
     Each subclass declares the Pydantic class that holds its extras payload
     (``extras_model_cls``) and any custom SSE event classes the scenario emits
-    over the live stream (``sse_event_classes``). Both are read at server
-    startup to build the discriminated unions on ``RunDetailResponse`` and the
-    SSE event union.
+    over the live stream (``sse_event_classes``). The app factory reads both
+    when it builds the app, to publish the ``scenario_extras`` and SSE event
+    unions in the API schema.
     """
 
     extras_model_cls: ClassVar[type[ScenarioRunExtrasBase]]

@@ -33,7 +33,12 @@ from glossogen.models.event import (
     SimulationEvent,
     ToolResultReceived,
 )
-from glossogen.run_storage.event_parsing import RoundNumberBackfill, parse_event
+from glossogen.run_storage.event_parsing import (
+    RoundNumberBackfill,
+    RunEventParser,
+    run_event_parser,
+    scenario_name_of_run,
+)
 from glossogen.run_storage.jsonl_lines import MalformedLine, iter_json_objects_skipping_malformed
 
 logger = logging.getLogger(__name__)
@@ -77,7 +82,11 @@ class MessageEventScan(NamedTuple):
 
 
 def scan_message_events(log_path: Path) -> MessageEventScan:
-    """Read ``log_path`` and return only the events the log-backed tables are built from."""
+    """Read ``log_path`` and return only the events the log-backed tables are built from.
+
+    Raises ValueError when the first line is not a ``simulation_started``, which
+    names the scenario the run is parsed with.
+    """
     messages: list[MessageSent] = []
     send_results: list[SimulationEvent] = []
     injections: list[ScannedInjection] = []
@@ -85,6 +94,7 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
     skipped = 0
     round_numbers = RoundNumberBackfill()
     in_postmortem = False
+    parser: RunEventParser | None = None
 
     def count_malformed(_line: MalformedLine) -> None:
         nonlocal skipped
@@ -94,6 +104,10 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
         for record in iter_json_objects_skipping_malformed(
             lines=handle, on_malformed=count_malformed
         ):
+            if parser is None:
+                parser = run_event_parser(
+                    scenario_name=scenario_name_of_run(first_record=record, origin=str(log_path))
+                )
             event_type = record.get("event_type")
             if event_type == _ROUND_ADVANCED:
                 round_numbers.observe(record=record)
@@ -105,7 +119,7 @@ def scan_message_events(log_path: Path) -> MessageEventScan:
             if event_type not in _WANTED_EVENT_TYPES:
                 continue
             try:
-                event = parse_event(raw=round_numbers.apply(record=record))
+                event = parser.parse(raw=round_numbers.apply(record=record))
             except Exception:
                 skipped += 1
                 continue

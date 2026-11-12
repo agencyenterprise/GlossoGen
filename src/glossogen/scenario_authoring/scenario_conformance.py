@@ -17,27 +17,26 @@ failed, or None. That shape is what lets one run report every problem rather
 than the first.
 """
 
-import ast
 import importlib
 import inspect
 import json
 import logging
 import os
+import sys
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any, NamedTuple, get_args
-
-from pydantic_core import PydanticUndefined
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.evaluation.metric_core.protocol_probe_config import load_probe_questions
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import core_event_types, parser_for
+from glossogen.models.event import core_event_types, fixed_event_type, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.run_config.provider_credentials import credential_variable_names
 from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.template_renderer import TemplateRenderer
@@ -646,65 +645,56 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
     return None
 
 
-def _events_module_name(built: BuiltScenario) -> str | None:
-    """Return the dotted name of this scenario's ``events`` module, or None.
-
-    Asked of the scenario module's own import spec rather than assembled by
-    trimming a dot off ``__module__``. ``parent`` is the value Python resolves a
-    relative import against, so it answers correctly both for the usual class in a
-    ``scenario`` submodule and for one defined in the package's ``__init__``, where
-    trimming a dot names the package above and reaches for somebody else's events.
-
-    None when the class is in a top-level module belonging to no package, which has
-    no sibling ``events`` to find.
-    """
-    spec = importlib.import_module(type(built.scenario).__module__).__spec__
-    if spec is None or not spec.parent:
-        return None
-    return f"{spec.parent}.events"
-
-
 def _scenario_event_types(built: BuiltScenario) -> tuple[type[EventBase], ...]:
-    """Return the event types this scenario's ``events`` module defines.
+    """Return the event types this scenario declares in ``event_types()``."""
+    return type(built.scenario).event_types()
 
-    Read from the module rather than from ``EventBase.__subclasses__``, which
-    holds every scenario's at once and cannot say whose is whose. Importing is
-    also the point: discovery tolerates a broken external ``events`` module so a
-    third-party plug-in cannot stop the platform reading unrelated logs, which
-    means its author is never told, and a path-loaded scenario's module has not
-    been imported at all.
+
+def _defined_events_are_declared(built: BuiltScenario) -> str | None:
+    """An event class the scenario defines but does not declare cannot be logged or read.
+
+    The event logger refuses a class outside ``event_types()``, and a reader skips
+    its lines. Looks at the event classes loaded from the scenario's own module and
+    the modules of its package, leaving out those another loaded scenario declares.
     """
-    name = _events_module_name(built=built)
-    if name is None:
-        return ()
-    module = importlib.import_module(name)
-    return tuple(
-        attribute
-        for attribute in vars(module).values()
-        if isinstance(attribute, type)
-        and issubclass(attribute, EventBase)
-        and attribute is not EventBase
-        and attribute.__module__ == module.__name__
+    scenario_cls = type(built.scenario)
+    module_name = scenario_cls.__module__
+    spec = importlib.import_module(module_name).__spec__
+    package = ""
+    if spec is not None and spec.parent:
+        package = spec.parent
+    declared = set(scenario_cls.event_types())
+    for name, other_cls in current_scenario_catalog().classes():
+        if name != built.name:
+            declared.update(other_cls.event_types())
+    undeclared = sorted(
+        f"{event_cls.__module__}.{event_cls.__qualname__}"
+        for event_cls in _loaded_event_classes(base=EventBase)
+        if event_cls not in declared
+        and fixed_event_type(event_cls=event_cls) is not None
+        and (
+            event_cls.__module__ == module_name
+            or (package != "" and event_cls.__module__.startswith(f"{package}."))
+        )
     )
-
-
-def _events_module_is_importable(built: BuiltScenario) -> str | None:
-    """A scenario with no ``events`` module passes; one that raises does not.
-
-    Discovery logs and skips an external module that raises, so nothing else ever
-    reports it and the scenario runs with its own events missing from the parser.
-    """
-    name = _events_module_name(built=built)
-    if name is None:
-        return None
-    try:
-        importlib.import_module(name)
-    except ModuleNotFoundError:
-        return None
-    except Exception as exc:
-        logger.exception("Importing %s failed", name)
-        return f"{name} raised {type(exc).__name__}: {exc}"
+    if undeclared:
+        return f"event_types() leaves out {', '.join(undeclared)}"
     return None
+
+
+def _loaded_event_classes(base: type[EventBase]) -> list[type[EventBase]]:
+    """Return every subclass of ``base``, recursively, that its module currently defines.
+
+    A module imported again, as a path-loaded scenario is, leaves its earlier
+    classes among the subclasses; those are not what the scenario now logs.
+    """
+    found: list[type[EventBase]] = []
+    for subclass in base.__subclasses__():
+        module = sys.modules.get(subclass.__module__)
+        if module is not None and getattr(module, subclass.__name__, None) is subclass:
+            found.append(subclass)
+        found.extend(_loaded_event_classes(base=subclass))
+    return found
 
 
 def _events_declare_a_literal_discriminator(built: BuiltScenario) -> str | None:
@@ -714,10 +704,9 @@ def _events_declare_a_literal_discriminator(built: BuiltScenario) -> str | None:
     wrong rather than as pydantic refusing a union.
     """
     for event_type in _scenario_event_types(built=built):
-        field = event_type.model_fields.get("event_type")
-        if field is None:
+        if "event_type" not in event_type.model_fields:
             return f"{event_type.__name__} declares no event_type"
-        if field.default is PydanticUndefined or not isinstance(field.default, str):
+        if fixed_event_type(event_cls=event_type) is None:
             return (
                 f"{event_type.__name__} has no fixed event_type; declare it as "
                 'Literal["..."] with that value as its default'
@@ -755,10 +744,7 @@ def _events_do_not_collide_with_the_platform(built: BuiltScenario) -> str | None
 def _events_parse_alongside_the_platform(built: BuiltScenario) -> str | None:
     """The run has to read back, and the parser is what reads it.
 
-    Building the union is the check: pydantic refuses one it cannot dispatch. A
-    union built here rather than the module-level parser, which was built while
-    ``models.event`` was importing and so cannot see a scenario loaded from a path
-    afterwards.
+    Building the union is the check: pydantic refuses one it cannot dispatch.
     """
     own = _scenario_event_types(built=built)
     if not own:
@@ -766,34 +752,6 @@ def _events_parse_alongside_the_platform(built: BuiltScenario) -> str | None:
     parser_for(event_types=(*core_event_types(), *own))
     for event_type in own:
         json.dumps(event_type.model_json_schema())
-    return None
-
-
-def _events_import_only_the_base_module(built: BuiltScenario) -> str | None:
-    """``events.py`` importing ``models.event`` deadlocks discovery.
-
-    That module builds its union by importing every scenario's ``events`` while it
-    is itself mid-import, so an ``events`` module that imports back from it closes
-    the cycle. Read from the source rather than by importing, because by the time
-    an import would fail the platform has already failed to start.
-    """
-    events_file = built.scenario.scenario_package_files() / "events.py"
-    if not events_file.is_file():
-        return None
-    tree = ast.parse(events_file.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "glossogen.models.event":
-            return (
-                f"events.py imports from glossogen.models.event at line {node.lineno}; "
-                "import glossogen.models.event_base instead, or discovery deadlocks"
-            )
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name == "glossogen.models.event":
-                    return (
-                        f"events.py imports glossogen.models.event at line {node.lineno}; "
-                        "import glossogen.models.event_base instead"
-                    )
     return None
 
 
@@ -890,11 +848,10 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("scenario metrics are well formed", _scenario_metrics_are_well_formed),
     ("the run-detail extension names the scenario", _run_detail_extension_names_the_scenario),
     ("display names fall back to ids", _display_names_fall_back_to_ids),
-    ("the events module imports", _events_module_is_importable),
+    ("defined events are declared", _defined_events_are_declared),
     ("events declare a literal event_type", _events_declare_a_literal_discriminator),
     ("events do not collide with the platform's", _events_do_not_collide_with_the_platform),
     ("events parse alongside the platform's", _events_parse_alongside_the_platform),
-    ("events.py imports only the event base", _events_import_only_the_base_module),
     ("declared judge models are readable", _judge_models_are_shaped),
     ("the probe config points at files that exist", _probe_config_points_at_files_that_exist),
     (

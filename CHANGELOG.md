@@ -47,6 +47,22 @@ the commit log.
   A metric annotating `compute` with `ScenarioBase` imports it from
   `glossogen.scenario_contract.scenario_base`. A metric still importing an old
   path fails to import, and evaluation logs it and skips it.
+- **Breaking for scenario authors: a scenario's events are the ones it returns
+  from `event_types()`.** Each run is parsed with the platform's events plus its
+  own scenario's, and nothing else; `glossogen.models.event` no longer imports
+  every scenario's `events.py` at import time. The event logger raises
+  `UndeclaredEventType` for an event class the running scenario does not return,
+  and a reader skips such lines with a warning. The `events.py` name, the rule
+  that it imports only `glossogen.models.event_base`, and the empty package
+  `__init__.py` no longer matter. Two scenarios may now use the same
+  `event_type`.
+- `parse_event` and `parse_event_bytes` (`glossogen.run_storage.event_parsing`)
+  take the run's `scenario_name`. `SIMULATION_EVENT_ADAPTER`, `known_event_types()`
+  and `glossogen.scenario_contract.submodule_discovery` are gone; reading a run
+  before the scenario catalog has loaded raises `ScenarioCatalogNotLoaded`, and a
+  log whose first line is not `simulation_started` raises `ValueError`.
+  `EventLogger` takes `allowed_event_types`
+  (`glossogen.scenario_contract.event_types.loggable_event_types`).
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes

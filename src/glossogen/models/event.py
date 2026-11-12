@@ -1,21 +1,15 @@
-"""Pydantic models representing discrete events emitted during a simulation run.
+"""Pydantic models for the platform's own simulation events, and parsers over event types.
 
-Core platform event subclasses live here. Scenario-specific event subclasses
-live in ``glossogen/scenarios/<scenario>/events.py``. At module load time
-:func:`_discover_scenario_event_types` walks the ``glossogen.scenarios``
-namespace package, imports every ``events`` submodule, and assembles them
-together with the core events into :data:`SIMULATION_EVENT_ADAPTER` — a
-discriminated-union :class:`pydantic.TypeAdapter` used by the JSONL
-parser. Scenario authors register new event types by adding them to
-their scenario's ``events.py``; no edit to this module is required.
+A scenario declares its own event types through ``event_types()``
+(:mod:`glossogen.scenario_contract.protocol`). A run is parsed with the platform's
+events plus the events its scenario declares: :func:`parser_for` builds that
+parser, and :mod:`glossogen.run_storage.event_parsing` picks the one for a run.
 
-``EventBase`` and ``TokenUsage`` live in :mod:`glossogen.models.event_base`
-so scenario event modules can subclass ``EventBase`` without a circular
-dependency on this module.
+``EventBase`` and ``TokenUsage`` live in :mod:`glossogen.models.event_base`.
 """
 
 from enum import Enum, StrEnum
-from typing import Annotated, Any, Literal, TypeAlias, Union, cast
+from typing import Annotated, Any, Literal, TypeAlias, Union, cast, get_args, get_origin
 
 from pydantic import Discriminator, Field, TypeAdapter, model_validator
 
@@ -27,10 +21,6 @@ from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallRequest
 from glossogen.models.wait_for import WaitFor
-from glossogen.scenario_contract.submodule_discovery import (
-    concrete_subclasses,
-    import_scenario_submodules,
-)
 
 
 class SimulationStarted(EventBase):
@@ -480,61 +470,34 @@ _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (
 )
 
 
-def _discover_scenario_event_types() -> tuple[type[EventBase], ...]:
-    """Discover every ``EventBase`` subclass exported by a scenario ``events`` module.
-
-    Imports each scenario's ``events`` submodule (registering its classes in
-    ``EventBase.__subclasses__``), then returns every concrete ``EventBase``
-    subclass that is not one of the core types. Scenario authors register new
-    event types by adding them to their scenario's ``events.py``, with no edit to
-    this module is required.
-    """
-    import_scenario_submodules(submodule_name="events")
-    core = frozenset(_CORE_EVENT_TYPES)
-    return tuple(cls for cls in concrete_subclasses(base=EventBase) if cls not in core)
-
-
-_SCENARIO_EVENT_TYPES: tuple[type[EventBase], ...] = _discover_scenario_event_types()
-
-_ALL_EVENT_TYPES: tuple[type[EventBase], ...] = (*_CORE_EVENT_TYPES, *_SCENARIO_EVENT_TYPES)
-
 # Statically-typed alias used by consumers. ``EventBase`` declares the
 # ``event_type`` discriminator, so type-checked code can read it on a generic
 # event without narrowing to a concrete subclass via ``isinstance`` first.
 # Concrete-subclass-specific fields still require ``isinstance`` narrowing.
 SimulationEvent: TypeAlias = EventBase
 
-# Runtime parsing uses the full discriminated union built from the discovered
-# scenario event types. ``Union`` accepts a tuple of types at runtime; the
-# ``Any`` cast hides this from the static type checker since the tuple is
-# only known at runtime.
-_simulation_event_union: Any = Union[_ALL_EVENT_TYPES]
-_simulation_event_form: Any = Annotated[_simulation_event_union, Discriminator("event_type")]
-SIMULATION_EVENT_ADAPTER: TypeAdapter[EventBase] = TypeAdapter[EventBase](_simulation_event_form)
 
+def fixed_event_type(event_cls: type[EventBase]) -> str | None:
+    """Return the ``event_type`` an event class always logs, or None when it has none.
 
-def known_event_types() -> frozenset[str]:
-    """Every ``event_type`` discriminator the parser accepts.
-
-    A log may name an event this build has no class for: one written by a
-    scenario that is not installed here, or one whose name changed since the run.
-    Readers that have to keep serving such a run check against this rather than
-    catching the union's validation error, so a genuinely malformed event of a
-    known type still fails.
+    A class that a parser can dispatch to declares ``event_type`` as a
+    ``Literal`` of one string, with that string as its default.
     """
-    return frozenset(
-        str(event_type.model_fields["event_type"].default) for event_type in _ALL_EVENT_TYPES
-    )
+    field = event_cls.model_fields.get("event_type")
+    if field is None or not isinstance(field.default, str):
+        return None
+    if get_origin(field.annotation) is not Literal or get_args(field.annotation) != (
+        field.default,
+    ):
+        return None
+    return field.default
 
 
 def core_event_types() -> tuple[type[EventBase], ...]:
     """Return the event types the platform itself declares.
 
-    A scenario's own types are checked against these: a discriminator that
-    repeats one of them shadows the platform's event in the parser, and the run
-    that wrote it reads back as something else afterwards. The conformance checks
-    need this list, and building a union of their own is how they avoid depending
-    on whether the scenario under test was discovered at import time.
+    Every run's parser includes these. A scenario's own types are checked against
+    them: a discriminator that repeats one of them cannot share a parser with it.
     """
     return _CORE_EVENT_TYPES
 
@@ -543,11 +506,7 @@ def parser_for(event_types: tuple[type[EventBase], ...]) -> TypeAdapter[EventBas
     """Build a parser over exactly these event types.
 
     Constructing one is itself a check: pydantic refuses a discriminated union whose
-    members repeat a discriminator or whose ``event_type`` is not a literal. Separate
-    from :data:`SIMULATION_EVENT_ADAPTER` because that one was built while this
-    module was importing, so it cannot see a scenario loaded from a path
-    afterwards, and reading it would pass a built-in and fail an identical
-    plug-in.
+    members repeat a discriminator or whose ``event_type`` is not a literal.
     """
     union: Any = Union[event_types]
     form: Any = Annotated[union, Discriminator("event_type")]
