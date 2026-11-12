@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/cn";
 import type { components } from "@/types/api.gen";
 import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { AgentInstance } from "./agent-instance";
-import { humanize } from "./format";
+import { channelLabel } from "./channel-label";
 
 type AgentDetail = components["schemas"]["AgentDetail"];
 
@@ -50,6 +50,8 @@ export function RunSidebar({
   onSelectLogs,
   onSelectEvalLogs,
 }: RunSidebarProps) {
+  const roleNameByAgentId = new Map(agents.map(agent => [agent.agent_id, agent.role_name]));
+  const roleNameOf = (agentId: string) => roleNameByAgentId.get(agentId) ?? agentId;
   return (
     <div className="flex flex-col overflow-y-auto border-r border-border bg-muted/50 py-4">
       <div className="mb-5">
@@ -80,7 +82,7 @@ export function RunSidebar({
             )}
             onClick={() => onSelectChannel(id)}
           >
-            <span className="opacity-50">#</span> {humanize(id)}
+            <span className="opacity-50">#</span> {channelLabel(id, roleNameOf)}
           </button>
         ))}
       </div>

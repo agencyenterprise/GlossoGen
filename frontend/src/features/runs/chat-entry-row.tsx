@@ -41,6 +41,8 @@ interface ChatEntryRowProps {
   agent: AgentDetail | undefined;
   color: AgentColor | undefined;
   entryChColor: AgentColor | undefined;
+  /** The entry's channel as its badge shows it. */
+  channelTag: string;
   isPreResume: boolean;
   showChannelBadge: boolean;
   isLinkHovered: boolean;
@@ -56,6 +58,7 @@ export const ChatEntryRow = memo(function ChatEntryRow({
   agent,
   color,
   entryChColor,
+  channelTag,
   isPreResume,
   showChannelBadge,
   isLinkHovered,
@@ -190,7 +193,7 @@ export const ChatEntryRow = memo(function ChatEntryRow({
                 entryChColor?.fg
               )}
             >
-              #{entry.channel_id}
+              #{channelTag}
             </span>
           ) : null}
 
