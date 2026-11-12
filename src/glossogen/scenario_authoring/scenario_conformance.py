@@ -7,9 +7,9 @@ knobs model it is validated against, `get_agent_roles` may name a different set
 of agents than `get_agents` builds. Each of those surfaces as a confusing
 failure minutes into a paid run, or as a metric that silently scores nothing.
 
-These live here rather than in the test suite because a scenario can ship from
-any distribution, and the tests do not. `glossogen validate <name-or-directory>`
-runs them against whatever it resolves, installed or not; the repository's own
+These live here rather than in the test suite because a scenario can live outside
+this repository, and the tests do not. `glossogen validate <name-or-directory>`
+runs them against whatever it resolves, configured as a source or not; the repository's own
 conformance suite runs them over the built-ins.
 
 Every check is a function taking a built scenario and returning the reason it

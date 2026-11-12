@@ -159,11 +159,10 @@ code under test at it: `monkeypatch.setattr(scenario_cls,
 "scenario_package_files", classmethod(...))`. Copy the whole package rather than
 the one file, because the other checks read from that directory too.
 
-This was measured, not assumed. `test_an_events_module_importing_the_event_union_is_reported`
-prepended an import to `prisoners_dilemma/events.py` and restored it in a
-`finally`. Roughly one full-suite run in eighteen, `validate prisoners_dilemma`
-read the file mid-window and failed with `events.py imports from
-glossogen.models.event at line 1`. Nothing was wrong with prisoners_dilemma; two
+This was measured, not assumed. A `validate` test prepended an import to
+`prisoners_dilemma/events.py` and restored it in a `finally`. Roughly one
+full-suite run in eighteen, `validate prisoners_dilemma` read the file
+mid-window and reported the import as a violation. Nothing was wrong with prisoners_dilemma; two
 tests were racing on one file.
 
 ### Writing

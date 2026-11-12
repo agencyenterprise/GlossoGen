@@ -5,11 +5,11 @@ LLM judge, and returns one or more `Measurement` entries that land in
 `<scenario>_report.json`.
 
 A metric written against the [scenario hooks](#scenario-hooks), rather than
-against one scenario's own events, works on scenarios you did not write. It can
-live in this repo or ship in your own package without touching this repo at
-all. A metric can also be scoped to a single scenario, reading that scenario's
-own events and living under its `evaluation/` directory; the
-[registration section](#in-this-repo) covers that shape.
+against one scenario's own events, works on scenarios you did not write, and is
+added to this repo as a generic metric. A metric can also be scoped to a single
+scenario, reading that scenario's own events and returned from its
+`scenario_metrics()`; the [registration section](#registering-it) covers both
+shapes, in this repo and in your own project.
 
 ## Before you write one
 

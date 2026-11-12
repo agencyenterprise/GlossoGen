@@ -10,43 +10,64 @@ the commit log.
 ## Unreleased
 
 ### Added
-- `@scenario(name=...)` in `glossogen.scenario_contract.registration` registers a
-  scenario class and sets the name `name()` returns. Every built-in scenario uses
-  it, and `glossogen.scenario_contract.registry` (`SCENARIO_REGISTRY`) is gone:
-  the scenario catalog (`glossogen.scenario_contract.catalog`) finds the built-ins
-  by scanning `glossogen/scenarios/`, once per process. Code outside the CLI loads
-  it with `load_scenario_catalog(...)` before looking a scenario up.
-- `SimulationScenario.event_types()` returns the event classes a scenario logs.
-  The default is `()`; every built-in returns what its `events.py` defines.
-- Scenario sources. A process loads the built-in scenarios plus, from the first
-  of these that is set: `--scenarios <source>` (a repeatable global option,
-  before the subcommand), `GLOSSOGEN_SCENARIOS` (`os.pathsep`-separated), or
+- **Scenarios register themselves and are loaded from configured sources.** A
+  scenario class is decorated with `@scenario(name=...)`
+  (`glossogen.scenario_contract.registration`), which sets the name `name()`
+  returns, and returns the event classes it logs from the new
+  `SimulationScenario.event_types()` (the default is `()`). Every built-in uses
+  both. A second class registering a name already held raises, naming both
+  modules.
+- Each process loads a scenario catalog once
+  (`glossogen.scenario_contract.catalog`): the built-in scenarios, found by
+  scanning `glossogen/scenarios/`, plus the first of these that is set:
+  `--scenarios <source>` (a repeatable global option, before the subcommand),
+  `GLOSSOGEN_SCENARIOS` (`os.pathsep`-separated), or
   `[tool.glossogen] scenarios = [...]` in the nearest `pyproject.toml`. A source
   is a module name, a `.py` file or a folder. With none set, the project
-  directory is scanned for files that use `@scenario`; `scenarios = []` turns
-  the scan off. Runs the server and the fork flows launch load the same sources
-  as their parent. A command asked for a scenario it did not load names the
-  sources it did load and how to add one. The Docker image sets
-  `GLOSSOGEN_SCENARIOS=""`, so the server loads the built-ins only.
+  directory is scanned for files that use `@scenario`; `scenarios = []`, or an
+  empty `GLOSSOGEN_SCENARIOS`, turns the scan off. Code outside the CLI loads the
+  catalog with `load_scenario_catalog(...)` before looking a scenario up.
+- Runs the server and the fork flows launch load the same sources as their
+  parent. A command asked for a scenario it did not load names the sources it did
+  load and how to add one. The Docker image sets `GLOSSOGEN_SCENARIOS=""`, so
+  the server loads the built-ins only.
+- Each run is parsed with the platform's events plus the events its own
+  scenario returns from `event_types()`. The event logger raises
+  `UndeclaredEventType` for an event class the running scenario does not return,
+  and a reader skips such lines with a warning. Two scenarios may use the same
+  `event_type`. `parse_event` and `parse_event_bytes`
+  (`glossogen.run_storage.event_parsing`) take the run's `scenario_name`;
+  reading a run before the catalog has loaded raises `ScenarioCatalogNotLoaded`,
+  and a log whose first line is not `simulation_started` raises `ValueError`.
+  `EventLogger` takes `allowed_event_types`
+  (`glossogen.scenario_contract.event_types.loggable_event_types`).
 - `glossogen validate <path>` takes a `.py` file or a folder and checks every
-  scenario it registers.
+  scenario it registers. `glossogen new-scenario` writes a project with the
+  scenario in `scenarios/<name>.py` and `[tool.glossogen] scenarios =
+  ["scenarios"]`.
 - `move_a_box` knobs `virtual_list_cost_fixed` and `virtual_list_cost_s`: on the
   virtual clock, each `act` list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
   its tokens as before.
 
 ### Changed
-- **Breaking for scenarios and metrics outside glossogen: entry points and
-  `SCENARIO_API_VERSION` are gone.** glossogen no longer reads the
-  `glossogen.scenarios.v1` or `glossogen.metrics` entry-point groups, and
-  `glossogen.scenario_contract.entry_points`, `glossogen.scenario_contract.api_version`,
-  `glossogen.plugin_entry_points` and
-  `glossogen.evaluation.metric_core.metric_entry_points` are deleted. To move a
-  scenario package over:
+- **Breaking for scenarios and metrics outside glossogen: entry points,
+  `SCENARIO_API_VERSION` and discovery by `events.py` are gone.** glossogen no
+  longer reads the `glossogen.scenarios.v1` or `glossogen.metrics` entry-point
+  groups, and the modules behind them are deleted
+  (`glossogen.scenario_contract.entry_points`,
+  `glossogen.scenario_contract.api_version`, `glossogen.plugin_entry_points`,
+  `glossogen.evaluation.metric_core.metric_entry_points`), along with
+  `glossogen.scenario_contract.registry` (`SCENARIO_REGISTRY`),
+  `glossogen.scenario_contract.submodule_discovery`, `SIMULATION_EVENT_ADAPTER`
+  and `known_event_types()`. `glossogen.models.event` no longer imports every
+  scenario's `events.py`, so the `events.py` name, the rule that it imports only
+  `glossogen.models.event_base` and the empty package `__init__.py` no longer
+  matter. An undecorated class no longer takes its name from its package
+  directory: `name()` raises. To move a scenario package over:
   1. Decorate the scenario class with `@scenario(name="<its entry-point key>")`
      from `glossogen.scenario_contract.registration`, and return its event
-     classes from `event_types()`. An undecorated class no longer takes its name
-     from its package directory: `name()` raises.
+     classes from `event_types()`.
   2. Delete the `[project.entry-points."glossogen.scenarios.v1"]` table.
   3. Tell glossogen where the scenario is: `[tool.glossogen] scenarios =
      ["my_scenarios"]` in the `pyproject.toml` of the project you run glossogen
@@ -58,48 +79,26 @@ the commit log.
   `scenario_metrics()`; nothing adds a metric to every scenario from outside
   glossogen any more. `glossogen validate <dir>` no longer reads a
   `pyproject.toml` entry point or checks the contract version, the entry-point
-  group or an empty package `__init__`. `glossogen new-scenario` writes a project
-  with the scenario in `scenarios/<name>.py` and `[tool.glossogen] scenarios =
-  ["scenarios"]`, with no entry point.
+  group or an empty package `__init__`. Identity providers still use entry
+  points.
 - **Breaking for scenario and metric packages: the scenario contract moved into
   `glossogen.scenario_contract`.** The old module paths are gone, with no
-  aliases, so a package importing one fails with `ModuleNotFoundError`. The
-  contract itself and the `glossogen.scenarios.v1` entry-point group are
-  unchanged. Imports, old to new:
+  aliases, so a package importing one fails with `ModuleNotFoundError`. Imports,
+  old to new:
   - `glossogen.scenario_protocol` → `glossogen.scenario_contract.protocol`
   - `glossogen.scenario_base` → `glossogen.scenario_contract.scenario_base`
   - `glossogen.scenario_run_detail_extension` → `glossogen.scenario_contract.run_detail_extension`
   - `glossogen.run_detail_types` → `glossogen.scenario_contract.run_detail_types`
-  - `glossogen.scenario_api` → `glossogen.scenario_contract.api_version`
-  - `glossogen.scenario_entry_points` → `glossogen.scenario_contract.entry_points`
   - `glossogen.scenario_event_types` → `glossogen.scenario_contract.event_types`
   - `glossogen.scenario_loader` → `glossogen.scenario_contract.loader`
   - `glossogen.scenario_name` → `glossogen.scenario_contract.scenario_name`
   - `glossogen.scenario_path_loader` → `glossogen.scenario_contract.path_loader`
-  - `glossogen.scenario_registry` → `glossogen.scenario_contract.registry`
-  - `glossogen.scenario_submodule_discovery` → `glossogen.scenario_contract.submodule_discovery`
   - `glossogen.recorded_scenario_rebuild` → `glossogen.scenario_contract.recorded_scenario_rebuild`
   - `glossogen.primary_channel_resolution` → `glossogen.scenario_contract.primary_channel_resolution`
 
   A metric annotating `compute` with `ScenarioBase` imports it from
   `glossogen.scenario_contract.scenario_base`. A metric still importing an old
   path fails to import, and evaluation logs it and skips it.
-- **Breaking for scenario authors: a scenario's events are the ones it returns
-  from `event_types()`.** Each run is parsed with the platform's events plus its
-  own scenario's, and nothing else; `glossogen.models.event` no longer imports
-  every scenario's `events.py` at import time. The event logger raises
-  `UndeclaredEventType` for an event class the running scenario does not return,
-  and a reader skips such lines with a warning. The `events.py` name, the rule
-  that it imports only `glossogen.models.event_base`, and the empty package
-  `__init__.py` no longer matter. Two scenarios may now use the same
-  `event_type`.
-- `parse_event` and `parse_event_bytes` (`glossogen.run_storage.event_parsing`)
-  take the run's `scenario_name`. `SIMULATION_EVENT_ADAPTER`, `known_event_types()`
-  and `glossogen.scenario_contract.submodule_discovery` are gone; reading a run
-  before the scenario catalog has loaded raises `ScenarioCatalogNotLoaded`, and a
-  log whose first line is not `simulation_started` raises `ValueError`.
-  `EventLogger` takes `allowed_event_types`
-  (`glossogen.scenario_contract.event_types.loggable_event_types`).
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes

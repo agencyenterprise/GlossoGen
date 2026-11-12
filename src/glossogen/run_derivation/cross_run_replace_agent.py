@@ -160,7 +160,7 @@ async def prepare_cross_run_replace_agent_run(
     scenario / agent / mismatched scenarios) so the CLI layer can surface
     a clear message without re-implementing validation.
     """
-    # Raises with the installed scenario names before any file is touched.
+    # Raises with the loaded scenario names before any file is touched.
     get_scenario_class(name=request.scenario_name)
     if request.provider not in SIMULATION_PROVIDERS:
         raise ValueError(f"Unknown provider: {request.provider}")

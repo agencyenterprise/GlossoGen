@@ -1,6 +1,6 @@
 # Installation
 
-Two ways in. To write a scenario or a metric in a package of your own, install
+Two ways in. To write a scenario, with its own metrics, in a project of your own, install
 glossogen as a dependency. To work on the platform itself, clone the repository
 and start at [Working on glossogen itself](#working-on-glossogen-itself).
 

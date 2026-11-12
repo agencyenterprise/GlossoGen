@@ -2,7 +2,7 @@
 
 `glossogen.testing` runs a scenario the way the platform runs it, with the LLM
 replaced by a script. It ships in the package, so a scenario in your own
-distribution is tested the same way the built-in ones are.
+project is tested the same way the built-in ones are.
 
 ```bash
 pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"

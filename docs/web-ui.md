@@ -50,7 +50,7 @@ run list rather than as an error.
 |---|---|
 | 1 | Navigation: Analysis (cross-run charts), Branches (lineage), Export and Import (move runs out as CSV or archives, or in from another deployment), and MCP connection instructions |
 | 2 | Search by run id substring |
-| 3 | Scenario filter, one chip per installed scenario, shown when more than one is installed. Selecting exactly one reveals the knob filter bar, item 4 |
+| 3 | Scenario filter, one chip per loaded scenario, shown when more than one is loaded. Selecting exactly one reveals the knob filter bar, item 4 |
 | 4 | The knob filter bar, covered below |
 | 5 | Label filter, AND-matched: a run must carry every selected label. `eval:*` and `src=*` labels get no chip |
 | 6 | A run row: when it started, how long it ran, what it cost when that is above zero, and the rounds it played, as a pass/fail bar per team when the scenario judges its rounds. A status shows only when the run did not complete: starting, in progress, error or killed. Hovering the row offers the run's bundle for download and a delete button, which asks before it moves the run to the runs directory's `_trash/`. An evaluated run carries an **Evaluated** badge whose hover lists its scores. A live run also has a stop button, which asks first too |
@@ -77,8 +77,8 @@ The comparisons on offer follow the knob's type:
 
 A knob that can be left unset also gets a "not set" box, which takes `=` or `!=`.
 
-The knobs come from the scenario's own schema, so a scenario installed from
-another package is filterable with no change to the platform.
+The knobs come from the scenario's own schema, so a scenario loaded from
+outside glossogen is filterable with no change to the platform.
 
 The same conditions travel to the CSV and raw exports, to `glossogen export
 --knob` and `glossogen analyze --knob`, and to the export endpoints as the
