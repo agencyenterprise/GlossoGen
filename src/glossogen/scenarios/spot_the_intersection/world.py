@@ -27,6 +27,10 @@ from glossogen.scenarios.spot_the_intersection.ids import (
     ROUND_RESULT_MARKER,
     ROUND_WON_MARKER,
 )
+from glossogen.scenarios.spot_the_intersection.metered_messages import (
+    MeteredMessage,
+    read_metered_messages,
+)
 from glossogen.scenarios.spot_the_intersection.outcome_reconstruction import (
     RestoredRounds,
     RoundInProgress,
@@ -126,6 +130,10 @@ class SpotTheIntersectionWorld(RoundWorld):
     def seat_of(self, agent_id: str) -> Seat | None:
         """The seat ``agent_id`` holds, or ``None`` for an agent with no board."""
         return self._seats.get(agent_id)
+
+    def metered_messages(self, events: Sequence[Any]) -> list[MeteredMessage]:
+        """Every message in a recorded log that cost one of this world's teams."""
+        return read_metered_messages(teams=self._teams, events=events)
 
     def has_submitted(self, agent_id: str) -> bool:
         """Whether ``agent_id`` has submitted this round."""

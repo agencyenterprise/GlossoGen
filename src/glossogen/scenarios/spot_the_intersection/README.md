@@ -224,11 +224,24 @@ and how a viewer chose a teammate.
 
 ## Metrics
 
-All generic: `round_success` (`_team_a` / `_team_b` with two teams),
+Generic: `round_success` (`_team_a` / `_team_b` with two teams),
 `round_success_after_resume`, the per-team character and language metrics on
 each team's link and, under one-to-one messaging, on its direct channels,
 `communication_*` via `build_communication_rounds`, and the `protocol_*` family
 via `get_protocol_probe_config` / `get_protocol_explanation_config`.
+
+This scenario's own, both per team and both counting only the messages the team
+was charged for (until its last member submits):
+
+- `busiest_member_share`: the busiest member's characters over the team's, per
+  round, averaged over the rounds the team sent anything. With four viewers,
+  0.25 means the team spread its sending evenly and 1.0 means one member sent
+  everything. Each member's observation is its share of the team's whole run.
+- `message_routes`: the distinct sender-to-teammate routes the team's messages
+  took per round (twelve with four viewers), with each round's routes in its
+  note. A post on the link reaches every teammate and a direct message reaches
+  its recipient, so broadcast and one-to-one runs compare on the same scale.
+  Each member's observation is how many teammates it reached per round.
 
 `protocol_probe` asks each viewer what it would send first for each board in
 `protocol_probe_questions.json`: seat 1's board of rounds 9, 6 and 10 of seed 3
@@ -251,7 +264,12 @@ the run's grid.
 - `world.py`, `world_state.py`, `outcome_reconstruction.py`: character metering,
   submissions and locking, scoring, and on resume, rebuilding outcomes from the
   recorded answers and continuing a round the run stopped in.
+- `metered_messages.py`: the messages a log shows each team was charged for,
+  read by the resume and by this scenario's metrics.
 - `messaging.py`: the `messaging` modes and who a viewer may address one-to-one.
+- `evaluation/busiest_member_share_metric.py`,
+  `evaluation/message_routes_metric.py`, `evaluation/team_traffic.py`:
+  this scenario's metrics and the per-team messages they read.
 - `tools.py`, `team_declaration.py`, `seats.py`, `injection_rendering.py`,
   `round_event_conversion.py`, `events.py`: the tool, roster, prompts, and events.
 - `run_detail_extension.py`: the run page's round data. The round timeline

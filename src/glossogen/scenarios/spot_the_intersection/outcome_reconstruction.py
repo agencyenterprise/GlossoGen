@@ -2,9 +2,9 @@
 
 Used on resume, fork and replace-agent. Reads ``SpotTheIntersectionRoundStarted``
 for each round's answer as recorded, ``IntersectionSubmissionRecorded`` for each
-member's submission and its team's charge at that moment, ``MessageSent`` from
-each member on its team's link and direct channels for a team that never locked,
-and ``RoundEnded`` for which rounds finished.
+member's submission and its team's charge at that moment, the messages each
+member was charged for (:func:`read_metered_messages`) for a team that never
+locked, and ``RoundEnded`` for which rounds finished.
 
 A finished round is scored through :func:`score_round`, the rule the live world
 applies, so the next round's briefing reports the right previous result. A round
@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
-from glossogen.models.event import MessageSent, RoundEnded
+from glossogen.models.event import RoundEnded
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
 from glossogen.scenarios.spot_the_intersection.board_rendering import (
     parse_board_line,
@@ -32,6 +32,7 @@ from glossogen.scenarios.spot_the_intersection.events import (
     IntersectionSubmissionRecorded,
     SpotTheIntersectionRoundStarted,
 )
+from glossogen.scenarios.spot_the_intersection.metered_messages import read_metered_messages
 from glossogen.scenarios.spot_the_intersection.world_state import (
     IntersectionOutcome,
     SimulatedOpponent,
@@ -39,7 +40,6 @@ from glossogen.scenarios.spot_the_intersection.world_state import (
     TeamSnapshot,
     TeamState,
     charged_characters,
-    metered_team_id,
     score_round,
     snapshot_from_submissions,
 )
@@ -148,19 +148,13 @@ def _read_rounds(teams: dict[str, TeamState], events: list[Any]) -> _RecordedRou
         elif isinstance(event, IntersectionSubmissionRecorded):
             by_team = recorded.submissions.setdefault(event.round_number, {})
             by_team.setdefault(event.team_id, []).append(event)
-        elif isinstance(event, MessageSent):
-            team_id = metered_team_id(
-                teams=teams,
-                sender_agent_id=event.message.sender_agent_id,
-                channel_id=event.message.channel_id,
-            )
-            if team_id is not None:
-                by_team = recorded.characters_sent.setdefault(event.round_number, {})
-                by_agent = by_team.setdefault(team_id, {})
-                sender = event.message.sender_agent_id
-                by_agent[sender] = by_agent.get(sender, 0) + len(event.message.text)
         elif isinstance(event, RoundEnded):
             recorded.ended.add(event.round_number)
+    for message in read_metered_messages(teams=teams, events=events):
+        by_team = recorded.characters_sent.setdefault(message.round_number, {})
+        by_agent = by_team.setdefault(message.team_id, {})
+        sender = message.sender_agent_id
+        by_agent[sender] = by_agent.get(sender, 0) + message.characters
     return recorded
 
 
