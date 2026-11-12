@@ -38,19 +38,19 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 
 ## Package layers
 
-The list groups the top-level packages from the bottom up. It is a grouping, not a full layer order: only the boundaries named in each item hold, and others are crossed on purpose (`dashboards/postgres_dashboard_store.py` imports `db.pool`, for example). Nothing enforces the boundaries automatically, so a review checks them.
+The list groups the top-level packages from the bottom up. It is a grouping, not a full layer order: only the boundaries named in each item hold, and others are crossed on purpose (the Postgres dashboard store in `dashboards/` imports `db.pool`, for example). Nothing enforces the boundaries automatically, so a review checks them.
 
-1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including `knob_filter.py`. They import no web framework and none of the groups after them. `models/` imports only `models/` and `model_catalog/`.
+1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including the knob filter. They import no web framework and none of the groups after them. `models/` imports only `models/` and `model_catalog/`.
 2. **LLM access**: `llm/`. The provider judges call, token counters and per-provider model construction. It imports only the contracts.
 3. **Scenario contract**: `scenario_contract/`. What a scenario implements and what it receives: `ScenarioBase` and `SimulationScenario`, `BaseKnobs`, `ScenarioWorld` and the `WorldContext` it reaches the run through, `ScenarioTool`, the notification and wake types a `read_notifications` override renders, the `Metric` contract and the evaluation configs a scenario declares, and the platform's runner prompts. Where the runtime implements one of these (`WorldContext`, `NotificationInbox`, the event log behind `ScenarioRuntimeHandle`), the contract holds the abstract type and `runtime/` the implementation. It imports the groups above and `template_renderer`, and nothing from `runtime/`, `runners/`, `evaluation/` or `scenarios/`.
 4. **Replay**: `run_replay/`. Rebuilds agent histories and simulation state from a run's log. It imports the groups above, and the runtime uses it for resume and in-run swaps.
-5. **Simulation**: `runtime/`, then `runners/`. The runtime owns the runner interface (`runtime/agent_runner.py`, `runtime/agent_tool_specs.py`) and imports nothing from `runners/` or `evaluation/`; the entry point hands the supervisor a runner factory. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
+5. **Simulation**: `runtime/`, then `runners/`. The runtime owns the runner interface (`AgentRunner` and the `ToolSpec`s it binds) and imports nothing from `runners/` or `evaluation/`; the entry point hands the supervisor a runner factory. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
 6. **Scenarios**: `engine/` and `scenarios/`, on top of the scenario contract and the runtime. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. Nothing outside `scenarios/` imports `glossogen.scenarios.*` except `testing/`, which names concrete scenarios by design.
 7. **After-the-run work**: `evaluation/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`). `evaluation/` imports the scenario contract, the contracts, `llm/` and `run_replay/`, and nothing from `runtime/` or `runners/`.
 8. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 9. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
-`models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/event_parsing.py` through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
+`models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/`'s event parsers through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
 
 `models/` also holds what a run's log records beyond the events themselves: the round-end triggers, the scheduled events, the base tool names, the `read_notifications` schema and elapsed-time conversion. The runtime, the runners and evaluation all read them from there.
 
@@ -90,27 +90,29 @@ Agents see these as generic communication primitives, not simulation APIs.
 
 ## Agent Runners
 
-The runtime owns the runner interface and `runners/` implements it. `AgentRunner` ([`runtime/agent_runner.py`](src/glossogen/runtime/agent_runner.py)) defines one method, `start(agent_config, runtime, cost_tracker)`, which returns an `AgentRunResult`. The same module holds `CLOSING_PROMPT_TIMEOUT_SECONDS`, the bound the supervisor waits for a closing prompt. The tools an agent is offered are `ToolSpec`s ([`runtime/agent_tool_specs.py`](src/glossogen/runtime/agent_tool_specs.py)), each an executor that takes `agent_id` first. A runner binds them to its framework's tool type. The entry point (`cli/run_command.py`, and the test harness in `testing/simulation_harness.py`) builds the supervisor with a factory for `PydanticAIRunner` and with `runners.agent_tools.list_tool_definitions`, which records the schema the model sees on `AgentRegistered`. That way `runtime/` imports nothing from `runners/`. Each runner instance handles one agent.
+The runtime owns the runner interface and `runners/` implements it. `AgentRunner` defines one method, `start(agent_config, runtime, cost_tracker)`, which returns an `AgentRunResult`; `CLOSING_PROMPT_TIMEOUT_SECONDS` beside it bounds how long the supervisor waits for a closing prompt. The tools an agent is offered are `ToolSpec`s, each an executor that takes `agent_id` first. A runner binds them to its framework's tool type. The entry point, the `run` command or the `testing/` harness, builds the supervisor with a factory for `PydanticAIRunner` and with `list_tool_definitions`, which records the schema the model sees on `AgentRegistered`. That way `runtime/` imports nothing from `runners/`. Each runner instance handles one agent.
 
 **PydanticAIRunner** is the primary implementation. It uses the Pydantic AI framework to launch an agent with:
 - The agent's system prompt (from `AgentConfig`)
-- The runtime's tool specs bound as pydantic-ai function tools (`runners/agent_tools.py`), running in the runner's process
+- The runtime's tool specs bound as pydantic-ai function tools, running in the runner's process
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first (see `runners/closing_prompt.py`), then exits. The supervisor creates one runner per agent through the factory.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first, with tool calls switched off, then exits. The supervisor creates one runner per agent through the factory.
 
-An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer` (`runners/open_model_anti_corruption_layer.py`). It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
+An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer`. It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
 
 ## Telemetry & Observability (Langfuse)
 
 Agent and round-judge LLM calls are traced to a local, self-hosted Langfuse via pydantic-ai's OpenTelemetry instrumentation. This is a distinct output channel from the JSONL Event Log (which remains the canonical state ledger); telemetry is for human-facing debugging/inspection, not simulation state.
 
-- **Settings** — `telemetry/telemetry_settings.py` reads `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`; `enabled` is true only when both keys are present.
-- **Bootstrap** — `telemetry/telemetry_bootstrap.py`'s `init_langfuse_telemetry` is called once per process, only in the `glossogen run` path (`cli._run_simulation`). It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live runs, their agents and round judges: `glossogen evaluate`'s probe and judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
+The `telemetry/` package holds the settings, the bootstrap and the span processor below.
+
+- **Settings** — read from `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`; `enabled` is true only when both keys are present.
+- **Bootstrap** — `init_langfuse_telemetry` is called once per process, only in the `glossogen run` path. It calls `langfuse.get_client()` (which installs a global OpenTelemetry `TracerProvider` wired to Langfuse's OTLP endpoint), verifies connectivity with `auth_check()`, then `Agent.instrument_all(InstrumentationSettings(include_content=True))`. Bootstrapping only in the run path is what scopes tracing to live runs, their agents and round judges: `glossogen evaluate`'s probe and judge agents run in a separate process and stay untraced. Any failure (keys absent, stack down, unexpected error) degrades to an untraced run; telemetry never raises into the simulation.
 - **Trace grouping** — `PydanticAIRunner._agent_trace_context` wraps each agent cycle in `langfuse.propagate_attributes(session_id=run_id, metadata={agent_id, role_name, model, provider, scenario}, tags=[...])`, so all agents of one run group under a single Langfuse session and each span carries the agent's identity. When telemetry is disabled it returns a `nullcontext`, adding no overhead.
-- **Round attribution** — because a trace spans every round and rounds advance on a wall-clock timer mid-cycle, round is a per-model-request property. `telemetry/telemetry_round_processor.py`'s `RoundStampingSpanProcessor` (added to the global tracer provider at bootstrap) stamps `round_number` on each `chat {model}` generation span at span-start, reading the live round via `current_round_source` — which the runner points at `runtime.current_round`. The value surfaces as `langfuse.observation.metadata.round_number`, so generations are filterable by simulation round. The agent-run / tool spans are intentionally left unstamped.
-- **Flush** — short-lived run subprocesses flush buffered spans before exit via `flush_telemetry` in `_run_simulation`'s `finally`, plus an `atexit` backstop registered at init.
+- **Round attribution** — because a trace spans every round and rounds advance on a wall-clock timer mid-cycle, round is a per-model-request property. `RoundStampingSpanProcessor` (added to the global tracer provider at bootstrap) stamps `round_number` on each `chat {model}` generation span at span-start, reading the live round via `current_round_source` — which the runner points at `runtime.current_round`. The value surfaces as `langfuse.observation.metadata.round_number`, so generations are filterable by simulation round. The agent-run / tool spans are intentionally left unstamped.
+- **Flush** — short-lived run subprocesses flush buffered spans before exit via `flush_telemetry` when the run command finishes, plus an `atexit` backstop registered at init.
 - **Stack** — `docker-compose.langfuse.yml` (repo root) vendors the Langfuse v3 stack (web, worker, postgres, clickhouse, redis, minio), started with `make langfuse-up`. Host ports are shifted off upstream defaults (web 3001, internal postgres 5433) to avoid colliding with the frontend dev server (3000) and a local Postgres (5432). `LANGFUSE_INIT_*` seed a deterministic org/project/user/key pair on first boot.
 
 ## Game Clock
@@ -158,7 +160,7 @@ The ChannelRouter stores messages and validates membership.
 
 ## Scenario Protocol
 
-The `SimulationScenario` ABC in [scenario_contract/protocol.py](src/glossogen/scenario_contract/protocol.py) defines a contract for scenario plug-ins. The `scenario_contract/` package holds the rest of the contract: `ScenarioBase`, the run-detail extension, the `@scenario` decorator (`registration.py`), the scenario catalog (`catalog.py`), the loader, and the scenario sources a process loads (`scenario_sources.py`, `scenario_source_kinds.py`).
+The `SimulationScenario` ABC defines a contract for scenario plug-ins. It lives in [`scenario_contract/`](src/glossogen/scenario_contract/) with the rest of the contract: `ScenarioBase`, the run-detail extension, the `@scenario` decorator, the scenario catalog, the loader, and the scenario sources a process loads.
 
 **Core methods (required by all scenarios):**
 - `knobs_model()` — return the knobs Pydantic model class. The JSON Schema (`knobs_json_schema()`) and per-field defaults derive from it on the base, so scenarios declare the model here rather than reimplementing schema/default accessors.
@@ -175,7 +177,7 @@ The `SimulationScenario` ABC in [scenario_contract/protocol.py](src/glossogen/sc
 - `get_tools()` — scenario-specific tools, one `ScenarioTool` each (agent_id injected automatically)
 - `bind_runtime(runtime)` and the `runtime` property are provided by the base; scenarios that emit custom events read `self.runtime` (raises if accessed before binding).
 
-Scoring is not a scenario method: `run_scenario_evaluation(...)` ([scenario_evaluation_runner.py](src/glossogen/evaluation/scenario_evaluation_runner.py)) is platform code that runs the requested metrics against a run's log. The game clock uses the timing getters to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
+Scoring is not a scenario method: `run_scenario_evaluation(...)` in `evaluation/` is platform code that runs the requested metrics against a run's log. The game clock uses the timing getters to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
 
 ### Scenario Package Layout
 
@@ -194,25 +196,25 @@ src/glossogen/scenarios/<scenario_name>/
 └── evaluation/              # scenario-specific Metric subclasses
 ```
 
-Each scenario class is registered with `@scenario(name="<scenario_name>")` from [scenario_contract/registration.py](src/glossogen/scenario_contract/registration.py), which records it in a process-wide registry and makes `name()` return that name. A second class registering a name already held raises, naming both modules. The built-ins use their package directory name, which is what their run directories and recorded runs carry.
+Each scenario class is registered with `@scenario(name="<scenario_name>")` from the scenario contract, which records it in a process-wide registry and makes `name()` return that name. A second class registering a name already held raises, naming both modules. The built-ins use their package directory name, which is what their run directories and recorded runs carry.
 
-The registry fills as scenario modules are imported; [scenario_contract/catalog.py](src/glossogen/scenario_contract/catalog.py) decides what is imported. `load_scenario_catalog(sources=...)` imports each source and keeps the classes registered from the modules it imported, after checking each name and that no two scenarios read their files from one directory (see "Scenario sources"). The built-in source is a `PackageScanSource` over `glossogen.scenarios`: it walks the package's directory, descending only into subpackages, and imports a file only if its syntax tree shows a class decorated with `@scenario` from `glossogen.scenario_contract.registration`, so scripts and helpers beside a scenario are never executed. Loading makes the catalog the process's current one.
+The registry fills as scenario modules are imported; the scenario catalog decides what is imported. `load_scenario_catalog(sources=...)` imports each source and keeps the classes registered from the modules it imported, after checking each name and that no two scenarios read their files from one directory (see "Scenario sources"). The built-in source is a `PackageScanSource` over `glossogen.scenarios`: it walks the package's directory, descending only into subpackages, and imports a file only if its syntax tree shows a class decorated with `@scenario` from `glossogen.scenario_contract.registration`, so scripts and helpers beside a scenario are never executed. Loading makes the catalog the process's current one.
 
-Each process loads its catalog once, from the sources described in "Scenario sources" below. `cli/cli_entry.py` does it before dispatching any command. `glossogen.server.app` loads the configured catalog when uvicorn imports it directly (`make dev`), the helpers in `testing/` do the same when a test process has not loaded one, `scripts/export_openapi.py` and `scripts/generate_demo_snapshot.py` load the built-in catalog only, before building the app or reading a run, and the test suite loads the built-in catalog in its root `conftest.py`. A lookup, or a read of a run's events, before that raises `ScenarioCatalogNotLoaded`.
+Each process loads its catalog once, from the sources described in "Scenario sources" below. The CLI does it before dispatching any command. The server app loads the configured catalog when uvicorn imports it directly (`make dev`), the helpers in `testing/` do the same when a test process has not loaded one, the build scripts behind `make gen-api-types` and the `/demo` snapshot load the built-in catalog only, before building the app or reading a run, and the test suite loads the built-in catalog when its session starts. A lookup, or a read of a run's events, before that raises `ScenarioCatalogNotLoaded`.
 
 Nothing looks up a name in the catalog directly. Every caller goes through `glossogen/scenario_contract/loader.py`, which asks the current catalog. `find_scenario_class` answers None for a name the catalog does not hold, for callers that degrade (run detail, the run list, export); `get_scenario_class` raises `ScenarioNotLoaded`, whose message names the scenario, lists every source the process loaded and where each was configured, and says to add the scenario to `[tool.glossogen] scenarios` or pass `--scenarios`. The CLI prints that message and exits.
 
 ### Scenario Event Parsing
 
-A scenario declares the event types it logs beyond the platform's by returning them from `event_types()`. The platform's own are `core_event_types()` in [models/event.py](src/glossogen/models/event.py), which imports no scenario code.
+A scenario declares the event types it logs beyond the platform's by returning them from `event_types()`. The platform's own are `core_event_types()` in `models/`, which imports no scenario code.
 
-A run logs only the platform's events and its own scenario's, and its first line, `simulation_started`, names that scenario. So a run is parsed with exactly those types. [run_storage/event_parsing.py](src/glossogen/run_storage/event_parsing.py) holds one parser per scenario name, built on first use and cached: `run_event_parser(scenario_name)`. `load_events(log_path)` reads the scenario from the log's first line and raises `ValueError` when that line is not a `simulation_started`. The readers that parse lines on their own take a parser from `run_event_parser`: the message-export scan builds it from the log's first line, and the run-summary scan and bundle import pass the scenario name to `parse_event` / `parse_event_bytes`.
+A run logs only the platform's events and its own scenario's, and its first line, `simulation_started`, names that scenario. So a run is parsed with exactly those types. `run_storage/` holds one parser per scenario name, built on first use and cached: `run_event_parser(scenario_name)`. `load_events(log_path)` reads the scenario from the log's first line and raises `ValueError` when that line is not a `simulation_started`. The readers that parse lines on their own take a parser from `run_event_parser`: the message-export scan builds it from the log's first line, and the run-summary scan and bundle import pass the scenario name to `parse_event` / `parse_event_bytes`.
 
-`run_storage` does not ask the catalog. When a catalog becomes the process's current one, it installs its `event_types_of` lookup in `event_parsing` with `install_scenario_event_types`, and installing another catalog (or restoring one after `scenario_catalog_installed`) replaces it and drops the cached parsers. A read before any catalog has loaded raises `ScenarioCatalogNotLoaded`, so an ordering bug fails at the first read instead of silently parsing with the platform's events alone.
+`run_storage` does not ask the catalog. When a catalog becomes the process's current one, it installs its `event_types_of` lookup in `run_storage/` with `install_scenario_event_types`, and installing another catalog (or restoring one after `scenario_catalog_installed`) replaces it and drops the cached parsers. A read before any catalog has loaded raises `ScenarioCatalogNotLoaded`, so an ordering bug fails at the first read instead of silently parsing with the platform's events alone.
 
-An event whose type is neither a platform event nor declared by the run's scenario is read into an `UnrecognizedEvent` ([models/event.py](src/glossogen/models/event.py)). It holds the line's `event_type` and the decoded JSON object as `payload`, reads `event_id`, `timestamp` and `round_number` like any event, and serializes back to an equal JSON object: byte for byte for a line the event logger wrote, in orjson's spelling for a line spelled another way. An undeclared line with no `event_id` or `timestamp` cannot be kept; the reader skips it and counts it in the same warning. `load_events` counts them per type in one warning per read. When the run's scenario is not in this process's catalog, every scenario event is one, and the warning names the missing scenario. Code that dispatches on event classes passes over them; run detail returns them as `unrecognized_events`, and the run page shows them in its timeline at the time they were logged. A malformed event of a type the parser does read still raises. Because no reader holds two scenarios' events at once, two scenarios may declare the same `event_type`.
+An event whose type is neither a platform event nor declared by the run's scenario is read into an `UnrecognizedEvent`, a platform event model. It holds the line's `event_type` and the decoded JSON object as `payload`, reads `event_id`, `timestamp` and `round_number` like any event, and serializes back to an equal JSON object: byte for byte for a line the event logger wrote, in orjson's spelling for a line spelled another way. An undeclared line with no `event_id` or `timestamp` cannot be kept; the reader skips it and counts it in the same warning. `load_events` counts them per type in one warning per read. When the run's scenario is not in this process's catalog, every scenario event is one, and the warning names the missing scenario. Code that dispatches on event classes passes over them; run detail returns them as `unrecognized_events`, and the run page shows them in its timeline at the time they were logged. A malformed event of a type the parser does read still raises. Because no reader holds two scenarios' events at once, two scenarios may declare the same `event_type`.
 
-The write side keeps logs readable: [runtime/event_logger.py](src/glossogen/runtime/event_logger.py) is built with the classes it may log, `loggable_event_types(scenario_cls)` from [scenario_contract/event_types.py](src/glossogen/scenario_contract/event_types.py), and raises `UndeclaredEventType` for any other class, a subclass of an accepted one included, and for an `UnrecognizedEvent`, which is never emitted live. The derivation flows clone a source run and rewrite its JSONL through `rewrite_run_jsonl`, which parses each kept line as JSON and serializes it again, unrecognized ones included, and resume it under the same scenario, so the check applies only to what the resumed run logs.
+The write side keeps logs readable: the runtime's `EventLogger` is built with the classes it may log, `loggable_event_types(scenario_cls)` from the scenario contract, and raises `UndeclaredEventType` for any other class, a subclass of an accepted one included, and for an `UnrecognizedEvent`, which is never emitted live. The derivation flows clone a source run and rewrite its JSONL through `rewrite_run_jsonl`, which parses each kept line as JSON and serializes it again, unrecognized ones included, and resume it under the same scenario, so the check applies only to what the resumed run logs.
 
 The catalog refuses, at load, a declared event type with no fixed `event_type` literal, or one that repeats a platform event's or another of the scenario's own. `glossogen validate` also reports an event class defined in the scenario's module or package that `event_types()` leaves out, unless another loaded scenario declares it.
 
@@ -220,21 +222,21 @@ The catalog refuses, at load, a declared event type with no fixed `event_type` l
 
 ### Scenario Run-Detail Extensions
 
-Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) return a `ScenarioRunDetailExtension` from `SimulationScenario.run_detail_extension()`, with a `ScenarioRunExtrasBase` payload class whose `scenario_name` literal is the scenario's name. Both classes live in [scenario_contract/run_detail_extension.py](src/glossogen/scenario_contract/run_detail_extension.py), outside `glossogen.server`, because the scenario contract names them. The module defining a scenario's extension can sit anywhere; nothing looks for it by file name.
+Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) return a `ScenarioRunDetailExtension` from `SimulationScenario.run_detail_extension()`, with a `ScenarioRunExtrasBase` payload class whose `scenario_name` literal is the scenario's name. Both classes are part of the scenario contract, outside `server/`, because `SimulationScenario` names them. The module defining a scenario's extension can sit anywhere; nothing looks for it by file name.
 
-[server/runs/scenario_extension.py](src/glossogen/server/runs/scenario_extension.py) asks a scenario class for its extension. [server/runs/models.py](src/glossogen/server/runs/models.py) names no scenario: `RunDetailResponse.scenario_extras` is typed as `SerializeAsAny[ScenarioRunExtrasBase]`, so it serializes as whichever subclass it holds. The API schema is completed when the app is built: `create_app` passes the extensions of every scenario loaded at that point to `publish_scenario_schemas` ([server/runs/scenario_openapi.py](src/glossogen/server/runs/scenario_openapi.py)), which publishes `scenario_extras` as a discriminated union over their `ScenarioRunExtrasBase` subclasses (discriminated by `scenario_name`) and the live event stream as the union of the platform's SSE events and every extension's `sse_event_classes`. `scripts/export_openapi.py` builds the app over the built-in catalog only, so `api.gen.ts` does not depend on which scenarios a developer has configured. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result. `glossogen validate` checks the payload's `scenario_name` matches the scenario.
+The server's response models name no scenario: `RunDetailResponse.scenario_extras` is typed as `SerializeAsAny[ScenarioRunExtrasBase]`, so it serializes as whichever subclass it holds. The API schema is completed when the app is built: `create_app` passes the extensions of every scenario loaded at that point to `publish_scenario_schemas`, which publishes `scenario_extras` as a discriminated union over their `ScenarioRunExtrasBase` subclasses (discriminated by `scenario_name`) and the live event stream as the union of the platform's SSE events and every extension's `sse_event_classes`. `make gen-api-types` builds the app over the built-in catalog only, so `api.gen.ts` does not depend on which scenarios a developer has configured. After the generic event walk, the run-detail reader calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result. `glossogen validate` checks the payload's `scenario_name` matches the scenario.
 
 Veyru is the canonical example; see [scenarios/veyru/run_detail_extension.py](src/glossogen/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
 
 ### Scenario Frontend Plug-ins
 
-On the frontend side, each scenario optionally ships a `ScenarioPlugin` at `frontend/src/features/runs/<scenario>/plugin.tsx` and registers it in [scenario-registry.ts](frontend/src/features/runs/scenario-registry.ts). Platform components look the plug-in up via `getScenarioPlugin(scenarioName)` and route scenario-specific concerns through it instead of hardcoding `scenarioName === "veyru"` checks. The contract lives in [scenario-plugin.ts](frontend/src/features/runs/scenario-plugin.ts): `RoundDetailPanel`, `renderToolMetadata`, `summarizeToolVerdict`, `liveJudge`, `getTimelineMarkers`, `classifyRoundTrigger`. The default plug-in returns null/empty for every slot. `extras` is typed `unknown` at the boundary so the registry can store every plug-in under a single type; each plug-in narrows internally.
+On the frontend side, each scenario optionally ships a `ScenarioPlugin` at `frontend/src/features/runs/<scenario>/plugin.tsx` and registers it in [`scenario-registry.ts`](frontend/src/features/runs/scenario-registry.ts). Platform components look the plug-in up via `getScenarioPlugin(scenarioName)` and route scenario-specific concerns through it instead of hardcoding `scenarioName === "veyru"` checks. The `ScenarioPlugin` type beside the registry is the contract: `RoundDetailPanel`, `renderToolMetadata`, `summarizeToolVerdict`, `liveJudge`, `getTimelineMarkers`, `classifyRoundTrigger`. The default plug-in returns null/empty for every slot. `extras` is typed `unknown` at the boundary so the registry can store every plug-in under a single type; each plug-in narrows internally.
 
 These are compiled into the bundle, so a scenario loaded from outside glossogen has no plug-in and resolves to `DEFAULT_SCENARIO_PLUGIN`. That is the intended outcome rather than a gap: the platform UI is driven by the run's event log and the scenario's knobs model, both of which an external scenario supplies.
 
 ### Scenario sources
 
-A scenario does not have to live in this repo. Any module that defines a class decorated with `@scenario` is a scenario once a process imports it, and [scenario_contract/scenario_sources.py](src/glossogen/scenario_contract/scenario_sources.py) decides what each process imports. A source is a module name, a `.py` file or a directory ([scenario_contract/scenario_source_kinds.py](src/glossogen/scenario_contract/scenario_source_kinds.py)). The built-in package always comes first; after it, the first of these that is set decides the rest:
+A scenario does not have to live in this repo. Any module that defines a class decorated with `@scenario` is a scenario once a process imports it, and the scenario sources decide what each process imports. A source is a module name, a `.py` file or a directory. The built-in package always comes first; after it, the first of these that is set decides the rest:
 
 1. `--scenarios <source>`, a repeatable global CLI option given before the subcommand;
 2. `GLOSSOGEN_SCENARIOS`, `os.pathsep`-separated;
@@ -250,11 +252,11 @@ The default scan is the one source that is not strict. A file it finds that fail
 
 Nothing a run records is imported. A run records only its scenario's name, and a reader looks that name up in its own catalog. Prod's server sets `GLOSSOGEN_SCENARIOS=""` in the `Dockerfile`, so it loads the built-ins and nothing it would have to find by scanning.
 
-**Children inherit the list.** The server and the derivation flows spawn `python -m glossogen run` and `evaluate` children (`server/run_launcher.py`, `server/runs/router.py`, `run_derivation/run_launching.py`) with `child_process_environment()`, which sets `GLOSSOGEN_SCENARIOS` to the modules the parent loaded beyond the built-ins, by name (a package `__init__.py` a walk imported as `<package>.__init__`, so the child imports that file without scanning the rest of the package), and puts the import roots of its file and directory sources first on `PYTHONPATH`. The child imports the same modules under the same names, so relative imports inside a scenario package keep working, whatever its working directory and without scanning. An empty value is set rather than unset, so a child of a parent that loaded only the built-ins does not scan either.
+**Children inherit the list.** The server and the derivation flows spawn `python -m glossogen run` and `evaluate` children with `child_process_environment()`, which sets `GLOSSOGEN_SCENARIOS` to the modules the parent loaded beyond the built-ins, by name (a package `__init__.py` a walk imported as `<package>.__init__`, so the child imports that file without scanning the rest of the package), and puts the import roots of its file and directory sources first on `PYTHONPATH`. The child imports the same modules under the same names, so relative imports inside a scenario package keep working, whatever its working directory and without scanning. An empty value is set rather than unset, so a child of a parent that loaded only the built-ins does not scan either.
 
-**`validate <path>`** loads the path as one more source on top of the ones the process already loaded ([scenario_contract/path_loader.py](src/glossogen/scenario_contract/path_loader.py)) and checks every scenario it registers. When the project around the path has a `pyproject.toml` with a `[build-system]`, [scenario_authoring/scenario_package_checks.py](src/glossogen/scenario_authoring/scenario_package_checks.py) also checks that setuptools `package-data` covers the scenario's prompts and presets, which a wheel would otherwise leave out.
+**`validate <path>`** loads the path as one more source on top of the ones the process already loaded and checks every scenario it registers. When the project around the path has a `pyproject.toml` with a `[build-system]`, it also checks that setuptools `package-data` covers the scenario's prompts and presets, which a wheel would otherwise leave out.
 
-Assets come from the scenario, not from a path under `glossogen`. `knobs_preset_names` / `load_knobs_preset` read `knobs_*.json` from `scenario_package_files()`, the directory of the module that defines the scenario class, via `importlib.resources`, and prompts resolve relative to that module. So each scenario needs a directory of its own: `load_scenario_catalog` refuses two loaded scenarios whose `scenario_package_files()` is the same directory, naming both scenarios, their modules and the directory, and `validate <path>` reports the same error. The built-ins each have a package. `glossogen new-scenario <name>` ([scenario_authoring/scenario_scaffold.py](src/glossogen/scenario_authoring/scenario_scaffold.py)) writes only `<target-dir>/<name>/`: the module, its `knobs_default.json` and `prompts/`, an `__init__.py` and a test. The scan of the project directory reaches it with no configuration. After writing, the command imports the configured sources again (`sources_reach`) and, when none of them loads the new module, says how to add it rather than writing the configuration.
+Assets come from the scenario, not from a path under `glossogen`. `knobs_preset_names` / `load_knobs_preset` read `knobs_*.json` from `scenario_package_files()`, the directory of the module that defines the scenario class, via `importlib.resources`, and prompts resolve relative to that module. So each scenario needs a directory of its own: `load_scenario_catalog` refuses two loaded scenarios whose `scenario_package_files()` is the same directory, naming both scenarios, their modules and the directory, and `validate <path>` reports the same error. The built-ins each have a package. `glossogen new-scenario <name>` (in `scenario_authoring/`, with `validate`) writes only `<target-dir>/<name>/`: the module, its `knobs_default.json` and `prompts/`, an `__init__.py` and a test. The scan of the project directory reaches it with no configuration. After writing, the command imports the configured sources again (`sources_reach`) and, when none of them loads the new module, says how to add it rather than writing the configuration.
 
 Which metrics apply to a scenario's runs is decided per scenario:
 `metric_registry.available_metrics(scenario_cls)` merges the generic metrics and
@@ -262,9 +264,8 @@ the scenario's own `scenario_metrics()`, and both the evaluation runner and the
 keyed-observation reader resolve through it. A generic metric wins a name
 collision, so a scenario cannot change what `round_success` means and make two
 reports incomparable. The API and `--metrics` validation read names only,
-through `scenario_metric_names.available_metric_names(scenario_cls)`;
-`generic_metric_names.py` holds the generic names separately so listing them
-does not import every metric class.
+through `available_metric_names(scenario_cls)`, which keeps the generic names
+apart from the metric classes so listing them does not import every metric.
 
 ### Scenario-declared parts and the contract split
 
@@ -319,7 +320,7 @@ A run is read back with the platform's event types plus those its scenario decla
 - `closing_prompt_failed` — the same exchange when no answer came back: error type and message, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
-`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) logs only the platform's events and the running scenario's declared ones, and only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_storage/run_archive.py`](src/glossogen/run_storage/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
+`EventLogger` logs only the platform's events and the running scenario's declared ones, and only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` in `run_storage/` locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
 
 ## Run Storage
 
@@ -362,22 +363,15 @@ metric that produced it:
 
 The CLI `run` command computes the output path automatically from `--runs-dir`, the scenario name, and the current unix timestamp. The `evaluate` command takes `--run-dir` pointing to a specific run directory and writes the report as a sibling to the JSONL file.
 
-[`run_storage/`](src/glossogen/run_storage/) reads this tree without the web server or Postgres, so the CLI, the exports and the analysis read runs the same way the server does:
+[`run_storage/`](src/glossogen/run_storage/) reads this tree without the web server or Postgres, so the CLI, the exports and the analysis read runs the same way the server does. It covers:
 
-- [`event_log_reader.py`](src/glossogen/run_storage/event_log_reader.py): `load_events(log_path)` parses a run's JSONL event log into typed events, reading event types this build has no class for into `UnrecognizedEvent`; `extract_agent_configs`, `extract_simulation_id` and `extract_scenario_config` read those events back into configs
-- [`run_discovery.py`](src/glossogen/run_storage/run_discovery.py): `discover_runs(runs_dir)` walks the tree and `build_summary` builds one run's `RunSummary`, cached per run in `run_summary_cache.json`
-- [`run_summary_models.py`](src/glossogen/run_storage/run_summary_models.py): `RunSummary` and its parts (`AgentModelSummary`, the `*Source` provenance records, `EvaluationScore`, `RoundResultTally`). The runs list API returns `RunSummary` as is
-- [`derivation_manifest_reader.py`](src/glossogen/run_storage/derivation_manifest_reader.py): the derivation manifests read into `*Source` records
-- [`evaluation_score_reader.py`](src/glossogen/run_storage/evaluation_score_reader.py): the per-metric scores out of a run's evaluation report
-- [`knob_filter.py`](src/glossogen/run_storage/knob_filter.py): `<knob><operator><value>` filters over a run's recorded `scenario_config`, shared by the runs listing, the export request model and the CLI's run selection
-- [`run_bundle.py`](src/glossogen/run_storage/run_bundle.py): the tar.gz bundle the server's export endpoint and `push-to-prod` build, and its `bundle_manifest.json`
-- [`run_file_paths.py`](src/glossogen/run_storage/run_file_paths.py), [`run_labels_file.py`](src/glossogen/run_storage/run_labels_file.py), [`run_identity.py`](src/glossogen/run_storage/run_identity.py): the scenario-named file paths in a run directory, the one reader of `labels.json`, and the `<scenario>/<run_dir_name>` identifier
-- [`run_archive.py`](src/glossogen/run_storage/run_archive.py), [`run_lineage.py`](src/glossogen/run_storage/run_lineage.py), [`archive_member_filter.py`](src/glossogen/run_storage/archive_member_filter.py): directory claiming and copy-at-event, a derived run's timeline parent, and which files an archive carries
-- [`jsonl_lines.py`](src/glossogen/run_storage/jsonl_lines.py), [`event_parsing.py`](src/glossogen/run_storage/event_parsing.py): reading JSONL line by line and parsing one event
-- [`replace_manifest.py`](src/glossogen/run_storage/replace_manifest.py), [`cross_run_replace_manifest.py`](src/glossogen/run_storage/cross_run_replace_manifest.py), [`derived_run_start.py`](src/glossogen/run_storage/derived_run_start.py): the manifests a derived run keeps, and when its own simulation began
-- [`eval_manifest.py`](src/glossogen/run_storage/eval_manifest.py), [`stream_manifest.py`](src/glossogen/run_storage/stream_manifest.py): the `eval_in_progress.json` and `stream.json` discovery files, with their stale-PID check
+- **The event log**: `load_events(log_path)` parses a run's JSONL into typed events with the run's scenario's parser, reading event types this build has no class for into `UnrecognizedEvent`, and the helpers that read agent configs, the simulation id and the scenario config back out of those events.
+- **Discovery and summaries**: `discover_runs(runs_dir)` walks the tree and builds one `RunSummary` per run, cached in `run_summary_cache.json`. The runs list API returns `RunSummary` as is, with the derivation manifests read into its `*Source` provenance records and the per-metric scores read out of the evaluation report.
+- **Selecting runs**: the `<knob><operator><value>` filter over a run's recorded `scenario_config`, shared by the runs listing, the export request model and the CLI's run selection.
+- **Files in a run directory**: the scenario-named file paths, which code builds only through [`run_file_paths.py`](src/glossogen/run_storage/run_file_paths.py); `labels.json`, which code reads only through [`run_labels_file.py`](src/glossogen/run_storage/run_labels_file.py); the `<scenario>/<run_dir_name>` identifier; the manifests a derived run keeps; and the `eval_in_progress.json` and `stream.json` discovery files with their stale-PID check.
+- **Copies and bundles**: claiming a run directory, copying a run at an event, which files an archive carries, a derived run's timeline parent, and the tar.gz bundle the server's export endpoint and `push-to-prod` build, with its `bundle_manifest.json`.
 
-The channels a finished run's scenario scores are resolved by [`scenario_contract/primary_channel_resolution.py`](src/glossogen/scenario_contract/primary_channel_resolution.py), which sits outside `run_storage/` because it rebuilds the scenario from its recorded config (`scenario_contract/recorded_scenario_rebuild.py`). Run detail reads the ordered channel ids from it, and the message export reads the team behind each channel and whether the scenario rebuilt at all.
+The channels a finished run's scenario scores are resolved in `scenario_contract/` rather than here, because resolving them rebuilds the scenario from its recorded config. Run detail reads the ordered channel ids from it, and the message export reads the team behind each channel and whether the scenario rebuilt at all.
 
 Discovery reads the first and last lines of each JSONL file to extract metadata (scenario name, timestamp, total messages, end reason) without loading the full log. Replace-agent, cross-run replace-agent, and fork-at-round runs are identified by the presence of `replace_manifest.json` (with `replaced_agent_id` set vs null) or `cross_run_replace_manifest.json`. Legacy fork runs (created when the message-level fork UI was active) are identified by the presence of `fork_manifest.json`; only their badge and lineage link are still rendered.
 
@@ -389,14 +383,14 @@ The clone keeps every agent's events on disk. The replaced agent's *reconstructe
 
 ### Replace-Agent Flow
 
-1. **Entry**: User invokes `python -m glossogen replace-agent <scenario> --source-run-dir <dir> --after-round <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`. The CLI calls the shared core helper `replace_agent.replace_agent_in_run`, which is `prepare_replace_agent_run` (everything on disk) followed by `run_launching.launch_prepared_run` (the detached subprocess). Tests call prepare alone.
+1. **Entry**: User invokes `python -m glossogen replace-agent <scenario> --source-run-dir <dir> --after-round <N> --replaced-agent-id <id> --model <model> --provider <provider> --runs-dir <dir>`. The CLI calls `replace_agent_in_run`, which is `prepare_replace_agent_run` (everything on disk) followed by `launch_prepared_run` (the detached subprocess). Tests call prepare alone.
 2. **Boundary resolution**: `resolve_fork_boundary(events, after_round)` picks the truncation anchor: the source's `RoundAdvanced(after_round + 1)` when one exists, or, when `after_round` was the source's final round, the last event before the agents were woken with the run's terminated `done` notice (see the fork-at-round section for that path's resume semantics).
 3. **Clone + truncate**: `copy_run_at_event` copies the source run directory and truncates the copied JSONL at the anchor's byte offset.
-4. **JSONL rewrite**: `run_jsonl_rewriter.rewrite_run_jsonl` rewrites the cloned log's `run_id` and drops its `simulation_ended` lines.
+4. **JSONL rewrite**: `rewrite_run_jsonl` rewrites the cloned log's `run_id` and drops its `simulation_ended` lines.
 5. **Per-agent model overrides**: An explicit `model_overrides` dict is built that pins every source agent to its original `(model, provider)` pair (read from `AgentRegistered` events at or before the boundary) and overwrites just the replaced agent's entry with the new model/provider. This guarantees non-replaced agents stay on their exact original models even if the top-level CLI defaults differ.
 6. **Manifest**: `replace_manifest.json` records `source_run_id`, `round_start` (the entry round, `after_round + 1`), `rounds_after_swap` (`round_count - round_start`), `target_event_id` (the resolved anchor, kept for traceability), `replaced_agent_id`, `replacement_model`, `replacement_provider`, `channels_with_visible_history`, `channel_history_floors`, `replaced_at`. The field names are the frozen on-disk schema every previously recorded run carries; API readers translate them to `after_round = round_start - 1`, `rounds_after = rounds_after_swap + 1`.
 7. **Resume**: Launches `glossogen run --resume <new_dir> --config replace_config.json` as a background subprocess.
-8. **Supervisor resume**: `resume_state_loader.load_resume_state` reads the manifest and rebuilds `RewindState` with the replaced agent's history filtered as above. The supervisor applies the manifest's channel visibility so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-fork history without affecting any other agent's view. Before the agents start, the CLI calls `scenario.restore_state_from_events(events)`. Veyru uses it to re-seed each team's `outcomes` list from the source's `message_sent`, `veyru_stabilization_judged` and `round_ended` events, so the entry round's `PREVIOUS VEYRU RESULT` block reports the source's actual round-N outcome.
+8. **Supervisor resume**: `load_resume_state` reads the manifest and rebuilds `RewindState` with the replaced agent's history filtered as above. The supervisor applies the manifest's channel visibility so `read_channel` returns prior messages only for whitelisted channels; all others have the agent's `member_join_index` bumped to the current message count, hiding pre-fork history without affecting any other agent's view. Before the agents start, the CLI calls `scenario.restore_state_from_events(events)`. Veyru uses it to re-seed each team's `outcomes` list from the source's `message_sent`, `veyru_stabilization_judged` and `round_ended` events, so the entry round's `PREVIOUS VEYRU RESULT` block reports the source's actual round-N outcome.
 
 ### Per-Channel History Visibility (Platform Feature)
 
@@ -410,12 +404,9 @@ The replace-agent flow lets the caller choose, per channel, whether the replaced
 
 Setting `postmortem_disabled_at_start: true` in the merged `knobs` payload makes `VeyruWorld.__init__` flip `_postmortem_globally_disabled = True` immediately. From resume onward `validate_outgoing_message`, `get_postmortem_injection`, and `get_max_postmortem_duration_seconds` all short-circuit, so the postmortem channel exists but is inert (no sends, no injections, no postmortem phase). Pass `--knobs '{"postmortem_disabled_at_start": true}'` on the CLI to opt in.
 
-### Key Modules
+### Where it lives
 
-- `run_derivation/replace_agent.py` — `ReplaceAgentRequest`/`ReplaceAgentResult`/`ForkBoundary` named tuples, `resolve_fork_boundary`, `resolve_rounds_after`, `prepare_replace_agent_run`, and `replace_agent_in_run` (shared core called by the CLI)
-- `run_derivation/run_launching.py` — `PreparedForkRun` + `launch_prepared_run`, the seam between preparing a fork on disk and spawning its subprocess
-- `run_derivation/run_jsonl_rewriter.py` — `rewrite_run_jsonl` (run-id rewrite, `simulation_ended` dropped) and `patch_simulation_started_scenario_config`
-- `cli/derivation_commands.py` `handle_replace_agent` — CLI subcommand implementation
+`run_derivation/` prepares the clone on disk and launches its subprocess, as two separate steps so tests can stop after the manifest. `run_storage/` holds the manifest model and its readers, `run_replay/` rebuilds the resumed state from the clone, and the `replace-agent` subcommand in `cli/` builds the `ReplaceAgentRequest` from its flags and the scenario's default channel visibility.
 
 ### Provenance
 
@@ -429,18 +420,18 @@ This shares replace-agent's primitives (clone of Sim A truncated at the fork bou
 
 ### Cross-Run Flow
 
-1. **Entry**: `python -m glossogen cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --after-round <N> --replaced-agent-id <id> --runs-dir <dir>`. The CLI calls the shared core helper `cross_run_replace_agent.cross_run_replace_agent_in_run` (prepare + launch, same seam as replace-agent).
+1. **Entry**: `python -m glossogen cross-run-replace-agent <scenario> --source-a-run-dir <dir> --source-b-run-dir <dir> --after-round <N> --replaced-agent-id <id> --runs-dir <dir>`. The CLI calls `cross_run_replace_agent_in_run` (prepare + launch, same seam as replace-agent).
 2. **Validate**: Sim A and Sim B exist, scenarios match, `replaced_agent_id` exists in both, `after_round >= 1`, Sim B reached at least `source_b_round_end`. Default `source_b_round_end = min(after_round, B_max_round)` so the imported agent gets the largest temporally-aligned slice of B's history without exceeding what B reached.
 3. **Resolve model**: when `--model` / `--provider` are absent, read Sim B's `AgentRegistered` for `replaced_agent_id` and use those values. Both must be passed together to override.
 4. **Clone Sim A** truncated at the fork boundary (same resolution as replace-agent), rewrite the JSONL run-id, copy Sim B's full JSONL to `<new_dir>/imported_history_source.jsonl`, build merged scenario_config (knobs + `model_overrides` pinning every Sim A agent to its Sim A model and the replaced agent to the imported model), write `replace_config.json`.
 5. **Compute blocked tool-call channels**: scenario default (`get_replace_agent_blocked_tool_call_channels`) ∪ Sim-B-only channels (channel IDs the imported agent had in Sim B but doesn't exist in Sim A — necessary to avoid pydantic-ai schema validation rejecting reconstructed tool calls referencing dead channel IDs).
 6. **Manifest**: write `cross_run_replace_manifest.json` with both `source_a_run_id` and `source_b_run_id`, the imported model/provider, `round_start`, `source_b_round_end`, `rounds_after_swap`, `replaced_agent_id`, `channels_with_visible_history`, `blocked_tool_call_channels`. `round_start` here is the entry round, as in `replace_manifest.json`.
 7. **Resume**: launches `glossogen run --resume <new_dir> --config replace_config.json` as a background subprocess.
-8. **Supervisor resume**: the CLI's resume path detects `cross_run_replace_manifest.json` (in addition to the existing `replace_manifest.json` detection) and builds an `AgentHistoryFilter` for the replaced agent with an `imported: ImportedHistory` slot containing Sim B's events, target_timestamp, and cutoff_round. The history reconstruction loop in `_build_rewind_state_at_timestamp` dispatches per-agent: when `filter.imported is not None`, that agent's history is built from Sim B's events and its system prompt is taken from Sim B's `AgentRegistered`; otherwise the agent's history is built from Sim A's events as usual. Channel visibility on Sim A's channels is applied identically to replace-agent.
+8. **Supervisor resume**: the CLI's resume path detects `cross_run_replace_manifest.json` (in addition to the existing `replace_manifest.json` detection) and builds an `AgentHistoryFilter` for the replaced agent with an `imported: ImportedHistory` slot containing Sim B's events, target_timestamp, and cutoff_round. The history reconstruction loop dispatches per agent: when `filter.imported is not None`, that agent's history is built from Sim B's events and its system prompt is taken from Sim B's `AgentRegistered`; otherwise the agent's history is built from Sim A's events as usual. Channel visibility on Sim A's channels is applied identically to replace-agent.
 
 ### Dual-Event-Stream History Reconstruction
 
-The single non-trivial architectural change vs replace-agent is the extension of `AgentHistoryFilter` (in `run_replay/message_rewind.py`) with a sub-NamedTuple:
+The single non-trivial architectural change vs replace-agent is the extension of `AgentHistoryFilter` (in `run_replay/`) with a sub-NamedTuple:
 
 ```python
 class ImportedHistory(NamedTuple):
@@ -460,13 +451,9 @@ Grouping the three correlated fields into one Optional sub-tuple makes invalid c
 
 Same as replace-agent, `glossogen run --resume` calls `write_resume_context_files` before it launches the supervisor. For cross-run runs this dumps the imported agent's reconstructed pydantic-ai history (built from Sim B) to disk, so the operator can verify by hand that the tail matches Sim B's last few `MessageSent` events for that agent, confirming the cross-run history was mounted correctly and not contaminated by Sim A.
 
-### Key Modules
+### Where it lives
 
-- `run_derivation/cross_run_replace_agent.py` — `CrossRunReplaceAgentRequest`/`CrossRunReplaceAgentResult` named tuples, `_resolve_source_b_cutoff_event_id`, `_compute_blocked_tool_call_channels`, `prepare_cross_run_replace_agent_run`, and `cross_run_replace_agent_in_run` (shared core called by the CLI)
-- `run_storage/cross_run_replace_manifest.py` — `CrossRunReplaceManifest` Pydantic model + `read_cross_run_replace_manifest` reader (kept separate from `run_storage/replace_manifest.py` so metrics / discovery can dispatch on file presence)
-- `run_replay/message_rewind.py` — `AgentHistoryFilter` extended with `imported: ImportedHistory | None`; `_find_imported_registration` looks up the imported agent's `AgentRegistered` in the imported event stream
-- `cli/derivation_commands.py` `handle_cross_run_replace_agent` + `_resolve_source_b_max_round` + `_resolve_imported_model_from_source_b` — CLI subcommand implementation
-- `evaluation/metrics/round_success_after_resume_metric.py` — reads either `replace_manifest.json` or `cross_run_replace_manifest.json` and projects to a common `_ResumeAnchor` (so the same metric works for both flows)
+The same packages as replace-agent. The cross-run manifest has its own model in `run_storage/`, apart from `replace_manifest.json`'s, so discovery, resume and the metrics tell the flows apart by which file is present. `round_success_after_resume` reads either manifest. The `cross-run-replace-agent` subcommand reads Sim B's last round and its model when the flags leave them out.
 
 ### Provenance
 
@@ -478,7 +465,7 @@ Fork-at-round is the simplest sibling of replace-agent: it clones a finished run
 
 ### Fork-at-Round Flow
 
-1. **Entry**: `python -m glossogen fork-at-round <scenario> --source-run-dir <dir> --after-round <N> --runs-dir <dir> [--knobs <file>] [--rounds-after K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent.replace_agent_in_run`.
+1. **Entry**: `python -m glossogen fork-at-round <scenario> --source-run-dir <dir> --after-round <N> --runs-dir <dir> [--knobs <file>] [--rounds-after K]`. The CLI builds a `ReplaceAgentRequest` with `replaced_agent_id=None`, `model=None`, `provider=None`, `channels_with_visible_history=None` and calls `replace_agent_in_run`.
 2. **Boundary resolution**: `resolve_fork_boundary` picks the anchor. When the source advanced into round `after_round + 1`, that `RoundAdvanced` is the anchor and the resumed clock re-opens the round. When `after_round` was the source's final round, the anchor is the last event before the agents were woken with the run's terminated `done` notice: the first `AgentResumed(terminated=True)` after the final round's closing events (its `round_ended`, `round_result_recorded` verdicts and `postmortem_ended`), or the last event before `SimulationEnded` when no agent was woken that way. Starting after the closing events keeps an in-run swap's wake, which looks the same, from cutting them out of the clone. A clone holding that notice rebuilds agents who remember the game ending, and they stop playing. The resumed clock then advances into a round the source never played (see below).
 3. **Source agent collection**: `collect_source_agents` filters `AgentRegistered` events to those at or before the boundary timestamp, so each agent is pinned to the model it was running at the boundary. A boundary behind an in-run swap that already fired is refused earlier, by `refuse_boundary_with_swapped_seats`.
 4. **Clone + truncate**: Same as replace-agent — `copy_run_at_event` copies the run directory and truncates the JSONL at the anchor's byte offset.
@@ -486,7 +473,7 @@ Fork-at-round is the simplest sibling of replace-agent: it clones a finished run
 6. **Merged config**: `request.knobs` is shallow-merged onto the source's `scenario_config`. `round_count` is set to `after_round + rounds_after`. `model_overrides` pins every agent to its source-active registration. The merged config is written to `replace_config.json` and patched into the cloned JSONL's `SimulationStarted` event.
 7. **Manifest**: Written as `replace_manifest.json` with `replaced_agent_id`, `replacement_model`, `replacement_provider` all `null`; `channels_with_visible_history` and `blocked_tool_call_channels` empty. `round_start` records the entry round and `rounds_after_swap` records `round_count - round_start` (the frozen on-disk schema).
 8. **Subprocess launch**: `_pick_subprocess_default_model` picks the first source-active registration as the `--model`/`--provider` defaults (every agent has an explicit `model_overrides` entry, so these defaults are never read but `glossogen run` requires the flags). Subprocess runs detached.
-9. **Resume-side reconstruction**: `resume_state_loader.load_resume_state` reads `replace_manifest.json`; when `replaced_agent_id is None`, calls `build_rewind_state_at_event(events, target_event_id, cutoff_round=None, agent_filters={})` and skips populating `replaced_agent_ids` / `replaced_agent_channel_visibility`. Every agent gets a full pass-through history.
+9. **Resume-side reconstruction**: `load_resume_state` reads `replace_manifest.json`; when `replaced_agent_id is None`, calls `build_rewind_state_at_event(events, target_event_id, cutoff_round=None, agent_filters={})` and skips populating `replaced_agent_ids` / `replaced_agent_channel_visibility`. Every agent gets a full pass-through history.
 
 ### Crash Recovery of Forks
 
@@ -512,22 +499,13 @@ The source's `scheduled_events` list is preserved unless overridden by `--knobs`
 
 When the scenario's knobs schema gained a required field after the source was created, validation will reject the merged config until the missing key is supplied. Pass it via `--knobs` for that fork. Example: veyru's `easy_round_numbers: frozenset[int]` was added later, so older veyru runs need `--knobs '{"easy_round_numbers": [1, 2, 3, 6, 13]}'` to fork.
 
-### Key Modules
+### Where it lives
 
-- `run_derivation/replace_agent.py` — shared core with `replaced_agent_id: str | None`; `_validate_replacement_payload`, `_pick_subprocess_default_model`, `collect_source_agents` (boundary-timestamp filtered), `find_boundary_timestamp`
-- `run_storage/replace_manifest.py` — `ReplaceManifest` Pydantic model with nullable `replaced_agent_id` / `replacement_model` / `replacement_provider`
-- `run_replay/resume_state_loader.py` — `load_resume_state` (dispatches on the manifests present), `read_replace_manifest_info` / `read_cross_run_manifest_info` (projections carrying `entry_round`), `apply_fork_boundary` (advance derivation + snapshot synthesis)
-- `runtime/game_clock.py` — `dispatch_resume_boundary_events()` + `deliver_initial_round_injections()`; `start_initial_round`'s resume branch delivers no injections inline, and records the fresh `RoundAdvanced` when `advance_on_resume` is set
-- `runtime/scheduler.py` — `RoundBoundaryScheduler(events, completed_event_count_by_round)` resumes each round after its recorded completed-event count
-- `run_replay/message_rewind.py` — `RewindState.completed_scheduler_event_count_by_round` and `RewindState.enter_round_by_advancing`
-- `runtime/autonomous_supervisor.py` — pre-seeds the scheduler from `resume_state.completed_scheduler_event_count_by_round`, opens one round past the clone's last when advancing, and calls `dispatch_resume_boundary_events` + `deliver_initial_round_injections` after agent runners launch
-- `cli/derivation_commands.py` — `handle_fork_at_round` handler and the `fork-at-round` argparse parser
-- `run_storage/run_summary_models.py` — `ForkAtRoundSource`
-- `run_storage/derivation_manifest_reader.py` — `read_fork_at_round_source` (returns `None` when the manifest's `replaced_agent_id` is non-null); `read_replace_agent_source` returns `None` when it is null so a single manifest never surfaces under both fields. Both translate the stored window to `after_round` / `rounds_after`
+Fork-at-round is replace-agent's code path with `replaced_agent_id=None`, so it lives in the same packages. The resume side spans `run_replay/`, which decides from the manifests present where the resumed run starts and whether it re-opens or advances a round, and `runtime/`, where the supervisor, the game clock and the scheduler apply that decision in the order described above.
 
 ### Provenance
 
-Fork-at-round runs store a `replace_manifest.json` with `replaced_agent_id=null` (the discriminator). Discovery reads `read_fork_at_round_source` which returns a `ForkAtRoundSource { source_run_id, after_round, rounds_after, target_event_id, forked_at }` on `RunSummary` / `RunDetailResponse` as `fork_at_round_source`. The frontend renders a green "↺ Forked after round N (+K)" badge in the run-detail header (links back to `source_run_id`) and a green chip in the runs-list row.
+Fork-at-round runs store a `replace_manifest.json` with `replaced_agent_id=null` (the discriminator). Discovery reads it with `read_fork_at_round_source`, and the replace-agent reader skips a manifest whose `replaced_agent_id` is null, so one manifest never surfaces under both fields. The reader returns a `ForkAtRoundSource { source_run_id, after_round, rounds_after, target_event_id, forked_at }` on `RunSummary` / `RunDetailResponse` as `fork_at_round_source`. The frontend renders a green "↺ Forked after round N (+K)" badge in the run-detail header (links back to `source_run_id`) and a green chip in the runs-list row.
 
 ### Multi-Swap Navigation
 
@@ -539,7 +517,7 @@ The in-run scheduler swaps one agent's seat for a fresh instance at scheduled ro
 
 ### Knobs Surface
 
-`BaseKnobs.scheduled_events: list[ScheduledEvent]` is a discriminated Pydantic union. Two variants:
+`BaseKnobs.scheduled_events: list[ScheduledEvent]` is a discriminated Pydantic union. Its variants are `swap_agent` and `set_postmortem`, below, and `inject_case`, which hands the scenario's `inject_case_payload` hook a case to play at that round.
 
 ```jsonc
 { "type": "swap_agent", "at_round": 16, "agent_id": "field_observer",
@@ -554,7 +532,7 @@ The in-run scheduler swaps one agent's seat for a fresh instance at scheduled ro
 ### Swap Flow
 
 1. **Round boundary fires** in `RoundBoundaryScheduler` (driven by the game clock's `signal_round_advanced`). The scheduler dispatches every event whose `at_round` matches.
-2. **`SwapAgent` dispatch** calls `execute_agent_swap` in `runtime/agent_swap.py` with an `AgentSwapResources` bundle (runtime, runner factory, runner-task table, log path, run dir, cost tracker).
+2. **`SwapAgent` dispatch** calls `execute_agent_swap` in `runtime/` with an `AgentSwapResources` bundle (runtime, runner factory, runner-task table, log path, run dir, cost tracker).
 3. **Drain old runner**: push `DoneNotification(reason="agent_swap")` to the existing `AgentSession`; wait `SWAP_RUNNER_GRACE_SECONDS`; force-cancel on timeout.
 4. **Compose effective channel visibility**: query `runtime.scenario.get_world().get_globally_disabled_channels()` and force `ChannelVisibilityNone` for each (so a previously-disabled channel like Veyru postmortem can never bleed into the new agent's view, even if the swap config didn't explicitly list it).
 5. **Rebuild seed history** by replaying the live JSONL through `build_message_history` with `cutoff_round=at_round`, `tool_calls_only=True`, and the effective channel visibility. The same builder produces the notification round-floor filter automatically (see below).
@@ -577,7 +555,7 @@ The base `ScenarioWorld` exposes two hooks for the in-run swap flow, both no-op 
 
 `read_notifications` is not channel-scoped, so its tool returns are not filtered by `channel_visibility`. The predecessor's `read_notifications` returns carry round-start injection text (e.g. `--- PREVIOUS VEYRU RESULT ---`), which would land in the swapped-in agent's seed history even when channel windowing is in effect.
 
-`run_replay/message_history_builder.py` derives a notification round floor from the `channel_visibility` config: `min(v.round_floor for v in channel_visibility.values() if isinstance(v, ChannelVisibilityFromRound))`, or `None` when no channel uses `FromRound`. `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below the floor are dropped, in both the parented-cycle and orphan-cycle paths.
+The history builder in `run_replay/` derives a notification round floor from the `channel_visibility` config: `min(v.round_floor for v in channel_visibility.values() if isinstance(v, ChannelVisibilityFromRound))`, or `None` when no channel uses `FromRound`. `read_notifications` calls whose source `ToolCallInvoked.round_number` falls below the floor are dropped, in both the parented-cycle and orphan-cycle paths.
 
 The filter applies to every caller that builds an agent history with a `FromRound` entry: replace-agent, fork, cross-run, and in-run swap.
 
@@ -585,23 +563,15 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 
 `write_swap_resume_context_file` writes one `resume_context_<agent_id>_round_<R>.json` per swap into the run directory. The filename includes the round number so multiple swaps in the same run keep separate files. The payload mirrors the replace-agent `resume_context_<agent_id>.json` shape and captures the swapped-in agent's pydantic-ai message history at swap time for audit.
 
-### Key Modules
+### Where it lives
 
-- `models/channel_visibility.py` — `ChannelVisibility` discriminated union (`Full` / `None` / `FromRound`)
-- `models/scheduled_events.py` — `SwapAgent`, `SetPostmortem`, `InjectCase`, `ScheduledEvent` discriminated union
-- `runtime/scheduler.py` — `RoundBoundaryScheduler` and the `SchedulerOps` Protocol
-- `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
-- `scenario_contract/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks
-- `models/event.py` — `AgentSwappedMidRun`, `PostmortemDisabledMidRun` event types
-- `run_replay/message_history_builder.py` — notification round-floor derivation + filter
-- `run_replay/resume_context_writer.py` — `write_swap_resume_context_file`
-- `evaluation/metrics/round_success_after_resume_metric.py` — walks every `AgentSwappedMidRun` event and emits one Measurement per anchor (named `round_success_after_resume_round_<R>_<agent_id>`); the in-run baseline window is the previous phase in the same run
+The swap knobs (`ScheduledEvent`, `ChannelVisibility`) and the events a swap logs are models in `models/`. `runtime/` holds the scheduler and the swap itself, `run_replay/` the seed-history builder with its notification round floor and the resume-context writer, and the scenario contract the two `ScenarioWorld` hooks. `round_success_after_resume` emits one measurement per swap, named `round_success_after_resume_round_<R>_<agent_id>`, whose baseline is the previous phase of the same run.
 
 ### FE Per-Agent-Instance Tabs
 
 The run viewer derives one `AgentInstance` per `(agent_id, generation)` from `agents` + `agent_swap_events` on the run-detail response. Single-instance agents render a flat sidebar row. Multi-instance agents render a parent role row with indented `Gen k · rA-B` sub-rows; the latest generation pulses green on live runs. Per-instance drawer tabs filter messages by round range and show round-banner dividers. The chat pane renders a dashed indigo `agent-swap-divider` between adjacent rounds that straddle a swap event.
 
-`server/runs/models.py` exposes `AgentSwapEventDTO` and a `agent_swap_events: list[AgentSwapEventDTO]` field on `RunDetailResponse`. `server/runs/detail_reader.py` populates it from the JSONL events.
+`RunDetailResponse` carries `agent_swap_events: list[AgentSwapEventDTO]`, which run detail builds from the JSONL events.
 
 ### Provenance
 
@@ -688,7 +658,7 @@ One organization in the installed identity provider corresponds to one glossogen
 
 #### Two operating modes
 
-- **Single-tenant mode**: no provider installed. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', external_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `IdentityMiddleware` short-circuits every request to that identity. The frontend's auth adapter answers "not configured" to every slot, so `proxy.ts` is a pass-through and no sign-in UI mounts. The landing page's Dashboard link points at `/g/local/runs` (`LOCAL_GROUP_SLUG` in `frontend/src/shared/lib/local-tenant.ts`), and `<GroupProvider>` takes the slug from that URL as in multi-tenant mode.
+- **Single-tenant mode**: no provider installed. On startup `ensure_local_group(pool)` upserts a synthetic `(slug='local', name='Local', external_org_id=NULL)` row plus a `user_last_active_group` entry for the synthetic `local-user`. `IdentityMiddleware` short-circuits every request to that identity. The frontend's auth adapter answers "not configured" to every slot, so the Next.js proxy is a pass-through and no sign-in UI mounts. The landing page's Dashboard link points at `/g/local/runs` (`LOCAL_GROUP_SLUG`), and `<GroupProvider>` takes the slug from that URL as in multi-tenant mode.
 - **Multi-tenant mode**: a provider installed on the backend and an auth adapter overlaid on the frontend. The adapter's proxy delegate gates routes; the backend asks the provider to verify the credential against the URL slug.
 
 #### URL slug as source of truth
@@ -697,7 +667,7 @@ REST routes are prefixed `/api/g/{group_slug}/...`. Frontend pages live under `/
 
 #### `IdentityMiddleware`
 
-Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Lives in [`src/glossogen/server/identity/middleware.py`](src/glossogen/server/identity/middleware.py). Per request:
+Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered), in `server/identity/` with the provider contract and its loader. Per request:
 
 1. Unauthenticated paths (`/api/health`, `/api/server-config`, `/.well-known/oauth-*`, `/mcp/...`, plus whatever prefixes the provider declares) skip the check.
 2. Local mode: attach the synthetic local `Identity`.
@@ -705,11 +675,11 @@ Pure ASGI (not `BaseHTTPMiddleware`, so SSE streams pass through unbuffered). Li
 4. Parse the slug from the URL via `_GROUP_SLUG_PATTERN = ^/(?:api|mcp)/g/([a-zA-Z0-9_-]+)` and resolve it to a `groups` row *before* calling the provider, so a provider never queries that table itself. An OAuth token must match the row's id.
 5. Resolve the group row from Postgres; attach `Identity` to `request.state`.
 
-How a credential is verified is entirely the provider's business; the platform never inspects one. The loader that finds the provider refuses to boot on ambiguity (two declared, or one declared under an unread contract version), because falling back to no provider would serve every request unauthenticated. The scenario and metric loaders warn and continue in the same situation, since there an unreadable declaration only costs a missing feature ([`identity_provider_loader.py`](src/glossogen/server/identity/identity_provider_loader.py)).
+How a credential is verified is entirely the provider's business; the platform never inspects one. The loader that finds the provider refuses to boot on ambiguity (two declared, or one declared under an unread contract version), because falling back to no provider would serve every request unauthenticated. The scenario and metric loaders warn and continue in the same situation, since there an unreadable declaration only costs a missing feature.
 
 #### Postgres schema
 
-Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` inside each revision, psycopg3 async in application code. Connection pool via `psycopg_pool.AsyncConnectionPool`. Query helpers in [`src/glossogen/db/queries.py`](src/glossogen/db/queries.py) return Pydantic rows (`GroupRow`, `RunRow`, `UserLastActiveGroupRow`, `PendingConsentRow`); no raw dicts cross the boundary.
+Tooling: alembic for migration scheduling, raw SQL via `op.execute("""...""")` inside each revision, psycopg3 async in application code. Connection pool via `psycopg_pool.AsyncConnectionPool`. The query helpers in `db/` return Pydantic rows (`GroupRow`, `RunRow`, `UserLastActiveGroupRow`, `PendingConsentRow`); no raw dicts cross the boundary.
 
 | Table | Purpose |
 | --- | --- |
@@ -727,20 +697,20 @@ Keeping `groups` in step with an external directory is the provider's job: it co
 
 #### Lookup + listing
 
-- [`server/runs/lookup.py`](src/glossogen/server/runs/lookup.py): `get_identity(request)`, `resolve_run_or_404(request, scenario, run_dir_name)` (DB lookup keyed on `(group_id, scenario, run_dir_name)` before touching disk), and `register_new_run(request, scenario, run_dir_name, status, source_*)` (called from every place that creates a new run on disk — fork, replace-agent, cross-run, fork-at-round, import, CLI).
-- [`server/runs/listing.py`](src/glossogen/server/runs/listing.py): `list_runs_for_group(request, scenario_filter)` queries Postgres for the group's runs, then enriches each row by reading the on-disk summary cache (or scanning the JSONL on a miss).
-- [`server/runs/label_mirror.py`](src/glossogen/server/runs/label_mirror.py): a run's `labels.json` is the source of truth for its labels, and `runs.labels` is a mirror the label union and label filtering read instead of opening one file per run. Rows never mirrored (`labels IS NULL`) are backfilled at startup. Orchestrator scripts write the file without going through the server, so drift is repaired wherever the server reads the file anyway: the listed page's rows and a run's detail.
+- A request resolves its run with `resolve_run_or_404(request, scenario, run_dir_name)`, a DB lookup keyed on `(group_id, scenario, run_dir_name)` before anything on disk is opened. Every place that creates a run on disk (fork, replace-agent, cross-run, fork-at-round, import, the CLI) registers it with `register_new_run`.
+- The runs list queries Postgres for the group's runs, then enriches each row from the on-disk summary cache, or by scanning the JSONL on a miss.
+- A run's `labels.json` is the source of truth for its labels, and `runs.labels` is a mirror the label union and label filtering read instead of opening one file per run. Rows never mirrored (`labels IS NULL`) are backfilled at startup. Orchestrator scripts write the file without going through the server, so drift is repaired wherever the server reads the file anyway: the listed page's rows and a run's detail.
 
 #### CLI tenancy surface
 
 - `glossogen run` accepts `--group-slug` (default `local`); the launcher inserts a `runs` row with that ownership after `claim_run_dir`.
-- `glossogen login --url <remote>` ([`oauth_client.py`](src/glossogen/prod_sync/oauth_client.py)) walks the OAuth flow against a remote backend, opening the user's browser to the consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
-- `glossogen push-to-prod` ([`prod_push.py`](src/glossogen/prod_sync/prod_push.py)) bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
-- `glossogen sync-metadata-to-prod` ([`prod_metadata_sync.py`](src/glossogen/prod_sync/prod_metadata_sync.py)) handles local runs the remote already has. It PUTs the local labels onto `/api/g/<slug>/runs/{scenario}/{run_dir_name}/labels` when the lists differ, and the local evaluation report onto `.../evaluation` when its measurements hash differs from the remote's `evaluation_content_hash` or the remote has none. It also PUTs every local label description the remote is missing or records differently onto `/api/g/<slug>/labels/descriptions`; descriptions only the remote has are left alone. Runs missing from the remote are skipped; `push-to-prod` is for those.
+- `glossogen login --url <remote>` walks the OAuth flow against a remote backend, opening the user's browser to the consent page; the loopback HTTP server collects the authorization code, exchanges it for tokens, calls `/mcp/whoami` to discover the bound group, and writes `~/.glossogen/credentials.json` (mode 0600).
+- `glossogen push-to-prod` bulk-uploads matching local runs to the configured remote via `/api/g/<slug>/runs/import`. Supports `--label` (AND), `--scenario`, `--include-incomplete`, `--dry-run`, `--concurrency` (default 1; the import endpoint is idempotent on `run_id` so re-running is safe).
+- `glossogen sync-metadata-to-prod` handles local runs the remote already has. It PUTs the local labels onto `/api/g/<slug>/runs/{scenario}/{run_dir_name}/labels` when the lists differ, and the local evaluation report onto `.../evaluation` when its measurements hash differs from the remote's `evaluation_content_hash` or the remote has none. It also PUTs every local label description the remote is missing or records differently onto `/api/g/<slug>/labels/descriptions`; descriptions only the remote has are left alone. Runs missing from the remote are skipped; `push-to-prod` is for those.
 
 ### MCP Runs Browser
 
-An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware` ([`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py)) which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
+An MCP server is mounted at `/mcp` on the FastAPI backend, providing programmatic access to simulation data and run launch flows for LLM clients (Claude Code, Cursor). Uses `FastMCP` with Streamable HTTP transport; the sub-app is wrapped by `McpRunContextMiddleware`, which reads the bearer token, recovers the bound `group_id` from the OAuth storage, and primes a `RunContext` contextvar so every tool runs scoped to that group. Requires `OAUTH_ISSUER_URL` to be set; the MCP endpoint is disabled if unset.
 
 The MCP server exposes these tools:
 
@@ -764,7 +734,7 @@ For run launch from MCP clients, a typical flow is:
 2. `get_knobs_preset` to load a baseline knobs payload.
 3. `start_run` with model/provider and any knob overrides.
 
-The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`) and shares simulation launch helpers with the REST start endpoint (`run_launcher.py`). Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
+The MCP server reuses the same data layer as the REST API (`discover_runs()`, `load_run_detail()`) and shares simulation launch helpers with the REST start endpoint. Run ID parameters accept unique prefixes (e.g., first 8 characters) for convenience.
 
 #### MCP OAuth Authentication
 
@@ -776,19 +746,17 @@ The OAuth flow:
 2. **Client registration**: `POST /mcp/register` (RFC 7591 dynamic client registration). `client_id` + `client_secret` are stored in the `oauth_clients` Postgres table.
 3. **Authorization**: `GET /mcp/authorize` with PKCE `code_challenge`.
    - **Single-tenant mode** (no identity provider): the OAuth provider auto-approves and mints an authorization code bound to the synthetic `local` group.
-   - **Multi-tenant mode**: the OAuth provider parks the parameters as a `pending_oauth_consents` row (migration `0003_pending_oauth_consent`) keyed by an opaque `request_id`, then redirects the browser to `provider.deferred_consent_url(request_id)`, which is `{FRONTEND_URL}/mcp-consent?request_id=<id>`. That page's shell renders the auth adapter's `ConsentGate`, which signs the user in and settles which group is being authorized; the platform's consent panel then POSTs `/mcp/consent/approve` with a session token. That endpoint is contributed by the identity provider, which verifies the caller and calls [`provider_services.approve_parked_consent`](src/glossogen/server/identity/provider_services.py) to mint the code, returning the OAuth-client redirect URL. The wrapper is what a provider calls: it reads the OAuth provider off `app.state` so a provider never reaches into it, and it translates the MCP library's `AuthorizeError` into `ConsentNotApprovable` so handling an expired link needs no `mcp` import. That exception means the link expired, was already used, or its OAuth client is gone: the provider answers it with a 4xx, not a server error. The frontend `window.location` redirects there, completing the loop with the MCP client. The parking machinery itself is platform code, because deferring consent is about having more than one group to choose from rather than about any one vendor.
+   - **Multi-tenant mode**: the OAuth provider parks the parameters as a `pending_oauth_consents` row (migration `0003_pending_oauth_consent`) keyed by an opaque `request_id`, then redirects the browser to `provider.deferred_consent_url(request_id)`, which is `{FRONTEND_URL}/mcp-consent?request_id=<id>`. That page's shell renders the auth adapter's `ConsentGate`, which signs the user in and settles which group is being authorized; the platform's consent panel then POSTs `/mcp/consent/approve` with a session token. That endpoint is contributed by the identity provider, which verifies the caller and calls `approve_parked_consent`, from the platform's services for providers, to mint the code, returning the OAuth-client redirect URL. The wrapper is what a provider calls: it reads the OAuth provider off `app.state` so a provider never reaches into it, and it translates the MCP library's `AuthorizeError` into `ConsentNotApprovable` so handling an expired link needs no `mcp` import. That exception means the link expired, was already used, or its OAuth client is gone: the provider answers it with a 4xx, not a server error. The frontend `window.location` redirects there, completing the loop with the MCP client. The parking machinery itself is platform code, because deferring consent is about having more than one group to choose from rather than about any one vendor.
 4. **Token exchange**: `POST /mcp/token` exchanges the authorization code for an access token (1 hour) and refresh token (30 days). Both rows carry `group_id` so the binding is preserved across refresh.
 5. **Authenticated requests**: Bearer token in the `Authorization` header. `McpRunContextMiddleware` resolves the token to its `group_id` and primes `RunContext` before the tool body runs.
 
 `IdentityMiddleware` also accepts MCP OAuth tokens as a Bearer fallback on `/api/g/<slug>/...` REST routes, so the same token issued to the CLI works for both MCP tool calls and REST imports.
 
-Implementation:
-- [`server/mcp/oauth_provider.py`](src/glossogen/server/mcp/oauth_provider.py) — `GlossoGenOAuthProvider` implementing `OAuthAuthorizationServerProvider`; parks consents when a provider is installed and materialises codes via `approve_pending_consent`, which providers reach through `provider_services.approve_parked_consent` rather than directly.
-- [`server/mcp/whoami_router.py`](src/glossogen/server/mcp/whoami_router.py) — `GET /mcp/whoami` (OAuth token auth, used by the CLI to discover its bound group). `POST /mcp/consent/approve` is contributed by the identity provider.
-- [`server/mcp/oauth_storage.py`](src/glossogen/server/mcp/oauth_storage.py) — psycopg3 async Postgres storage for clients, codes, tokens, and pending consents.
-- [`server/mcp/asgi_context.py`](src/glossogen/server/mcp/asgi_context.py) — primes `RunContext`.
-- [`frontend/src/app/mcp-consent/`](frontend/src/app/mcp-consent/) — the consent page. A shell: the auth adapter's `ConsentGate` settles which group is being authorized, and [`features/mcp-consent/consent-panel.tsx`](frontend/src/features/mcp-consent/consent-panel.tsx) carries the copy and the Approve button.
-- CLI surface ([`src/glossogen/prod_sync/oauth_client.py`](src/glossogen/prod_sync/oauth_client.py) + [`src/glossogen/prod_sync/prod_push.py`](src/glossogen/prod_sync/prod_push.py)): `glossogen login` walks the OAuth flow against a remote, learns `group_slug` from `/mcp/whoami`, and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token.
+The OAuth provider, its Postgres storage, `/mcp/whoami` and the middleware that primes `RunContext` live in `server/mcp/`. A provider reaches parked consents only through `approve_parked_consent`, never the OAuth provider directly. `POST /mcp/consent/approve` is contributed by the identity provider.
+
+On the frontend, the consent page under `app/mcp-consent/` is a shell: the auth adapter's `ConsentGate` settles which group is being authorized, and the platform's consent panel in `features/mcp-consent/` carries the copy and the Approve button.
+
+On the CLI side, `glossogen login` walks the OAuth flow against a remote, learns `group_slug` from `/mcp/whoami`, and stores `{access_token, refresh_token, group_slug}` in `~/.glossogen/credentials.json`; `glossogen push-to-prod` bulk-uploads local runs to `/api/g/<slug>/runs/import` using the stored token. Both are in `prod_sync/`.
 
 The frontend includes an MCP integration modal (accessible via the **MCP** button on the runs page) that shows connection instructions for Claude Code and Cursor.
 
@@ -799,10 +767,10 @@ The frontend includes an MCP integration modal (accessible via the **MCP** butto
 - **Type generation**: `openapi-typescript` generates TypeScript types from the backend's OpenAPI schema. CI enforces that generated types stay in sync with the backend.
 - **Lint enforcement**: ESLint forbids raw `fetch()` — all API calls must go through the typed client at `@/shared/lib/api-client`. This ensures compile-time validation of request paths, parameters, and response types.
 - **Auth + tenancy**:
-  - [`features/auth/auth-adapter.ts`](frontend/src/features/auth/auth-adapter.ts) is the contract the platform reads identity through; [`features/auth/adapter/`](frontend/src/features/auth/adapter/) holds the implementation, and a deployment needing different authentication replaces that directory. Four modules, one per runtime that imports them: `proxy.ts`, `server.ts`, `browser.ts`, `client.tsx`.
-  - [`frontend/src/proxy.ts`](frontend/src/proxy.ts) (Next.js 16's renamed `middleware.ts`) delegates to the auth adapter's handler, or passes through when there is none. Its `matcher` stays a literal in that file because Next.js reads it statically. An adapter typically uses the delegate to activate the URL's group on the session for the current request, which is what lets a user switch groups by URL alone.
-  - All authenticated pages live under [`app/g/[groupSlug]/`](frontend/src/app/g/[groupSlug]/); the active slug threads through React via [`GroupProvider`](frontend/src/features/auth/group-context.tsx) and `useActiveGroupSlug()`.
-  - Standalone routes, each a shell rendering one adapter component: [`/sign-in`](frontend/src/app/sign-in/[[...rest]]/page.tsx) / [`/sign-up`](frontend/src/app/sign-up/[[...rest]]/page.tsx) (catch-all, so a provider's internal flow URLs resolve), [`/select-org`](frontend/src/app/select-org/page.tsx) for signed-in users with no active group, [`/mcp-consent`](frontend/src/app/mcp-consent/page.tsx) for the OAuth consent loop.
-  - The API client at [`shared/lib/api-client.ts`](frontend/src/shared/lib/api-client.ts) calls `session.getToken({ skipCache: true })` per request and substitutes `{group_slug}` in the URL template with the active slug. `skipCache: true` matters: without it, a token minted before `setActive` returns with `org_slug=null` and every `/api/g/<slug>/...` call 403s.
+  - The auth adapter contract in `features/auth/` is what the platform reads identity through; [`features/auth/adapter/`](frontend/src/features/auth/adapter/) holds the implementation, one module per runtime that imports it, and a deployment needing different authentication replaces that directory. [Creating an identity provider](docs/creating-an-identity-provider.md) lists its modules.
+  - [`frontend/src/proxy.ts`](frontend/src/proxy.ts) (Next.js 16's renamed middleware) delegates to the auth adapter's handler, or passes through when there is none. Its `matcher` stays a literal in that file because Next.js reads it statically. An adapter typically uses the delegate to activate the URL's group on the session for the current request, which is what lets a user switch groups by URL alone.
+  - All authenticated pages live under [`app/g/[groupSlug]/`](frontend/src/app/g/[groupSlug]/); the active slug threads through React via `GroupProvider` and `useActiveGroupSlug()`.
+  - Standalone routes, each a shell rendering one adapter component: `/sign-in` / `/sign-up` (catch-all, so a provider's internal flow URLs resolve), `/select-org` for signed-in users with no active group, `/mcp-consent` for the OAuth consent loop.
+  - The API client (`@/shared/lib/api-client`) calls `session.getToken({ skipCache: true })` per request and substitutes `{group_slug}` in the URL template with the active slug. `skipCache: true` matters: without it, a token minted before `setActive` returns with `org_slug=null` and every `/api/g/<slug>/...` call 403s.
 - **Lineage badges**: derived runs (replace-agent, cross-run replace-agent, fork-at-round, legacy fork) display a badge in the run-detail header linking to the source run, plus floating-action buttons in the chat pane to scroll to each lineage event. Simulations are launched from the CLI (or via the MCP `start_run` tool); the frontend is a read-only viewer.
 

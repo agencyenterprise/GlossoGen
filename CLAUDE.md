@@ -19,25 +19,31 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 
 ## Where things are
 
-[Architecture.md](Architecture.md) describes the runtime, the scenario contract, run storage, the derivation flows and the web server. Each module's docstring describes what it holds.
+[Architecture.md](Architecture.md) describes the runtime, the scenario contract, run storage, the derivation flows and the web server, and its [Package layers](Architecture.md#package-layers) section groups the packages below. Each package's `__init__.py` docstring says what the package holds, and each module's docstring what the module holds.
 
-- `src/glossogen/scenarios/<name>/` — one folder per scenario. Adding one: [docs/creating-a-scenario.md](docs/creating-a-scenario.md)
-- `src/glossogen/scenario_contract/` — the scenario contract: `protocol.py` (`SimulationScenario`) and `scenario_base.py` (`ScenarioBase`), the run-detail extension contract. `base_knobs.py` holds `BaseKnobs`, the knobs every scenario shares, and `channel_noise.py` the character noise one of them sets; `platform_runner_prompts.py` the runner prompts an agent gets unless its scenario replaces them. The types a scenario implements or receives live here too: `scenario_world.py` (`ScenarioWorld`, `WorldContext`), `scenario_tool.py`, `activity_notification.py`, `notification_delivery.py` (`Wake`, `NotificationInbox`, the default `read_notifications` rendering), `parked_wait.py`, and the `Metric` contract (`metric_protocol.py`, `measurement.py`, `keyed_observation.py`, `metric_run_options.py`) with the evaluation configs a scenario declares. `registration.py` holds the `@scenario` decorator; `scenario_sources.py` decides which sources a process loads (`--scenarios`, `GLOSSOGEN_SCENARIOS`, `[tool.glossogen] scenarios`, or a scan of the project directory) and `scenario_source_kinds.py` holds the module, file and directory sources; `catalog.py` loads the scenarios a process can run, once, at startup; `loader.py` is the only way a scenario name is resolved; `path_loader.py` loads a path for `validate`. Also rebuilding a finished run's scenario from its recorded config (`recorded_scenario_rebuild.py`) and resolving its primary channels (`primary_channel_resolution.py`)
-- `src/glossogen/runtime/` — the supervisor that launches the game clock and agent runners, shared simulation state, the channel router, the game clock, the virtual clock a scenario can order agents by, the runner interface the supervisor drives (`agent_runner.py`, `agent_tool_specs.py`), communication tools, `read_notifications` waits, the runtime's implementations of the contract's `WorldContext` and `NotificationInbox`, the JSONL event logger, the event bus that streams events to SSE subscribers, and the embedded server that serves that stream
+- `src/glossogen/scenarios/<name>/` — one folder per built-in scenario. Adding one: [docs/creating-a-scenario.md](docs/creating-a-scenario.md)
+- `src/glossogen/scenario_contract/` — what a scenario implements and receives (`SimulationScenario`, `ScenarioBase`, `BaseKnobs`, `ScenarioWorld`, `ScenarioTool`, the `Metric` contract, the run-detail extension), and how a process finds scenarios: the `@scenario` decorator, the sources, the catalog and the loader
+- `src/glossogen/engine/` — the round engine scenarios build on: team declarations, the structure derived from them, and `RoundWorld`'s per-round metering
+- `src/glossogen/scenario_authoring/` — `glossogen new-scenario` and `glossogen validate`
+- `src/glossogen/runtime/` — a running simulation: the supervisor, the game clock, shared state and channels, the agents' tools and waits, in-run swaps, the runner interface, the event logger and the live event stream
 - `src/glossogen/runners/` — the pydantic-ai implementation of the runtime's runner interface
-- `src/glossogen/llm/` — the `LLMProvider` judges call, token counters, and per-provider pydantic-ai model construction (`pydantic_ai_model_factory.py`)
-- `src/glossogen/run_config/` — building a run's config before launch: resolving `--config`/`--knobs` presets and `key=value` overrides into it, and validating it, including the check that a run's model credentials are present (`provider_credentials.py`)
-- `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
+- `src/glossogen/run_config/` — building and validating a run's config before launch, from presets, `key=value` overrides and the provider credentials it needs
 - `src/glossogen/run_replay/` — rebuilding agent histories and simulation state from a run's event log, for `--resume`, forks, swaps and exports
-- `src/glossogen/evaluation/` — metric registries and shared metric helpers (`metric_core/`), reports, generic metrics. The `Metric` contract itself is in `scenario_contract/`. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
-- `src/glossogen/model_catalog/` — the LLM catalog: `provider_catalog.py` (the models and providers a run can be launched with), `self_hosted_config.py` (the model-to-endpoint map for the self-hosted provider), `token_pricing.py` (per-model token rates and the cost of token counts). Imports nothing from `models/`
-- `src/glossogen/models/` — Pydantic data models, including the platform's JSONL events (`event.py`). Imports nothing from `runtime/` and no scenario code
-- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log reader (`event_log_reader.py`) and the per-scenario event parsers (`event_parsing.py`), which parse each run with the platform's events and those its scenario returns from `event_types()`, discovery and `RunSummary`, a run directory's file paths, labels file and identifier, derivation, eval and stream manifests, evaluation scores, run archives and bundles, and the filter that selects runs by their recorded knobs (`knob_filter.py`). Imports only `models/` and `model_catalog/` besides itself. `scenario_contract/primary_channel_resolution.py`, which run detail and the message export both read a run's primary channels from, sits outside it because it rebuilds a scenario
+- `src/glossogen/run_derivation/` — replace-agent, cross-run replace-agent and fork-at-round
+- `src/glossogen/evaluation/` — the metric registries, the shared metric helpers, reports and the generic metrics. Adding one: [docs/creating-a-metric.md](docs/creating-a-metric.md)
+- `src/glossogen/llm/` — the `LLMProvider` judges call, token counters, and per-provider pydantic-ai model construction
+- `src/glossogen/model_catalog/` — the models and providers a run can use, the self-hosted endpoint map and token pricing. Imports nothing from `models/`
+- `src/glossogen/models/` — Pydantic data models, including the platform's JSONL events. Imports nothing from `runtime/` and no scenario code
+- `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log, discovery and run summaries, manifests, scores, archives and bundles, and the knob filter that selects runs. Imports only `models/` and `model_catalog/` besides itself
 - `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
-- `src/glossogen/server/` — FastAPI app: identity middleware, routers, the MCP server (`server/mcp/`)
-- `src/glossogen/prod_sync/` — pushing runs and syncing local metadata to a remote server, with the OAuth PKCE client behind `glossogen login` (`oauth_client.py`)
+- `src/glossogen/label_descriptions/` — a group's label glossary, on the filesystem or in Postgres
+- `src/glossogen/atif_export/` / `thread_export/` — exporting agents as ATIF trajectories, and one agent's thread as a provider-native request
+- `src/glossogen/telemetry/` — Langfuse tracing of a run's LLM calls
+- `src/glossogen/server/` — the FastAPI app: identity middleware, routers, the MCP server
 - `src/glossogen/db/` — Postgres layer (raw SQL, psycopg3 async, alembic migrations)
-- `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`, and the Docker frontend container `serve` starts (`frontend_container.py`)
+- `src/glossogen/prod_sync/` — pushing runs and syncing metadata to a remote server, and the OAuth client behind `glossogen login`
+- `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`
+- `src/glossogen/testing/` — scripted-agent harnesses for testing a scenario or a metric
 - `frontend/` — Next.js app; `src/features/` per surface, scenario plug-ins in `src/features/runs/`
 - `modal/` — self-hosted vLLM endpoints; see `modal/README.md`
 
@@ -47,7 +53,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - Build a run directory's scenario-named file paths through `run_storage/run_file_paths.py`, never with an f-string.
 - Read `labels.json` only through `run_storage/run_labels_file.py`.
 - Resolve a scenario name only through `scenario_contract/loader.py`.
-- Metrics and the helpers they import type against `ScenarioBase` (`scenario_contract/scenario_base.py`), not `SimulationScenario` (`scenario_contract/protocol.py`).
+- Metrics and the helpers they import type against `ScenarioBase`, not `SimulationScenario`.
 - No platform module names a scenario's metrics or extension; a scenario declares them through `scenario_metrics()` / `run_detail_extension()`. A metric meaningful for one scenario lives in that scenario's `evaluation/`.
 - Prompts (agent system prompts, injections) are Jinja2 templates in the scenario's `prompts/`. Never hardcode prompt text in Python.
 - `run_export/` and `run_analysis/` name no scenario and no metric; columns come from each run's recorded config and report.
@@ -189,6 +195,13 @@ read as machine-written and are not wanted:
 
 Read it back before committing. If you would not say it out loud to a colleague,
 rewrite it.
+
+**Docs describe packages and layers, not files.** Say what a package is for and
+where its boundaries are, and let module docstrings say which file holds what. Name
+a file only when it is a chokepoint code must go through (the invariants above),
+something the reader creates or edits (a scenario's own files, a metric, an
+identity provider), or something CI or tooling checks (`api.gen.ts`,
+`vulture_whitelist.py`). A file list goes stale the next time a module moves.
 
 ### Docstrings
 

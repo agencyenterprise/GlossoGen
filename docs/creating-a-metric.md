@@ -30,8 +30,8 @@ Two questions decide the shape of what you write:
 
 ## The contract
 
-One method, defined in
-[metric_protocol.py](../src/glossogen/scenario_contract/metric_protocol.py):
+One method, defined in the
+[scenario contract](../src/glossogen/scenario_contract/):
 
 ```python
 class Metric(ABC):
@@ -53,7 +53,7 @@ class Metric(ABC):
 |---|---|
 | `name` | What callers pass to `--metrics`, and the key the report is written under. Must be unique |
 | `events` | The full ordered event log, already parsed |
-| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`, widened by `scored_channel_ids`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase` ([scenario_base.py](../src/glossogen/scenario_contract/scenario_base.py)), the part of the contract a metric reads; annotate your override the same way |
+| `scenario` | The built scenario: ask it which channels it scores (`get_primary_channels()`, widened by `scored_channel_ids`), how it renders a round (`build_communication_rounds`), anything on its contract. Typed `ScenarioBase`, the part of the contract a metric reads; annotate your override the same way |
 | `llm_provider` | The judge selected by `evaluate --model/--provider`; deterministic metrics ignore it |
 | `run_dir` | The run directory, for writing a sidecar next to the report |
 | `options` | Per-invocation flags the CLI passes through; most metrics ignore it |
@@ -176,13 +176,13 @@ class ExternalWordCountMetric(Metric):
         return measurements
 ```
 
-Build the channel set with `scored_channel_ids` from
-[scored_channels.py](../src/glossogen/scenario_contract/scored_channels.py),
+Build the channel set with the scenario contract's `scored_channel_ids`,
 not from `channel_id` alone. A primary channel with `includes_direct_channels`
 also owns the direct channels its members open during the run, and a metric that
 reads only `channel_id` misses that traffic.
-[primary_channel_messages.py](../src/glossogen/evaluation/metric_core/primary_channel_messages.py)
-groups the messages on those channels by round.
+`collect_primary_messages_by_round`, among the shared helpers in
+[`evaluation/metric_core/`](../src/glossogen/evaluation/metric_core/), groups
+the messages on those channels by round.
 
 If your metric writes a sidecar (per-message factors, probe responses, an
 ontology), write it into `run_dir` next to the report and name it after the
@@ -298,15 +298,12 @@ Worth covering:
 - The empty-list case, on a run your metric does not apply to.
 - The partition case, if you emit one `Measurement` per team.
 - A judge-driven metric's parsing, against a recorded judge response, using
-  `StubLLMProvider` from
-  [stub_llm_provider.py](../src/glossogen/testing/stub_llm_provider.py) rather
-  than a live call.
+  `StubLLMProvider` from `glossogen.testing` rather than a live call.
 
 To score a whole run directory the way `glossogen evaluate` does, see
 [Testing a metric](testing-a-scenario.md#testing-a-metric).
 
-[tests/unit/test_available_metrics.py](../tests/unit/test_available_metrics.py)
-covers the registration side: that a scenario's own metric is offered and
+A unit test of `available_metrics` covers the registration side: that a scenario's own metric is offered and
 runnable for that scenario only, that the advertised and runnable lists agree,
 and that a scenario metric cannot take a generic metric's name.
 
