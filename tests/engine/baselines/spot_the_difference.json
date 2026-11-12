@@ -71,7 +71,8 @@
     "easy_round_numbers": [],
     "two_teams": true,
     "shared_link": false,
-    "all_must_submit": true
+    "all_must_submit": true,
+    "score_characters": true
    },
    "provider": "anthropic"
   },

@@ -3,7 +3,8 @@
 Controls the grid size, the per-round object-count and difference-count
 distributions, which difference kinds are enabled, the warmup rounds forced
 to a single difference, the postmortem discussion phase, channel noise, the
-optional per-round character budget, and the optional two-team competitive mode.
+optional per-round character budget, the optional two-team competitive mode,
+and whether the agents are told that their characters are counted.
 
 ``round_time_budget_seconds`` is an optional hard cap: when positive, every
 character a team sends on the link channel counts against it and a team that
@@ -60,6 +61,14 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     answers are sent to the judge, and the team is eligible only if the two
     answers agree on the same full set of K differences with no false positives.
     When off, the first submission from either member locks and scores the team.
+
+    ``score_characters`` (on by default) tells the agents that the characters they
+    send on the link channel are their score. When off, no text an agent receives
+    mentions characters, brevity or shorthand: the prompts drop the score, the
+    round results drop the character count, and the discussion phase is framed as
+    a talk about the round that just ended. The run still records every count.
+    It needs a single team and no character budget, since both of those tell the
+    agents about characters.
     """
 
     judge_model: str
@@ -77,6 +86,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
     two_teams: bool = False
     shared_link: bool = False
     all_must_submit: bool = True
+    score_characters: bool = True
 
     @model_validator(mode="after")
     def _validate_object_count_distribution(self) -> Self:
@@ -135,6 +145,22 @@ class SpotTheDifferenceKnobs(BaseKnobs):
         if self.shared_link and not self.two_teams:
             raise ValueError(
                 "shared_link requires two_teams=True (there is no other team to share with)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_score_characters(self) -> Self:
+        if self.score_characters:
+            return self
+        if self.two_teams:
+            raise ValueError(
+                "score_characters=False requires two_teams=False "
+                "(two teams win on fewest characters)"
+            )
+        if self.round_time_budget_seconds != -1:
+            raise ValueError(
+                "score_characters=False requires round_time_budget_seconds=-1 "
+                "(the budget is counted in characters)"
             )
         return self
 

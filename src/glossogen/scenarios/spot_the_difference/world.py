@@ -66,6 +66,7 @@ class SpotTheDifferenceWorld(RoundWorld):
         two_teams: bool,
         shared_link: bool,
         all_must_submit: bool,
+        score_characters: bool,
     ) -> None:
         super().__init__(
             team_specs=team_specs,
@@ -77,6 +78,7 @@ class SpotTheDifferenceWorld(RoundWorld):
         self._two_teams = two_teams
         self._shared_link = shared_link
         self._all_must_submit = all_must_submit
+        self._score_characters = score_characters
         self._current_case: DiffCase | None = None
         # Derived from the declaration rather than rebuilt. Under shared_link
         # both teams declare the same link, so both hold that channel id here
@@ -133,6 +135,11 @@ class SpotTheDifferenceWorld(RoundWorld):
     def all_must_submit(self) -> bool:
         """Whether every team member must submit before the team is scored."""
         return self._all_must_submit
+
+    @property
+    def score_characters(self) -> bool:
+        """Whether the agents are told that their link characters are their score."""
+        return self._score_characters
 
     def is_team_locked(self, team_id: str) -> bool:
         """Whether ``team_id``'s answer is already locked for the round."""
@@ -264,7 +271,9 @@ class SpotTheDifferenceWorld(RoundWorld):
                 continue
             await self._notify_team(
                 team=team,
-                text=_render_terminal_text(outcome=recorded[-1]),
+                text=_render_terminal_text(
+                    outcome=recorded[-1], score_characters=self._score_characters
+                ),
             )
 
     def on_message(
@@ -352,8 +361,11 @@ def _team_done(team: TeamState) -> bool:
     return team.round_budget_exceeded
 
 
-def _render_terminal_text(outcome: DiffOutcome) -> str:
-    """Build the end-of-round reveal message for one team's link channel."""
+def _render_terminal_text(outcome: DiffOutcome, score_characters: bool) -> str:
+    """Build the end-of-round reveal message for one team's link channel.
+
+    Without ``score_characters`` a single team's result leaves out the character count.
+    """
     found = f"found {outcome.found_count}/{outcome.total_differences} differences"
     if outcome.false_positive_count > 0:
         found = f"{found}, {outcome.false_positive_count} incorrect"
@@ -379,6 +391,8 @@ def _render_terminal_text(outcome: DiffOutcome) -> str:
             f"both teammates must submit the same set of differences."
         )
     if not outcome.competitive:
+        if not score_characters:
+            return _render_unscored_solo_text(outcome=outcome, found=found)
         if outcome.eligible:
             return f"{ROUND_RESULT_MARKER}. Correct — {found} using {characters}."
         return f"{ROUND_RESULT_MARKER}. Incomplete — {found} using {characters}."
@@ -390,3 +404,10 @@ def _render_terminal_text(outcome: DiffOutcome) -> str:
     if outcome.eligible:
         return f"{ROUND_LOST_MARKER}. {found} using {characters}; the other team used fewer."
     return f"{ROUND_LOST_MARKER}. {found} using {characters} — not all differences found."
+
+
+def _render_unscored_solo_text(outcome: DiffOutcome, found: str) -> str:
+    """The single-team round result when the agents are not told about characters."""
+    if outcome.eligible:
+        return f"{ROUND_RESULT_MARKER}. Correct — {found}."
+    return f"{ROUND_RESULT_MARKER}. Incomplete — {found}."
