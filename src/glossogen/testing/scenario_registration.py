@@ -8,6 +8,7 @@ source list that leaves the scenario out makes every command answer that the
 scenario is not loaded.
 """
 
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.scenario_sources import (
@@ -34,3 +35,16 @@ def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> Non
             f"{name!r} resolves to {resolved.__module__}.{resolved.__qualname__}, "
             f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}."
         )
+
+
+def assert_scenario_is_loaded(scenario_name: str) -> None:
+    """Assert the catalog the working directory configures loads ``scenario_name``.
+
+    For a test that looks its scenario up by name rather than importing it. Loads
+    the catalog first if the test process has not loaded one, so run it from the
+    project root. Fails with the message a command gives for a scenario that is
+    not loaded, which lists the sources that were.
+    """
+    load_configured_scenario_catalog_unless_loaded()
+    if find_scenario_class(name=scenario_name) is None:
+        raise AssertionError(current_scenario_catalog().not_loaded_message(name=scenario_name))

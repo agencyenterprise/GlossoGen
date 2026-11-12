@@ -1,6 +1,7 @@
 """Loading and checking the scenarios a file or directory registers, for `validate <path>`.
 
-The scaffold is the fixture throughout. It writes a project that passes, so each
+A generated scenario folder in a packaged project is the fixture throughout
+(`tests/fakes/packaged_scenario_project.py`). It passes, so each
 test breaks one thing in a copy of it and states what should be reported. That
 keeps the tests about the checks rather than about a hand-built tree that may not
 resemble what an author actually has.
@@ -13,16 +14,16 @@ import pytest
 
 from glossogen.scenario_authoring.scenario_conformance import CheckOutcome, check_scenario, failures
 from glossogen.scenario_authoring.scenario_package_checks import check_scenario_package
-from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.path_loader import (
     PathLoadedScenario,
     ScenarioPathError,
     load_scenarios_from_path,
 )
+from tests.fakes.packaged_scenario_project import write_packaged_project
 
-REF = "v9.9.9"
 SCENARIO = "reactor_purge"
+SCENARIO_MODULE = Path("scenarios") / SCENARIO / f"{SCENARIO}.py"
 
 
 @pytest.fixture(autouse=True)
@@ -33,9 +34,7 @@ def isolated(isolated_scenario_imports: None) -> None:
 
 def scaffold(target: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Write the project every test starts from, enter it, and return its directory."""
-    project = write_scenario_package(
-        scenario_name=SCENARIO, target_dir=target, glossogen_ref=REF
-    ).package_dir
+    project = write_packaged_project(target=target, scenario_name=SCENARIO)
     monkeypatch.chdir(project)
     return project
 
@@ -65,12 +64,12 @@ def test_a_scenario_file_loads_by_path(tmp_path: Path, monkeypatch: pytest.Monke
     """No install and no configuration: the path is the source."""
     project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
 
-    loaded = load_one(path=Path("scenarios") / f"{SCENARIO}.py")
+    loaded = load_one(path=SCENARIO_MODULE)
 
     assert loaded.name == SCENARIO
-    assert loaded.scenario_cls.__module__ == f"scenarios.{SCENARIO}"
-    assert loaded.module_dir == (project / "scenarios").resolve()
-    assert loaded.package_name == "scenarios"
+    assert loaded.scenario_cls.__module__ == f"scenarios.{SCENARIO}.{SCENARIO}"
+    assert loaded.module_dir == (project / "scenarios" / SCENARIO).resolve()
+    assert loaded.package_name == f"scenarios.{SCENARIO}"
     assert loaded.project_dir == project.resolve()
 
 
@@ -89,7 +88,7 @@ def test_the_loaded_scenario_resolves_by_name(
     """The checks that look a scenario up by name find the one the path registered."""
     scaffold(target=tmp_path, monkeypatch=monkeypatch)
 
-    loaded = load_one(path=Path("scenarios") / f"{SCENARIO}.py")
+    loaded = load_one(path=SCENARIO_MODULE)
 
     assert find_scenario_class(name=SCENARIO) is loaded.scenario_cls
 
@@ -99,7 +98,7 @@ def test_the_contract_checks_pass_on_a_scaffolded_project(
 ) -> None:
     """A path-loaded class goes through the same checks as a configured one."""
     scaffold(target=tmp_path, monkeypatch=monkeypatch)
-    loaded = load_one(path=Path("scenarios") / f"{SCENARIO}.py")
+    loaded = load_one(path=SCENARIO_MODULE)
 
     broken = failures(check_scenario(scenario_cls=loaded.scenario_cls))
 
@@ -109,12 +108,10 @@ def test_the_contract_checks_pass_on_a_scaffolded_project(
 def test_package_data_passes_on_a_scaffolded_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The scaffold's package-data covers its prompts and preset."""
+    """The package-data the scenario guide recommends covers the prompts and preset."""
     scaffold(target=tmp_path, monkeypatch=monkeypatch)
 
-    outcome = package_check(
-        path=Path("scenarios") / f"{SCENARIO}.py", name="package data ships prompts and presets"
-    )
+    outcome = package_check(path=SCENARIO_MODULE, name="package data ships prompts and presets")
 
     assert outcome.passed, outcome.detail
 
@@ -126,13 +123,11 @@ def test_missing_package_data_is_reported(tmp_path: Path, monkeypatch: pytest.Mo
         project=project, pattern=r"\[tool\.setuptools\.package-data\].*?\n\n", replacement=""
     )
 
-    outcome = package_check(
-        path=Path("scenarios") / f"{SCENARIO}.py", name="package data ships prompts and presets"
-    )
+    outcome = package_check(path=SCENARIO_MODULE, name="package data ships prompts and presets")
 
     assert not outcome.passed
     assert "package-data" in outcome.detail
-    assert "'scenarios'" in outcome.detail
+    assert f"'scenarios.{SCENARIO}'" in outcome.detail
 
 
 def test_a_pattern_that_does_not_reach_a_subdirectory_is_reported(
@@ -146,9 +141,7 @@ def test_a_pattern_that_does_not_reach_a_subdirectory_is_reported(
     project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
     edit_pyproject(project=project, pattern=r'"\*\*/\*\.jinja"', replacement='"*.jinja"')
 
-    outcome = package_check(
-        path=Path("scenarios") / f"{SCENARIO}.py", name="package data ships prompts and presets"
-    )
+    outcome = package_check(path=SCENARIO_MODULE, name="package data ships prompts and presets")
 
     assert not outcome.passed
     assert "prompts/" in outcome.detail
@@ -165,7 +158,7 @@ def test_package_data_is_not_checked_for_another_build_backend(
         replacement='build-backend = "x.y"',
     )
 
-    report = check_scenario_package(loaded=load_one(path=Path("scenarios") / f"{SCENARIO}.py"))
+    report = check_scenario_package(loaded=load_one(path=SCENARIO_MODULE))
 
     assert not [one for one in report.outcomes if "package data" in one.check]
     assert any("'x.y'" in note for note in report.notes)
@@ -178,7 +171,7 @@ def test_a_project_that_builds_no_wheel_gets_no_package_checks(
     project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
     edit_pyproject(project=project, pattern=r"\[build-system\].*?\n\n", replacement="")
 
-    report = check_scenario_package(loaded=load_one(path=Path("scenarios") / f"{SCENARIO}.py"))
+    report = check_scenario_package(loaded=load_one(path=SCENARIO_MODULE))
 
     assert report.outcomes == []
     assert report.notes == ()
@@ -200,11 +193,11 @@ def test_a_file_that_does_not_import_says_so(
 ) -> None:
     """The import error reaches the author with the file it came from."""
     project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
-    module = project / "scenarios" / f"{SCENARIO}.py"
+    module = project / SCENARIO_MODULE
     module.write_text(module.read_text() + "\nraise RuntimeError('broken on purpose')\n")
 
     with pytest.raises(ScenarioPathError) as raised:
-        load_scenarios_from_path(path=Path("scenarios") / f"{SCENARIO}.py")
+        load_scenarios_from_path(path=SCENARIO_MODULE)
 
     assert "broken on purpose" in str(raised.value)
     assert f"{SCENARIO}.py" in str(raised.value)

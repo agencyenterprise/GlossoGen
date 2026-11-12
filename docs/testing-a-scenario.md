@@ -8,13 +8,11 @@ project is tested the same way the built-in ones are.
 pip install "glossogen[testing] @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
 
-Async tests need this in your `pyproject.toml`, or every one of them errors with
-"async def functions are not natively supported":
-
-```toml
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-```
+The extra installs `pytest-asyncio`. Mark each async test
+`@pytest.mark.asyncio`, as the test `new-scenario` writes does, or set
+`asyncio_mode = "auto"` in your pytest configuration. An unmarked async test
+without that setting errors with "async def functions are not natively
+supported".
 
 ## The contract check: `glossogen validate`
 
@@ -23,8 +21,8 @@ first and exits non-zero, so it belongs in your CI whether or not you write
 tests.
 
 ```bash
-glossogen validate scenarios/reactor_purge.py   # a file or folder: loaded as one more source
-glossogen validate reactor_purge                # a scenario your sources load, by name
+glossogen validate ./reactor_purge    # a file or folder: loaded as one more source
+glossogen validate reactor_purge      # a scenario your sources load, by name
 ```
 
 A name resolves through the scenarios this process loaded from its configured
@@ -59,19 +57,21 @@ Two rounds are enough, because round two has a round one behind it.
 ### The registration check
 
 A test that imports your scenario class registers it whether or not your
-project's scenario sources would load it. This checks the catalog those sources
-load instead, from the directory pytest runs in:
+project's scenario sources would load it. These check the catalog those sources
+load instead, from the directory pytest runs in. By name, which is what the test
+`new-scenario` writes uses, so it imports nothing from the scenario's folder:
 
 ```python
-from glossogen.testing import assert_scenario_is_registered
-
-from scenarios.reactor_purge import ReactorPurgeScenario
+from glossogen.testing import assert_scenario_is_loaded
 
 
-def test_the_scenario_sources_load_this_class() -> None:
-    assert_scenario_is_registered(scenario_cls=ReactorPurgeScenario)
+def test_the_scenario_sources_load_this_scenario() -> None:
+    assert_scenario_is_loaded(scenario_name="reactor_purge")
 ```
 
+It fails with the message a command gives for a scenario that is not loaded,
+listing the sources that were. `assert_scenario_is_registered(scenario_cls=...)`
+checks a class you imported instead: that the name resolves to that exact class.
 It fails, saying to add the file or folder to `[tool.glossogen] scenarios`, when
 the sources leave the class out.
 
@@ -108,6 +108,7 @@ import pytest
 from glossogen.testing import assert_no_agent_crashed, assert_round_loop_completed, run_rounds
 
 
+@pytest.mark.asyncio
 async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     result = await run_rounds(
         scenario_name="reactor_purge",

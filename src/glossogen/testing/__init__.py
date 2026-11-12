@@ -23,8 +23,9 @@ What a scenario author needs, in order:
 - `glossogen validate <name-or-path>` covers the static contract: channels that
   exist, roles that match the agents, presets that still validate, templates that
   render. It is a command rather than part of this package, so it needs no test
-  suite to run. `assert_scenario_is_registered` covers what a test that imports
-  the class cannot see: that the project's configured scenario sources load it.
+  suite to run. `assert_scenario_is_loaded` and `assert_scenario_is_registered`
+  cover what a test that imports the class cannot see: that the project's
+  configured scenario sources load it, by name or as that class.
 - `run_scenario` / `run_rounds` drive the real round loop with scripted agents,
   and the `assert_*` helpers state what a finished run must contain.
 
@@ -43,7 +44,10 @@ from glossogen.testing.metric_harness import (
     score_metrics,
     use_scripted_probe_model,
 )
-from glossogen.testing.scenario_registration import assert_scenario_is_registered
+from glossogen.testing.scenario_registration import (
+    assert_scenario_is_loaded,
+    assert_scenario_is_registered,
+)
 from glossogen.testing.scenario_runtime import (
     assert_agents_chatted_every_round,
     assert_no_agent_crashed,
@@ -105,6 +109,7 @@ __all__ = [
     "assert_postmortem_never_ran",
     "assert_postmortem_ran",
     "assert_round_loop_completed",
+    "assert_scenario_is_loaded",
     "assert_scenario_is_registered",
     "build_event_gated_model",
     "build_round_paced_model",

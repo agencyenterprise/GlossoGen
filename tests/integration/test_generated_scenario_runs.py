@@ -1,13 +1,13 @@
-"""A generated scenario package runs, not just parses.
+"""A generated scenario folder runs, not just parses.
 
-`new-scenario` promises a package that works before anything is edited, and a
+`new-scenario` promises a scenario that works before anything is edited, and a
 template that only looks right is worse than none: the author would debug their
 own first change against a broken starting point.
 
-So this generates one, loads it the way `glossogen` does from inside the project,
-through its `[tool.glossogen]` source, and puts it through the same two gates the
-generated README tells its author to run. Nothing is installed, no LLM is
-called, and no clock is waited on.
+So this generates one into an empty project, loads it the way `glossogen` does
+from that project, through the scan of the project directory, and puts it
+through the same two gates the command's next steps tell its author to run.
+Nothing is installed, no LLM is called, and no clock is waited on.
 """
 
 from importlib import import_module
@@ -19,7 +19,7 @@ import pytest
 from glossogen.models.event import RoundResultRecorded
 from glossogen.models.event_base import EventBase
 from glossogen.scenario_authoring.scenario_conformance import check_scenario, failures
-from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
+from glossogen.scenario_authoring.scenario_scaffold import write_scenario_folder
 from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.scenario_sources import load_configured_scenario_catalog
@@ -43,16 +43,15 @@ def isolated(isolated_scenario_imports: None) -> None:
 def generated_scenario_class(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> type[SimulationScenario]:
-    """Write a project, enter it, and load the catalog its pyproject.toml configures.
+    """Write the folder into an empty project, enter it, and load the catalog it scans.
 
     Loading through the configured source is not incidental. Half the contract is
     about how the platform finds a scenario, so checking a class imported by hand
     would skip exactly what a scenario outside glossogen gets wrong.
     """
-    project = write_scenario_package(
-        scenario_name=SCENARIO_NAME, target_dir=tmp_path, glossogen_ref="v0.0.0"
-    )
-    monkeypatch.chdir(project.package_dir)
+    write_scenario_folder(scenario_name=SCENARIO_NAME, target_dir=tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GLOSSOGEN_SCENARIOS", raising=False)
     load_configured_scenario_catalog(cli_sources=(), runs_dirs=())
     return get_scenario_class(name=SCENARIO_NAME)
 
@@ -67,7 +66,7 @@ def build(scenario_cls: type[SimulationScenario], overrides: dict[str, Any]) -> 
 def test_a_generated_scenario_passes_the_contract(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The first thing its README tells the author to run.
+    """The first thing the next steps tell the author to run.
 
     A generated package that cannot pass `validate` teaches the contract
     wrong, and does it to everyone who generates one.
@@ -84,7 +83,7 @@ def test_a_generated_scenario_passes_the_contract(
 def test_the_generated_sources_load_the_generated_class(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The generated `[tool.glossogen] scenarios` reaches the generated module."""
+    """The scan of the project directory reaches the generated module."""
     assert_scenario_is_registered(scenario_cls=generated_scenario_class(tmp_path, monkeypatch))
 
 
@@ -143,7 +142,7 @@ async def test_the_generated_event_reaches_the_log(
 
     # The event class exists only in the generated package, so it is reached by name.
     round_opened: type[EventBase] = import_module(
-        f"scenarios.{SCENARIO_NAME}"
+        f"{SCENARIO_NAME}.{SCENARIO_NAME}"
     ).GeneratedDrillRoundOpened
     opened = result.of_type(event_type=round_opened)
     assert len(opened) == 1
