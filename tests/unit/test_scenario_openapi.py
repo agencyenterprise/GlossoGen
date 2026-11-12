@@ -14,7 +14,6 @@ from glossogen.models.event import SimulationEvent
 from glossogen.scenario_contract.catalog import (
     ScenarioCatalog,
     current_scenario_catalog,
-    scenario_catalog_installed,
 )
 from glossogen.scenario_contract.run_detail_extension import (
     ScenarioRunDetailExtension,
@@ -25,6 +24,7 @@ from glossogen.scenario_contract.run_detail_types import ChannelMessage
 from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.server.runs.models import PLATFORM_SSE_EVENT_TYPES, RunDetailResponse
 from glossogen.server.runs.scenario_extension import collect_scenario_extensions, scenario_extension
+from tests.fakes.catalog_installation import catalog_including, scenario_catalog_installed
 from tests.fakes.external_scenario.run_detail_extension import ExternalScenarioRunExtras
 from tests.fakes.external_scenario.scenario import ExternalScenario
 from tests.fakes.local_app import build_local_app
@@ -88,8 +88,8 @@ def test_the_event_stream_union_holds_the_platform_and_scenario_events(tmp_path:
 
 def test_a_scenario_loaded_before_the_app_is_built_is_in_its_schema(tmp_path: Path) -> None:
     """The union comes from the catalog at build time, not from what was imported first."""
-    widened = current_scenario_catalog().including(
-        name="external_scenario", scenario_cls=ExternalScenario
+    widened = catalog_including(
+        base=current_scenario_catalog(), name="external_scenario", scenario_cls=ExternalScenario
     )
 
     with scenario_catalog_installed(catalog=widened):
@@ -177,7 +177,9 @@ def test_a_scenario_model_named_like_a_platform_model_gets_its_own_component(
     tmp_path: Path,
 ) -> None:
     """Both models keep their own schema; neither reference lands on the other's fields."""
-    widened = current_scenario_catalog().including(name="collision", scenario_cls=CollidingScenario)
+    widened = catalog_including(
+        base=current_scenario_catalog(), name="collision", scenario_cls=CollidingScenario
+    )
 
     with scenario_catalog_installed(catalog=widened):
         schema = build_local_app(runs_dir=tmp_path).openapi()

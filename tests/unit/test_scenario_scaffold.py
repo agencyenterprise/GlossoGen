@@ -27,10 +27,10 @@ from glossogen.scenario_contract import catalog
 from glossogen.scenario_contract.catalog import (
     ScenarioSource,
     current_scenario_catalog,
-    scenario_catalog_installed,
 )
 from glossogen.scenario_contract.scenario_sources import resolve_scenario_sources
 from glossogen.testing import assert_scenario_is_loaded
+from tests.fakes.catalog_installation import scenario_catalog_installed
 
 SCENARIO = "reactor_purge"
 
@@ -49,7 +49,7 @@ def sources_from(working_dir: Path) -> tuple[ScenarioSource, ...]:
 
 def test_only_the_scenario_folder_is_written(tmp_path: Path) -> None:
     """Nothing outside `<target>/<name>/`: the project around it is the author's."""
-    folder = generate(tmp_path, SCENARIO)
+    folder = generate(target=tmp_path, scenario_name=SCENARIO)
 
     assert folder == tmp_path / SCENARIO
     assert [path.name for path in tmp_path.iterdir()] == [SCENARIO]
@@ -66,15 +66,15 @@ def test_only_the_scenario_folder_is_written(tmp_path: Path) -> None:
 
 def test_a_second_scenario_goes_in_a_folder_beside_the_first(tmp_path: Path) -> None:
     """Each scenario reads its prompts and presets from its own folder."""
-    generate(tmp_path, SCENARIO)
-    generate(tmp_path, "second_drill")
+    generate(target=tmp_path, scenario_name=SCENARIO)
+    generate(target=tmp_path, scenario_name="second_drill")
 
     assert sorted(path.name for path in tmp_path.iterdir()) == [SCENARIO, "second_drill"]
 
 
 def test_the_module_registers_the_scenario_under_its_name(tmp_path: Path) -> None:
     """The decorator carries the name, which is also the event prefix."""
-    module = (generate(tmp_path, SCENARIO) / f"{SCENARIO}.py").read_text()
+    module = (generate(target=tmp_path, scenario_name=SCENARIO) / f"{SCENARIO}.py").read_text()
 
     assert '@scenario(name="reactor_purge")' in module
     assert '"reactor_purge_round_opened"' in module
@@ -83,7 +83,9 @@ def test_the_module_registers_the_scenario_under_its_name(tmp_path: Path) -> Non
 
 def test_the_generated_test_needs_no_pytest_configuration(tmp_path: Path) -> None:
     """A project without `asyncio_mode = "auto"` would error on an unmarked async test."""
-    test_source = (generate(tmp_path, SCENARIO) / f"test_{SCENARIO}.py").read_text()
+    test_source = (
+        generate(target=tmp_path, scenario_name=SCENARIO) / f"test_{SCENARIO}.py"
+    ).read_text()
 
     assert test_source.count("async def test_") == test_source.count("@pytest.mark.asyncio")
     assert f"from {SCENARIO}" not in test_source, "the test looks the scenario up by name"
@@ -95,7 +97,7 @@ def test_the_prompt_templates_keep_their_own_placeholders(tmp_path: Path) -> Non
     A prompt whose placeholders were consumed at generation time renders a
     channel name of nothing, at the first turn of the first paid run.
     """
-    folder = generate(tmp_path, SCENARIO)
+    folder = generate(target=tmp_path, scenario_name=SCENARIO)
     prompt = (folder / "prompts" / "briefer_system.jinja").read_text()
 
     assert "{{ channels[0].display_name }}" in prompt
@@ -122,7 +124,7 @@ def test_the_project_scan_reaches_the_folder(
 @pytest.mark.usefixtures("isolated_scenario_imports")
 def test_the_scan_imports_the_module_but_not_the_test(tmp_path: Path) -> None:
     """The test file has no `@scenario`, so the scan's syntax-tree filter skips it."""
-    generate(tmp_path, SCENARIO)
+    generate(target=tmp_path, scenario_name=SCENARIO)
 
     imported = [
         module
@@ -149,14 +151,18 @@ def test_sources_that_leave_the_folder_out_do_not_reach_it(tmp_path: Path) -> No
 
 @pytest.mark.usefixtures("isolated_scenario_imports")
 def test_a_folder_the_scan_skips_is_not_reached(tmp_path: Path) -> None:
-    """The scan never descends into `tests/`, so a scenario written there is not found."""
+    """The scan never descends into `tests/`, so a scenario written there is not found.
+
+    Every source imports cleanly: a `failure` would also leave the scenario unreached,
+    without the skip rule having been what kept the scan out.
+    """
     written = write_scenario_folder(scenario_name=SCENARIO, target_dir=tmp_path / "tests")
 
     reach = sources_reach(
         module_path=written.module_path, sources=sources_from(working_dir=tmp_path)
     )
 
-    assert not reach.reached
+    assert reach == SourceReach(reached=False, failure=None)
 
 
 @pytest.mark.usefixtures("isolated_scenario_imports")
@@ -317,7 +323,7 @@ def test_a_command_line_source_gives_pytest_the_folder_through_the_environment(
 def test_a_name_that_is_not_an_identifier_is_refused(tmp_path: Path) -> None:
     """It becomes a module, a folder and a run directory."""
     with pytest.raises(ScaffoldError) as refused:
-        generate(tmp_path, "Reactor Purge")
+        generate(target=tmp_path, scenario_name="Reactor Purge")
 
     assert "lowercase" in str(refused.value)
     assert not list(tmp_path.iterdir()), "a refused name still wrote something"
@@ -326,21 +332,21 @@ def test_a_name_that_is_not_an_identifier_is_refused(tmp_path: Path) -> None:
 def test_a_name_a_built_in_holds_is_refused(tmp_path: Path) -> None:
     """Two classes registering one name stop every command that loads both."""
     with pytest.raises(ScaffoldError) as refused:
-        generate(tmp_path, "veyru")
+        generate(target=tmp_path, scenario_name="veyru")
 
     assert "already a scenario" in str(refused.value)
 
 
 def test_an_existing_folder_is_not_written_over(tmp_path: Path) -> None:
     """Regenerating over a folder someone has edited would discard their work."""
-    generate(tmp_path, SCENARIO)
+    generate(target=tmp_path, scenario_name=SCENARIO)
 
     with pytest.raises(ScaffoldError) as refused:
-        generate(tmp_path, SCENARIO)
+        generate(target=tmp_path, scenario_name=SCENARIO)
 
     assert "already exists" in str(refused.value)
 
 
 def test_the_class_prefix_derives_from_the_scenario_name() -> None:
     """One value spells the classes and the module."""
-    assert scenario_class_prefix("reactor_purge") == "ReactorPurge"
+    assert scenario_class_prefix(scenario_name="reactor_purge") == "ReactorPurge"

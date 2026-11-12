@@ -121,7 +121,7 @@ async def test_reimport_finds_a_run_renamed_after_a_timestamp_collision(tmp_path
         scenario_name=SCENARIO,
         original_timestamp=1770000100,
     )
-    source = _TrackingFile(bundle)
+    source = _TrackingFile(initial_bytes=bundle)
 
     response = await import_run_bundle(
         file=UploadFile(file=source, filename="run.tar.gz"),
@@ -136,7 +136,7 @@ async def test_reimport_finds_a_run_renamed_after_a_timestamp_collision(tmp_path
 
 async def test_a_manifest_scenario_must_match_the_jsonl_event(tmp_path: Path) -> None:
     bundle = _bundle_with_event(
-        _started(scenario_name="another_scenario"),
+        event=_started(scenario_name="another_scenario"),
         manifest_scenario_name=SCENARIO,
     )
 
@@ -152,7 +152,7 @@ async def test_a_manifest_scenario_must_match_the_jsonl_event(tmp_path: Path) ->
 
 async def test_a_manifest_scenario_must_be_a_safe_scenario_name(tmp_path: Path) -> None:
     bundle = _bundle_with_event(
-        _started(scenario_name=".."),
+        event=_started(scenario_name=".."),
         manifest_scenario_name="..",
     )
 
@@ -184,7 +184,7 @@ async def test_a_traversal_member_is_reported_as_an_invalid_bundle(tmp_path: Pat
 def test_a_bundle_cannot_declare_more_than_the_raw_export_ceiling() -> None:
     oversized = tarfile.TarInfo(name="large.bin")
     oversized.size = MAX_RAW_EXPORT_BYTES + 1
-    tar = cast(tarfile.TarFile, cast(object, _TarWithMembers([oversized])))
+    tar = cast(tarfile.TarFile, cast(object, _TarWithMembers(members=[oversized])))
 
     with pytest.raises(ExportTooLargeError):
         _validate_tar_members(tar=tar)
@@ -329,7 +329,7 @@ async def test_a_run_of_a_scenario_this_server_has_not_loaded_imports(tmp_path: 
     """Its first event is a platform event, so it reads without the scenario's code."""
     runs_dir = tmp_path / "runs"
     bundle = _bundle_with_event(
-        _started(scenario_name="not_loaded_here"),
+        event=_started(scenario_name="not_loaded_here"),
         manifest_scenario_name="not_loaded_here",
     )
 

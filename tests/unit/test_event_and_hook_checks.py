@@ -1,12 +1,11 @@
 """The conformance checks covering a scenario's events and its metric hooks.
 
-Every check here guards a failure that is silent at the time it happens. A repeated
-`event_type` shadows one side of the parser, so the run writes fine and reads back
-afterwards as something else. An event class the scenario defines but leaves out
-of `event_types()` is refused by the event logger and skipped by every reader, and
-the first sign is a failed run. A probe config naming a
-file that is not there makes every metric in that family report having nothing to
-measure, which is what a run with nothing to measure reports too.
+Every check here guards a failure that is silent at the time it happens. An event
+class the scenario defines but leaves out of `event_types()` is refused by the event
+logger, and the first sign is a failed run. A probe config naming a file that is not
+there makes every metric in that family report having nothing to measure, which is
+what a run with nothing to measure reports too. A repeated or unfixed `event_type` is
+refused when the catalog loads, so it is tested with the catalog.
 
 Each test breaks one thing against a real scenario and asserts the check says so,
 through `check_scenario`, which is what the CLI calls. Passing on an intact scenario
@@ -19,7 +18,6 @@ from collections.abc import Callable
 from typing import Any, Literal, Protocol
 
 import pytest
-from pydantic import Field
 
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.event_base import EventBase
@@ -32,10 +30,8 @@ from glossogen.scenarios.prisoners_dilemma import events as pd_events
 
 SCENARIO = "prisoners_dilemma"
 
-COLLISION = "events do not collide with the platform's"
-LITERAL = "events declare a literal event_type"
-PARSER = "events parse alongside the platform's"
 DECLARED = "defined events are declared"
+SCHEMAS = "events have JSON schemas"
 JUDGES = "declared judge models are readable"
 PROBE = "the probe config points at files that exist"
 
@@ -53,14 +49,21 @@ def outcomes_for(check_name: str, scenario_name: str) -> list[CheckOutcome]:
 
 def failed(check_name: str, scenario_name: str) -> CheckOutcome:
     """Assert the named check failed, and return the first failure it reported."""
-    broken = [outcome for outcome in outcomes_for(check_name, scenario_name) if not outcome.passed]
+    broken = [
+        outcome
+        for outcome in outcomes_for(check_name=check_name, scenario_name=scenario_name)
+        if not outcome.passed
+    ]
     assert broken, f"{check_name!r} passed against a scenario it should have rejected"
     return broken[0]
 
 
 def passes(check_name: str, scenario_name: str) -> bool:
     """Whether the named check passed against every preset."""
-    return all(outcome.passed for outcome in outcomes_for(check_name, scenario_name))
+    return all(
+        outcome.passed
+        for outcome in outcomes_for(check_name=check_name, scenario_name=scenario_name)
+    )
 
 
 class DeclareEvent(Protocol):
@@ -101,70 +104,20 @@ def define_in_the_events_module(
     monkeypatch.setattr(pd_events, event_cls.__name__, event_cls, raising=False)
 
 
-def test_an_event_stealing_a_platform_discriminator_is_reported(
+def test_an_event_with_a_field_that_has_no_json_schema_is_reported(
     declare_event: DeclareEvent,
 ) -> None:
-    """Whichever side loses, the run reads back afterwards as the other thing."""
+    """The catalog builds the parser, which accepts a callable field; the schema cannot."""
 
-    class Colliding(EventBase):
-        """Answers to a name the platform's MessageSent already answers to."""
+    class Unschematic(EventBase):
+        """Carries a field type pydantic can hold but not describe."""
 
-        event_type: Literal["message_sent"] = "message_sent"
+        event_type: Literal["pd_unschematic"] = "pd_unschematic"
+        callback: Callable[[], None]
 
-    declare_event(event_cls=Colliding)
-    outcome = failed(COLLISION, SCENARIO)
+    declare_event(event_cls=Unschematic)
 
-    assert "message_sent" in outcome.detail
-    assert "MessageSent" in outcome.detail
-
-
-def test_two_of_a_scenarios_own_events_sharing_a_discriminator_are_reported(
-    declare_event: DeclareEvent,
-) -> None:
-    """The same failure within one scenario, which the platform list cannot catch."""
-
-    class Duplicate(EventBase):
-        """Repeats a discriminator prisoners_dilemma already ships."""
-
-        event_type: Literal["pd_decision_submitted"] = "pd_decision_submitted"
-
-    declare_event(event_cls=Duplicate)
-
-    assert "pd_decision_submitted" in failed(COLLISION, SCENARIO).detail
-
-
-def test_the_parser_refuses_a_colliding_union_too(
-    declare_event: DeclareEvent,
-) -> None:
-    """A backstop under the check above, and the reason the union is built at all.
-
-    The collision check runs first and explains it in the scenario's terms; this one
-    catches whatever that misses, by building the parser the run's log is read with.
-    """
-
-    class Colliding(EventBase):
-        """Answers to a platform name."""
-
-        event_type: Literal["round_ended"] = "round_ended"
-
-    declare_event(event_cls=Colliding)
-
-    assert not passes(PARSER, SCENARIO)
-
-
-def test_an_event_without_a_fixed_discriminator_is_reported(
-    declare_event: DeclareEvent,
-) -> None:
-    """`event_type` is what the parser dispatches on, so it cannot vary."""
-
-    class Unfixed(EventBase):
-        """Carries no literal, so nothing can dispatch on it."""
-
-        event_type: str = Field(default_factory=str)
-
-    declare_event(event_cls=Unfixed)
-
-    assert "Unfixed" in failed(LITERAL, SCENARIO).detail
+    assert failed(SCHEMAS, SCENARIO).detail != ""
 
 
 def test_an_event_the_scenario_defines_but_does_not_declare_is_reported(
@@ -179,7 +132,10 @@ def test_an_event_the_scenario_defines_but_does_not_declare_is_reported(
 
     define_in_the_events_module(event_cls=Forgotten, monkeypatch=monkeypatch)
 
-    assert f"{pd_events.__name__}.Forgotten" in failed(DECLARED, SCENARIO).detail
+    assert (
+        f"{pd_events.__name__}.Forgotten"
+        in failed(check_name=DECLARED, scenario_name=SCENARIO).detail
+    )
 
 
 def test_an_event_declared_by_the_scenario_passes(
@@ -194,7 +150,7 @@ def test_an_event_declared_by_the_scenario_passes(
 
     declare_event(event_cls=Remembered)
 
-    assert passes(DECLARED, SCENARIO)
+    assert passes(check_name=DECLARED, scenario_name=SCENARIO)
 
 
 def test_an_event_another_loaded_scenario_declares_is_not_reported(
@@ -217,7 +173,7 @@ def test_an_event_another_loaded_scenario_declares_is_not_reported(
         get_scenario_class(name="veyru"), "event_types", classmethod(neighbour_event_types)
     )
 
-    assert passes(DECLARED, SCENARIO)
+    assert passes(check_name=DECLARED, scenario_name=SCENARIO)
 
 
 def test_a_judge_with_a_blank_model_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -234,7 +190,7 @@ def test_a_judge_with_a_blank_model_is_reported(monkeypatch: pytest.MonkeyPatch)
         get_scenario_class(name=SCENARIO), "get_judge_models", classmethod(blank_judge)
     )
 
-    assert "round judge" in failed(JUDGES, SCENARIO).detail
+    assert "round judge" in failed(check_name=JUDGES, scenario_name=SCENARIO).detail
 
 
 def test_a_judge_declaration_is_not_compared_against_the_knobs(
@@ -259,7 +215,7 @@ def test_a_judge_declaration_is_not_compared_against_the_knobs(
         get_scenario_class(name=SCENARIO), "get_judge_models", classmethod(no_judge)
     )
 
-    assert passes(JUDGES, SCENARIO)
+    assert passes(check_name=JUDGES, scenario_name=SCENARIO)
 
 
 def test_a_probe_config_naming_a_missing_bank_is_reported(
@@ -280,12 +236,12 @@ def test_a_probe_config_naming_a_missing_bank_is_reported(
 
     monkeypatch.setattr(scenario_cls, "get_protocol_probe_config", missing_bank)
 
-    assert "gone.json" in failed(PROBE, "veyru").detail
+    assert "gone.json" in failed(check_name=PROBE, scenario_name="veyru").detail
 
 
 def test_a_scenario_without_a_probe_config_passes() -> None:
     """The hook opts out by returning None, and opting out is not a failure."""
-    assert passes(PROBE, SCENARIO)
+    assert passes(check_name=PROBE, scenario_name=SCENARIO)
 
 
 SEND_PARAMETERS = "send_message parameters are typed"
@@ -310,7 +266,7 @@ async def _send_without_agent(text: str) -> None:
 
 
 def test_the_default_send_executor_passes() -> None:
-    assert passes(SEND_PARAMETERS, SCENARIO)
+    assert passes(check_name=SEND_PARAMETERS, scenario_name=SCENARIO)
 
 
 @pytest.mark.parametrize(
@@ -327,7 +283,7 @@ def test_a_send_executor_the_schema_cannot_describe_is_reported(
     monkeypatch.setattr(
         get_scenario_class(name=SCENARIO), "send_message_executor", returning_executor
     )
-    assert expected in failed(SEND_PARAMETERS, SCENARIO).detail
+    assert expected in failed(check_name=SEND_PARAMETERS, scenario_name=SCENARIO).detail
 
 
 HIDDEN_READ = "hidden base tools are base tools"
@@ -342,9 +298,9 @@ def test_hiding_read_notifications_is_reported(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(
         get_scenario_class(name=SCENARIO), "hidden_base_tools", hiding_read_notifications
     )
-    assert "cannot be hidden" in failed(HIDDEN_READ, SCENARIO).detail
+    assert "cannot be hidden" in failed(check_name=HIDDEN_READ, scenario_name=SCENARIO).detail
     monkeypatch.undo()
-    assert passes(HIDDEN_READ, SCENARIO)
+    assert passes(check_name=HIDDEN_READ, scenario_name=SCENARIO)
 
 
 def test_hiding_a_tool_that_is_not_a_base_tool_is_reported(
@@ -357,7 +313,7 @@ def test_hiding_a_tool_that_is_not_a_base_tool_is_reported(
     monkeypatch.setattr(
         get_scenario_class(name=SCENARIO), "hidden_base_tools", hiding_a_scenario_tool
     )
-    assert "stabilize_veyru" in failed(HIDDEN_READ, SCENARIO).detail
+    assert "stabilize_veyru" in failed(check_name=HIDDEN_READ, scenario_name=SCENARIO).detail
 
 
 def test_runner_prompts_that_do_not_render_are_reported(
@@ -368,6 +324,6 @@ def test_runner_prompts_that_do_not_render_are_reported(
         raise KeyError(f"no template for {agent_id}")
 
     monkeypatch.setattr(get_scenario_class(name=SCENARIO), "runner_prompts", raising_runner_prompts)
-    assert "raised KeyError" in failed(RUNNER_PROMPTS, SCENARIO).detail
+    assert "raised KeyError" in failed(check_name=RUNNER_PROMPTS, scenario_name=SCENARIO).detail
     monkeypatch.undo()
-    assert passes(RUNNER_PROMPTS, SCENARIO)
+    assert passes(check_name=RUNNER_PROMPTS, scenario_name=SCENARIO)

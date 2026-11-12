@@ -23,6 +23,7 @@ from glossogen.models.event import (
     SimulationEvent,
     ToolCallInvoked,
     ToolResultReceived,
+    parser_for,
 )
 from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
@@ -41,7 +42,7 @@ from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_contract.activity_notification import NewInfoNotification
-from glossogen.scenario_contract.event_types import loggable_event_types, run_event_parser
+from glossogen.scenario_contract.event_types import loggable_event_types
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
     EventGate,
@@ -526,7 +527,7 @@ async def _run_supervised(
         with contextlib.suppress(asyncio.CancelledError):
             await recording
 
-    parser = run_event_parser(scenario_cls=type(scenario))
+    parser = parser_for(event_types=tuple(loggable_event_types(scenario_cls=type(scenario))))
     events = [
         parser.validate_json(line) for line in log_path.read_bytes().splitlines() if line.strip()
     ]

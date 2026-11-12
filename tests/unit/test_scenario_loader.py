@@ -10,7 +10,6 @@ from collections.abc import Iterator
 import orjson
 import pytest
 
-from glossogen.scenario_contract import catalog
 from glossogen.scenario_contract.catalog import (
     ScenarioNotLoaded,
     built_in_scenario_sources,
@@ -24,6 +23,7 @@ from glossogen.scenario_contract.loader import (
     iter_scenario_classes,
 )
 from glossogen.scenario_contract.scenario_source_kinds import ModuleSource
+from tests.fakes.catalog_installation import scenario_catalog_installed
 from tests.fakes.scenario_with_bad_preset.scenario import ScenarioWithBadPreset
 
 BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
@@ -33,13 +33,20 @@ EXTERNAL_NAME = "external_scenario"
 
 
 @pytest.fixture
-def with_external(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Load the built-ins plus the fake external package, then restore the catalog."""
-    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
-    load_scenario_catalog(
-        sources=(*built_in_scenario_sources(), ModuleSource(module=FAKE_PACKAGE, origin="test"))
-    )
-    yield
+def with_external() -> Iterator[None]:
+    """Load the built-ins plus the fake external package, then restore the catalog.
+
+    Restoring goes through ``scenario_catalog_installed``, which puts back the run
+    readers' event-type lookup too.
+    """
+    with scenario_catalog_installed(catalog=current_scenario_catalog()):
+        load_scenario_catalog(
+            sources=(
+                *built_in_scenario_sources(),
+                ModuleSource(module=FAKE_PACKAGE, origin="test"),
+            )
+        )
+        yield
 
 
 def test_a_built_in_scenario_resolves() -> None:

@@ -1,8 +1,4 @@
-"""Pydantic event types specific to the orbital_anomaly scenario.
-
-Imports only from ``glossogen.models.event_base`` so the event-discovery
-walker can import this module without triggering ``scenario.py``.
-"""
+"""Pydantic event types specific to the orbital_anomaly scenario."""
 
 from typing import Literal
 

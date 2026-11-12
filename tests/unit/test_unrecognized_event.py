@@ -1,5 +1,6 @@
 """A line of an event type no loaded scenario declares reads back, and writes back unchanged."""
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -7,8 +8,11 @@ import orjson
 import pytest
 from pydantic import ValidationError
 
-from glossogen.models.event import UnrecognizedEvent
+from glossogen.models.event import SimulationStarted, UnrecognizedEvent, core_event_types
 from glossogen.run_storage.event_log_reader import load_events
+from glossogen.runtime.event_bus import EventBus
+from glossogen.runtime.event_logger import EventLogger
+from glossogen.scenarios.move_a_box.events import MoveABoxOperatorFinished
 
 START_LINE = (
     b'{"event_id":"start","timestamp":"2026-01-01T00:00:00Z","round_number":0,'
@@ -45,6 +49,56 @@ async def test_a_line_the_logger_wrote_serializes_back_byte_for_byte(tmp_path: P
     assert [event.model_dump() for event in unrecognized] == [
         orjson.loads(line) for line in UNRECOGNIZED_LINES
     ]
+
+
+async def test_a_line_the_event_logger_wrote_reads_back_unrecognized_without_its_scenario(
+    tmp_path: Path, event_bus: EventBus
+) -> None:
+    """The logger accepts a scenario's event; a reader without that scenario keeps the line.
+
+    The run is named for a scenario this process has not loaded, so the reader
+    parses with the platform's events only.
+    """
+    scenario_event = MoveABoxOperatorFinished(
+        round_number=1,
+        agent_id="operator_a",
+        crate_id="operator_a#1",
+        crate_marking="CR-1111",
+        cell=(1, 1),
+        bay=None,
+        temperature=20,
+        steps_used=3,
+        reasoning=None,
+    )
+    log = tmp_path / "gone_scenario.jsonl"
+    logger = EventLogger(
+        log_path=log,
+        event_bus=event_bus,
+        allowed_event_types=frozenset((*core_event_types(), MoveABoxOperatorFinished)),
+    )
+    await logger.open()
+    await logger.log(
+        event=SimulationStarted(
+            event_id="start",
+            round_number=0,
+            timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            run_id="gone_scenario/1",
+            scenario_name="gone_scenario",
+            scenario_description="",
+            channel_ids=["link"],
+            provider="anthropic",
+        )
+    )
+    await logger.log(event=scenario_event)
+    await logger.close()
+
+    started, read_back = await load_events(log_path=log)
+
+    assert isinstance(started, SimulationStarted)
+    assert isinstance(read_back, UnrecognizedEvent)
+    assert read_back.event_type == "move_a_box_operator_finished"
+    assert read_back.event_id == scenario_event.event_id
+    assert read_back.payload["crate_marking"] == "CR-1111"
 
 
 async def test_an_unrecognized_event_reads_like_any_event(tmp_path: Path) -> None:

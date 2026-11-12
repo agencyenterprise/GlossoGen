@@ -1,4 +1,4 @@
-"""Asking every installed metric what it wrote beside its report.
+"""Asking every metric a run can have what it wrote beside its report.
 
 The analysis layer names no metric, and this is what keeps that true once sidecars
 are in play: it walks the registry, asks each metric for its keyed observations, and
@@ -40,8 +40,8 @@ async def read_keyed_observations(
     """Return every applicable metric's keyed observations for one run, by metric name.
 
     The metrics asked are the ones that can run on the run's scenario, its own
-    included. A run whose scenario is no longer installed is still asked for the
-    generic and installed ones. Metrics that wrote no sidecar contribute nothing,
+    included. A run whose scenario is not loaded is still asked for the
+    generic ones. Metrics that wrote no sidecar contribute nothing,
     so the result carries only the metrics this run actually has numbers for.
     """
     metrics = available_metrics(scenario_cls=find_scenario_class(name=scenario_name))

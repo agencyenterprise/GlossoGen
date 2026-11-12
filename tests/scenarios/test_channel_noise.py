@@ -42,7 +42,9 @@ def corrupts_its_channel(scenario_name: str) -> bool:
 # Parametrized over the scenarios that corrupt something, rather than over all
 # of them with the rest skipping. A skip reads as "did not run" long after
 # anyone remembers why; an absent parameter says the test never applied.
-NOISY_SCENARIOS = sorted(name for name in BUILT_IN_SCENARIOS if corrupts_its_channel(name))
+NOISY_SCENARIOS = sorted(
+    name for name in BUILT_IN_SCENARIOS if corrupts_its_channel(scenario_name=name)
+)
 
 # Every character is corrupted at 1.0, so a single short message is enough to
 # tell a noisy channel from a clean one without depending on a lucky draw.

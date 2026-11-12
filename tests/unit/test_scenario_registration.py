@@ -6,10 +6,10 @@ sources would load it, so these check the catalog the sources load instead.
 
 import subprocess
 import sys
+from collections.abc import Iterator
 
 import pytest
 
-from glossogen.scenario_contract import catalog
 from glossogen.scenario_contract.catalog import (
     built_in_scenario_sources,
     current_scenario_catalog,
@@ -17,6 +17,7 @@ from glossogen.scenario_contract.catalog import (
 )
 from glossogen.scenario_contract.scenario_source_kinds import ModuleSource
 from glossogen.testing import assert_scenario_is_registered
+from tests.fakes.catalog_installation import scenario_catalog_installed
 from tests.fakes.external_scenario.scenario import ExternalScenario
 
 BUILT_IN_SCENARIOS = dict(current_scenario_catalog().classes())
@@ -32,9 +33,10 @@ class ScenarioNamedAfterABuiltIn(ExternalScenario):
 
 
 @pytest.fixture(autouse=True)
-def restore_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Put the process catalog back after a test loads another."""
-    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
+def restore_catalog() -> Iterator[None]:
+    """Put the process catalog and the run readers' event-type lookup back after a test."""
+    with scenario_catalog_installed(catalog=current_scenario_catalog()):
+        yield
 
 
 def test_a_scenario_its_sources_load_passes() -> None:

@@ -364,13 +364,13 @@ async def test_an_event_no_class_declares_is_kept_unrecognized_and_counted(
     assert "an_event_renamed_since_the_run" in caplog.text
 
 
-async def test_an_unrecognized_event_still_advances_the_round_backfill(tmp_path: Path) -> None:
-    """An unrecognized event must not shift the rounds of the readable ones.
+async def test_an_unrecognized_event_gets_the_running_round_without_its_line_gaining_one(
+    tmp_path: Path,
+) -> None:
+    """The backfill gives an unrecognized row the round running when it was logged.
 
-    The backfill infers each event's round from the last `round_advanced` it
-    walked past, so a reader that passed a row by before observing it would file
-    every later event under the wrong round, and every per-round metric with it.
-    The unrecognized row gets the running round too, without its line gaining one.
+    The row's own line has no `round_number`, and the loaded event does not gain one
+    in its serialized form.
     """
     log = write_log(
         path=tmp_path / "run.jsonl",
@@ -378,14 +378,11 @@ async def test_an_unrecognized_event_still_advances_the_round_backfill(tmp_path:
             start_row(scenario_name="smoke"),
             base_row(event_id="a", event_type="round_advanced", round_number=4, trigger="idle"),
             base_row(event_id="b", event_type="no_class_declares_this"),
-            message_row(event_id="m1", text="after the unrecognized row"),
         ],
     )
 
     events = await load_events(log_path=log)
 
-    sent = next(event for event in events if isinstance(event, MessageSent))
-    assert sent.round_number == 4, "the unrecognized row must not reset the running round"
     unrecognized = next(event for event in events if isinstance(event, UnrecognizedEvent))
     assert unrecognized.round_number == 4
     assert "round_number" not in unrecognized.model_dump(mode="json")

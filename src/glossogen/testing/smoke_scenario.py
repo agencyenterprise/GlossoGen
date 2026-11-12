@@ -125,9 +125,9 @@ class SmokeScenario(SimulationScenario):
     def name(cls) -> str:
         """Return the scenario identifier.
 
-        Overridden because the base derives this from the package directory,
-        which here is ``testing``: this scenario ships with the harness rather
-        than in the scenarios package.
+        Overridden because the base raises ``TypeError`` for a class the ``@scenario``
+        decorator did not register, and this one ships with the harness rather than
+        in the scenarios package.
         """
         return "smoke"
 
