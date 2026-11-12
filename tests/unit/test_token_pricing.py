@@ -153,17 +153,21 @@ def test_reasoning_tokens_do_not_add_to_the_price() -> None:
     """They are already inside `output_tokens`, so pricing them again doubles the thinking."""
 
     def priced(reasoning_tokens: int) -> float | None:
+        usage = TokenUsage(
+            input_tokens=10_000,
+            output_tokens=2_000,
+            reasoning_tokens=reasoning_tokens,
+            cache_read_input_tokens=0,
+            cache_creation_input_tokens=0,
+        )
         return usage_cost_usd(
             model="gpt-5",
             provider="openai",
             at=AT,
-            usage=TokenUsage(
-                input_tokens=10_000,
-                output_tokens=2_000,
-                reasoning_tokens=reasoning_tokens,
-                cache_read_input_tokens=0,
-                cache_creation_input_tokens=0,
-            ),
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_read_tokens=usage.cache_read_input_tokens,
+            cache_write_tokens=usage.cache_creation_input_tokens,
         )
 
     none_of_it_was_thinking = priced(0)

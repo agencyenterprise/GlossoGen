@@ -49,7 +49,7 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 
 `models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/event_parsing.py` through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
 
-One limit: the groups are not acyclic. `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_contract` and `scenarios` import each other in a cycle, which later steps break up. `llm/` joins it through its imports of `models/` and `model_catalog/`.
+One limit: the groups are not acyclic. `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_contract` and `scenarios` import each other in a cycle, which later steps break up.
 
 ## Simulation Flow
 

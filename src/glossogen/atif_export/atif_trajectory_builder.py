@@ -279,7 +279,10 @@ def _build_steps(context: AtifRunContext, generation: _Generation) -> _BuiltStep
                 model=generation.model,
                 provider=generation.provider,
                 at=event.timestamp,
-                usage=event.usage,
+                input_tokens=event.usage.input_tokens,
+                output_tokens=event.usage.output_tokens,
+                cache_read_tokens=event.usage.cache_read_input_tokens,
+                cache_write_tokens=event.usage.cache_creation_input_tokens,
             )
             closes_cycle = build_step_metrics(usage=event.usage, cost_usd=cost_usd) is not None
             llm_call_count: int | None = None

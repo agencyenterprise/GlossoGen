@@ -306,7 +306,10 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                         model=billed.model,
                         provider=billed.provider,
                         at=event.timestamp,
-                        usage=event.usage,
+                        input_tokens=event.usage.input_tokens,
+                        output_tokens=event.usage.output_tokens,
+                        cache_read_tokens=event.usage.cache_read_input_tokens,
+                        cache_write_tokens=event.usage.cache_creation_input_tokens,
                     )
                     if event_cost is not None:
                         cost_usd += event_cost

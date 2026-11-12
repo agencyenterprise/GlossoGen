@@ -17,7 +17,6 @@ from genai_prices import Usage, calc_price
 from genai_prices.types import ModelInfo, TieredPrices
 
 from glossogen.model_catalog.provider_catalog import PROVIDER_SPECS, Provider
-from glossogen.models.event_base import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +118,18 @@ def find_pricing(model: str, provider: str, at: datetime) -> TokenPricing | None
     )
 
 
-def usage_cost_usd(model: str, provider: str, at: datetime, usage: TokenUsage) -> float | None:
+def usage_cost_usd(
+    model: str,
+    provider: str,
+    at: datetime,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read_tokens: int,
+    cache_write_tokens: int,
+) -> float | None:
     """The cost of one recorded usage at the rates in effect at ``at``, or ``None`` when unpriced.
+
+    The token counts have the meaning they have in :func:`compute_token_cost_usd`.
 
     ``at`` is the time the usage was recorded. Pricing each record at its own time
     keeps a rate that changes during a run, by date or by time of day, from being
@@ -131,10 +140,10 @@ def usage_cost_usd(model: str, provider: str, at: datetime, usage: TokenUsage) -
         return None
     return compute_token_cost_usd(
         pricing=pricing,
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
-        cache_read_tokens=usage.cache_read_input_tokens,
-        cache_write_tokens=usage.cache_creation_input_tokens,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
     )
 
 
