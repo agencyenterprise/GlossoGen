@@ -64,7 +64,7 @@ the commit log.
   (`input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`)
   where it took `usage: TokenUsage`, so `model_catalog/` imports nothing from
   `models/`. Build the call from a `TokenUsage` as `input_tokens=usage.input_tokens`,
-  `cache_read_tokens=usage.cache_read_input_tokens` and
+  `output_tokens=usage.output_tokens`, `cache_read_tokens=usage.cache_read_input_tokens` and
   `cache_write_tokens=usage.cache_creation_input_tokens`. Costs are unchanged.
 - **`glossogen new-scenario <name>` writes only the scenario's folder**,
   `<target-dir>/<name>/`: the module, `knobs_default.json`, `prompts/`, an
