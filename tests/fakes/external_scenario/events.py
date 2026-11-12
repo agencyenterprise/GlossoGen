@@ -1,8 +1,7 @@
 """The event type this fake external scenario contributes.
 
-Imports only from ``glossogen.models.event_base``, which is the rule every
-scenario's ``events`` module follows and the reason discovery can run while
-``glossogen.models.event`` is still importing.
+A run is parsed with the event types its scenario returns from
+``event_types()``.
 """
 
 from typing import Literal

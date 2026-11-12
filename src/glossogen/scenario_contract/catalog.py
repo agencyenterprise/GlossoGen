@@ -24,7 +24,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple, Protocol, Self
 
-from glossogen.models.event import core_event_types, fixed_event_type
+from pydantic import PydanticUserError
+
+from glossogen.models.event import core_event_types, fixed_event_type, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.run_storage.event_parsing import (
     ScenarioCatalogNotLoaded,
@@ -235,7 +237,8 @@ def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], 
     """Refuse event types a run's parser could not dispatch alongside the platform's.
 
     Each needs a fixed ``event_type`` that no platform event and no other of the
-    scenario's own events uses.
+    scenario's own events uses. Building the parser the scenario's runs are read
+    with is the last check: pydantic refuses a union it cannot dispatch.
     """
     taken = {fixed_event_type(event_cls=cls): cls.__name__ for cls in core_event_types()}
     for event_cls in event_types:
@@ -251,6 +254,13 @@ def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], 
                 f"which {taken[discriminator]} already uses"
             )
         taken[discriminator] = event_cls.__name__
+    try:
+        parser_for(event_types=(*core_event_types(), *event_types))
+    except PydanticUserError as exc:
+        logger.exception("The parser for %s's runs could not be built", where)
+        raise ScenarioCatalogError(
+            f"{where}'s runs cannot be parsed with the event types it declares: {exc}"
+        ) from exc
 
 
 def _scenario_modules_under(directory: Path, module_prefix: str) -> list[str]:

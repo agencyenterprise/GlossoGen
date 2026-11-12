@@ -6,13 +6,23 @@ factory from the catalog current at that time.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Literal
 
+from pydantic import BaseModel
+
+from glossogen.models.event import SimulationEvent
 from glossogen.scenario_contract.catalog import (
     ScenarioCatalog,
     current_scenario_catalog,
     scenario_catalog_installed,
 )
+from glossogen.scenario_contract.run_detail_extension import (
+    ScenarioRunDetailExtension,
+    ScenarioRunExtrasBase,
+)
+from glossogen.scenario_contract.run_detail_types import AgentDetail as PlatformAgentDetail
+from glossogen.scenario_contract.run_detail_types import ChannelMessage
+from glossogen.scenarios.veyru.scenario import VeyruScenario
 from glossogen.server.runs.models import PLATFORM_SSE_EVENT_TYPES, RunDetailResponse
 from glossogen.server.runs.scenario_extension import collect_scenario_extensions, scenario_extension
 from tests.fakes.external_scenario.run_detail_extension import ExternalScenarioRunExtras
@@ -126,5 +136,55 @@ def test_with_no_scenario_extras_the_field_keeps_the_base_schema(tmp_path: Path)
     field = schema["components"]["schemas"]["RunDetailResponse"]["properties"]["scenario_extras"]
     assert field["anyOf"][0] == {"$ref": f"{EXTRAS_PREFIX}ScenarioRunExtrasBase"}
     assert "ScenarioRunExtrasBase" in schema["components"]["schemas"]
-    published = {ref["$ref"].removeprefix(EXTRAS_PREFIX) for ref in events_union(schema)["oneOf"]}
+    published = {
+        ref["$ref"].removeprefix(EXTRAS_PREFIX) for ref in events_union(schema=schema)["oneOf"]
+    }
     assert published == {cls.__name__ for cls in PLATFORM_SSE_EVENT_TYPES}
+
+
+class AgentDetail(ScenarioRunExtrasBase):
+    """Extras sharing its class name with a platform response model."""
+
+    scenario_name: Literal["collision"] = "collision"
+    custom_field: int
+
+
+class CollidingExtension(ScenarioRunDetailExtension):
+    """Declares the colliding extras model."""
+
+    extras_model_cls: ClassVar[type[ScenarioRunExtrasBase]] = AgentDetail
+    sse_event_classes: ClassVar[tuple[type[BaseModel], ...]] = ()
+
+    def build_extras(
+        self,
+        events: list[SimulationEvent],
+        agents_by_id: dict[str, PlatformAgentDetail],
+        messages: list[ChannelMessage],
+    ) -> ScenarioRunExtrasBase:
+        _ = events, agents_by_id, messages
+        return AgentDetail(custom_field=0)
+
+
+class CollidingScenario(VeyruScenario):
+    """A scenario whose extras model is named like a platform model."""
+
+    @classmethod
+    def run_detail_extension(cls) -> ScenarioRunDetailExtension:
+        return CollidingExtension()
+
+
+def test_a_scenario_model_named_like_a_platform_model_gets_its_own_component(
+    tmp_path: Path,
+) -> None:
+    """Both models keep their own schema; neither reference lands on the other's fields."""
+    widened = current_scenario_catalog().including(name="collision", scenario_cls=CollidingScenario)
+
+    with scenario_catalog_installed(catalog=widened):
+        schema = build_local_app(runs_dir=tmp_path).openapi()
+
+    components = schema["components"]["schemas"]
+    extras_ref = extras_union(schema=schema)["discriminator"]["mapping"]["collision"]
+    assert "custom_field" in components[extras_ref.removeprefix(EXTRAS_PREFIX)]["properties"]
+    detail = components["RunDetailResponse"]["properties"]["agents"]["items"]["$ref"]
+    assert "agent_id" in components[detail.removeprefix(EXTRAS_PREFIX)]["properties"]
+    assert extras_ref != detail

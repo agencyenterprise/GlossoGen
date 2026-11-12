@@ -13,7 +13,7 @@ from typing import Any, Literal
 import orjson
 import pytest
 
-from glossogen.models.event import MessageSent
+from glossogen.models.event import MessageSent, fixed_event_type
 from glossogen.models.event_base import EventBase
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_storage import event_parsing
@@ -277,3 +277,25 @@ def test_a_single_event_without_rounds_is_given_round_zero_and_its_message_the_s
     assert isinstance(event, MessageSent)
     assert event.round_number == 0
     assert event.message.round_number == 0
+
+
+class StringTyped(EventBase):
+    """A string ``event_type`` with a string default: nothing can dispatch on it."""
+
+    event_type: str = "string_typed"
+
+
+class Mismatched(EventBase):
+    """A literal that disagrees with its default."""
+
+    event_type: Literal["one"] = "other"  # pyright: ignore[reportAssignmentType]
+
+
+@pytest.mark.parametrize(
+    ("event_cls", "expected"),
+    [(AlphaPing, "ping"), (StringTyped, None), (Mismatched, None)],
+)
+def test_only_a_literal_matching_its_default_is_a_fixed_event_type(
+    event_cls: type[EventBase], expected: str | None
+) -> None:
+    assert fixed_event_type(event_cls=event_cls) == expected

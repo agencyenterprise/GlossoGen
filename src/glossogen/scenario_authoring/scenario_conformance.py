@@ -27,8 +27,6 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any, NamedTuple, get_args
 
-from pydantic_core import PydanticUndefined
-
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.evaluation.metric_core.protocol_probe_config import load_probe_questions
@@ -706,10 +704,9 @@ def _events_declare_a_literal_discriminator(built: BuiltScenario) -> str | None:
     wrong rather than as pydantic refusing a union.
     """
     for event_type in _scenario_event_types(built=built):
-        field = event_type.model_fields.get("event_type")
-        if field is None:
+        if "event_type" not in event_type.model_fields:
             return f"{event_type.__name__} declares no event_type"
-        if field.default is PydanticUndefined or not isinstance(field.default, str):
+        if fixed_event_type(event_cls=event_type) is None:
             return (
                 f"{event_type.__name__} has no fixed event_type; declare it as "
                 'Literal["..."] with that value as its default'

@@ -144,10 +144,10 @@ async def test_the_generated_world_scores_the_round_it_says_it_does(
 async def test_the_generated_event_reaches_the_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`events.py` is discovered and its event parses back out of the JSONL.
+    """The generated event is declared in `event_types()` and parses back out of the JSONL.
 
-    This is what the "import only event_base" rule protects, and an author who
-    breaks it sees their event type vanish rather than raise.
+    The event logger refuses an undeclared event, and a reader skips one, so
+    this is where a scaffold that forgot to declare it would show.
     """
     scenario_cls = generated_scenario_class(tmp_path, monkeypatch)
     scenario = build(scenario_cls, fast_round_overrides(round_count=1))

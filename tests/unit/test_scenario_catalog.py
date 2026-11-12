@@ -362,25 +362,36 @@ def test_the_catalog_refuses_an_event_type_a_parser_could_not_dispatch(
 
 
 @pytest.mark.usefixtures("empty_registry")
+@pytest.mark.parametrize(
+    ("package", "field"),
+    [
+        ("no_default_pkg", "event_type: str"),
+        ("str_default_pkg", 'event_type: str = "unfixed"'),
+        ("mismatched_pkg", 'event_type: Literal["one"] = "other"'),
+    ],
+)
 def test_the_catalog_refuses_an_event_without_a_fixed_event_type(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, package: str, field: str
 ) -> None:
-    """Nothing can dispatch to an event whose ``event_type`` varies."""
-    module = scenario_module_with_events(name="unfixed", event_type="probe_ok") + textwrap.dedent(
-        """
+    """Nothing can dispatch to an event whose ``event_type`` is not one fixed literal.
+
+    A plain string with a string default would pass a check of the default alone,
+    and pydantic would then refuse the union at the first read of any run.
+    """
+    module = scenario_module_with_events(name=package.removesuffix("_pkg"), event_type="probe_ok")
+    module += textwrap.dedent(f"""
 
         class Unfixed(EventBase):
-            event_type: str
+            {field}
 
 
         Scenario.event_types = classmethod(lambda cls: (Unfixed,))
-        """
-    )
-    write_package(root=tmp_path, package="unfixed_pkg", files={"scen.py": module})
+        """)
+    write_package(root=tmp_path, package=package, files={"scen.py": module})
     monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
 
     with pytest.raises(ScenarioCatalogError, match="no fixed event_type"):
-        load_scenario_catalog(sources=(PackageScanSource(package="unfixed_pkg"),))
+        load_scenario_catalog(sources=(PackageScanSource(package=package),))
 
 
 def scenario_module_with_events(name: str, event_type: str) -> str:

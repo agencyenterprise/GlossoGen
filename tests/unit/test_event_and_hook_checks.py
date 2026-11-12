@@ -16,7 +16,7 @@ every preset.
 
 import inspect
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 import pytest
 from pydantic import Field
@@ -63,8 +63,14 @@ def passes(check_name: str, scenario_name: str) -> bool:
     return all(outcome.passed for outcome in outcomes_for(check_name, scenario_name))
 
 
+class DeclareEvent(Protocol):
+    """Adds an event class to what the scenario under test declares."""
+
+    def __call__(self, event_cls: type[EventBase]) -> None: ...
+
+
 @pytest.fixture(name="declare_event")
-def declare_event_fixture(monkeypatch: pytest.MonkeyPatch) -> Callable[[type[EventBase]], None]:
+def declare_event_fixture(monkeypatch: pytest.MonkeyPatch) -> DeclareEvent:
     """Add an event class to what the scenario returns from `event_types()`.
 
     The class is also placed in the scenario's events module, as an author would
@@ -96,7 +102,7 @@ def define_in_the_events_module(
 
 
 def test_an_event_stealing_a_platform_discriminator_is_reported(
-    declare_event: Callable[[type[EventBase]], None],
+    declare_event: DeclareEvent,
 ) -> None:
     """Whichever side loses, the run reads back afterwards as the other thing."""
 
@@ -105,7 +111,7 @@ def test_an_event_stealing_a_platform_discriminator_is_reported(
 
         event_type: Literal["message_sent"] = "message_sent"
 
-    declare_event(Colliding)
+    declare_event(event_cls=Colliding)
     outcome = failed(COLLISION, SCENARIO)
 
     assert "message_sent" in outcome.detail
@@ -113,7 +119,7 @@ def test_an_event_stealing_a_platform_discriminator_is_reported(
 
 
 def test_two_of_a_scenarios_own_events_sharing_a_discriminator_are_reported(
-    declare_event: Callable[[type[EventBase]], None],
+    declare_event: DeclareEvent,
 ) -> None:
     """The same failure within one scenario, which the platform list cannot catch."""
 
@@ -122,13 +128,13 @@ def test_two_of_a_scenarios_own_events_sharing_a_discriminator_are_reported(
 
         event_type: Literal["pd_decision_submitted"] = "pd_decision_submitted"
 
-    declare_event(Duplicate)
+    declare_event(event_cls=Duplicate)
 
     assert "pd_decision_submitted" in failed(COLLISION, SCENARIO).detail
 
 
 def test_the_parser_refuses_a_colliding_union_too(
-    declare_event: Callable[[type[EventBase]], None],
+    declare_event: DeclareEvent,
 ) -> None:
     """A backstop under the check above, and the reason the union is built at all.
 
@@ -141,13 +147,13 @@ def test_the_parser_refuses_a_colliding_union_too(
 
         event_type: Literal["round_ended"] = "round_ended"
 
-    declare_event(Colliding)
+    declare_event(event_cls=Colliding)
 
     assert not passes(PARSER, SCENARIO)
 
 
 def test_an_event_without_a_fixed_discriminator_is_reported(
-    declare_event: Callable[[type[EventBase]], None],
+    declare_event: DeclareEvent,
 ) -> None:
     """`event_type` is what the parser dispatches on, so it cannot vary."""
 
@@ -156,7 +162,7 @@ def test_an_event_without_a_fixed_discriminator_is_reported(
 
         event_type: str = Field(default_factory=str)
 
-    declare_event(Unfixed)
+    declare_event(event_cls=Unfixed)
 
     assert "Unfixed" in failed(LITERAL, SCENARIO).detail
 
@@ -177,7 +183,7 @@ def test_an_event_the_scenario_defines_but_does_not_declare_is_reported(
 
 
 def test_an_event_declared_by_the_scenario_passes(
-    declare_event: Callable[[type[EventBase]], None],
+    declare_event: DeclareEvent,
 ) -> None:
     """Declaring the same class is the fix the failure above asks for."""
 
@@ -186,7 +192,7 @@ def test_an_event_declared_by_the_scenario_passes(
 
         event_type: Literal["pd_remembered"] = "pd_remembered"
 
-    declare_event(Remembered)
+    declare_event(event_cls=Remembered)
 
     assert passes(DECLARED, SCENARIO)
 

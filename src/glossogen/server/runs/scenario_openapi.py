@@ -7,26 +7,30 @@ the scenario catalog has loaded. :func:`publish_scenario_schemas` is called by
 the app factory, once the catalog has loaded: it makes the app's OpenAPI schema
 describe ``scenario_extras`` as the discriminated union of every loaded
 scenario's extras model, and the stream as the union of every SSE event model.
+
+Schemas are JSON documents, and FastAPI's ``openapi()`` returns one as a dict, so
+the functions here take and return dicts rather than models.
 """
 
 import json
+import re
 from collections.abc import Mapping
 from typing import Annotated, Any, Union
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, Discriminator
 
-from glossogen.scenario_contract.run_detail_extension import (
-    ScenarioRunDetailExtension,
-    ScenarioRunExtrasBase,
-)
-from glossogen.server.runs.models import PLATFORM_SSE_EVENT_TYPES, RunDetailResponse
+from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
+from glossogen.server.runs.models import PLATFORM_SSE_EVENT_TYPES
 
-_REF_TEMPLATE = "#/components/schemas/{model}"
+_REF_PREFIX = "#/components/schemas/"
+_DETAIL_PATH = "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}"
 _EVENTS_PATH = "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/events"
 _EXTRAS_FIELD = "scenario_extras"
-_EXTRAS_PROBE_PATH = "/scenario-extras"
-_EVENTS_PROBE_PATH = "/scenario-events"
+_EXTRAS_PROBE_PATH = "/scenario-extras-probe"
+_EVENTS_PROBE_PATH = "/scenario-events-probe"
 
 
 def publish_scenario_schemas(
@@ -34,82 +38,100 @@ def publish_scenario_schemas(
 ) -> None:
     """Make ``app``'s OpenAPI schema describe the extras and SSE events of ``extensions``.
 
-    Wraps ``app.openapi`` so the schema FastAPI builds from the routes is
-    completed the first time it is asked for, and cached as FastAPI caches it.
+    Replaces ``app.openapi`` with a builder that generates the app's schema the way
+    FastAPI does, from the same settings, over its routes plus two probe routes
+    that respond with the scenario unions. Generating them in one pass gives every
+    model one name across the whole schema, as FastAPI disambiguates them. The
+    probe routes are then removed and their unions moved where they belong. The
+    schema is built once, on first request, and cached on the app as FastAPI
+    caches it.
     """
-    build_route_schema = app.openapi
+    probe_routes = _probe_routes(extensions=extensions)
 
     def openapi() -> dict[str, Any]:
-        if app.openapi_schema is not None:
-            return app.openapi_schema
-        schema = build_route_schema()
-        _add_scenario_unions(schema=schema, extensions=extensions)
-        return schema
+        if app.openapi_schema is None:
+            app.openapi_schema = _build_schema(app=app, probe_routes=probe_routes)
+        return app.openapi_schema
 
     app.openapi = openapi  # pyright: ignore[reportAttributeAccessIssue]
 
 
-def _add_scenario_unions(
-    schema: dict[str, Any], extensions: Mapping[str, ScenarioRunDetailExtension]
-) -> None:
-    """Replace the extras field and the event stream's schema with the scenario unions."""
+def _probe_routes(extensions: Mapping[str, ScenarioRunDetailExtension]) -> list[APIRoute]:
+    """Return routes whose responses are the extras union, if any, and the SSE event union."""
+    routes: list[APIRoute] = []
     extras_models = tuple(extension.extras_model_cls for extension in extensions.values())
-    sse_models = (
-        *PLATFORM_SSE_EVENT_TYPES,
-        *(cls for extension in extensions.values() for cls in extension.sse_event_classes),
-    )
-    probe = _probe_schema(extras_models=extras_models, sse_models=sse_models)
-    components: dict[str, Any] = schema["components"]["schemas"]
-    for name, definition in probe["components"]["schemas"].items():
-        components.setdefault(name, definition)
-    if extras_models:
-        extras_schema = _response_schema(schema=probe, path=_EXTRAS_PROBE_PATH)
-        properties = components[RunDetailResponse.__name__]["properties"]
-        properties[_EXTRAS_FIELD] = {
-            **extras_schema,
-            # Pydantic's default title for the field.
-            "title": _EXTRAS_FIELD.replace("_", " ").title(),
-        }
-    events_schema = _response_schema(schema=schema, path=_EVENTS_PATH)
-    events_schema.update(
-        {**_response_schema(schema=probe, path=_EVENTS_PROBE_PATH), "title": events_schema["title"]}
-    )
-    schema["components"]["schemas"] = dict(sorted(components.items()))
-    _drop_unreferenced(schema=schema, name=ScenarioRunExtrasBase.__name__)
-
-
-def _probe_schema(
-    extras_models: tuple[type[ScenarioRunExtrasBase], ...],
-    sse_models: tuple[type[BaseModel], ...],
-) -> dict[str, Any]:
-    """Return the OpenAPI schema of an app whose two routes respond with the scenario unions.
-
-    Generating the unions through FastAPI, rather than through pydantic directly,
-    gives them the same shape and key order as the rest of the schema.
-    """
-    probe = FastAPI()
     if extras_models:
         extras_union: Any = Union[extras_models]
         extras_form: Any = Annotated[extras_union, Discriminator("scenario_name")]
-        probe.add_api_route(
-            path=_EXTRAS_PROBE_PATH,
+        routes.append(
+            APIRoute(
+                path=_EXTRAS_PROBE_PATH,
+                endpoint=_probe_endpoint,
+                response_model=extras_form | None,
+                methods=["GET"],
+            )
+        )
+    sse_models: tuple[type[BaseModel], ...] = (
+        *PLATFORM_SSE_EVENT_TYPES,
+        *(cls for extension in extensions.values() for cls in extension.sse_event_classes),
+    )
+    sse_union: Any = Union[sse_models]
+    routes.append(
+        APIRoute(
+            path=_EVENTS_PROBE_PATH,
             endpoint=_probe_endpoint,
-            response_model=extras_form | None,
+            response_model=None,
+            responses={200: {"model": Annotated[sse_union, Discriminator("event_type")]}},
             methods=["GET"],
         )
-    sse_union: Any = Union[sse_models]
-    probe.add_api_route(
-        path=_EVENTS_PROBE_PATH,
-        endpoint=_probe_endpoint,
-        response_model=None,
-        responses={200: {"model": Annotated[sse_union, Discriminator("event_type")]}},
-        methods=["GET"],
     )
-    return probe.openapi()
+    return routes
 
 
 async def _probe_endpoint() -> None:
     """Stand in for the probe routes, which are only described, never served."""
+
+
+def _build_schema(app: FastAPI, probe_routes: list[APIRoute]) -> dict[str, Any]:
+    """Generate ``app``'s schema with the probe routes, then move their unions into place."""
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        summary=app.summary,
+        description=app.description,
+        terms_of_service=app.terms_of_service,
+        contact=app.contact,
+        license_info=app.license_info,
+        routes=[*app.routes, *probe_routes],
+        webhooks=app.webhooks.routes,
+        tags=app.openapi_tags,
+        servers=app.servers,
+        separate_input_output_schemas=app.separate_input_output_schemas,
+        external_docs=app.openapi_external_docs,
+    )
+    paths: dict[str, Any] = schema["paths"]
+    components: dict[str, Any] = schema["components"]["schemas"]
+    # FastAPI publishes some components no path reaches; only those this step
+    # leaves unreached, such as the extras base class, are removed.
+    unreached_before = _unreachable_components(schema=schema)
+    if _EXTRAS_PROBE_PATH in paths:
+        detail_ref: str = _response_schema(schema=schema, path=_DETAIL_PATH)["$ref"]
+        detail = components[detail_ref.removeprefix(_REF_PREFIX)]
+        detail["properties"][_EXTRAS_FIELD] = {
+            **_response_schema(schema=schema, path=_EXTRAS_PROBE_PATH),
+            # Pydantic's default title for the field.
+            "title": _EXTRAS_FIELD.replace("_", " ").title(),
+        }
+        del paths[_EXTRAS_PROBE_PATH]
+    events = _response_schema(schema=schema, path=_EVENTS_PATH)
+    events.update(
+        {**_response_schema(schema=schema, path=_EVENTS_PROBE_PATH), "title": events["title"]}
+    )
+    del paths[_EVENTS_PROBE_PATH]
+    for name in _unreachable_components(schema=schema) - unreached_before:
+        del components[name]
+    return schema
 
 
 def _response_schema(schema: dict[str, Any], path: str) -> dict[str, Any]:
@@ -117,11 +139,20 @@ def _response_schema(schema: dict[str, Any], path: str) -> dict[str, Any]:
     return schema["paths"][path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
 
 
-def _drop_unreferenced(schema: dict[str, Any], name: str) -> None:
-    """Remove component ``name`` when nothing in ``schema`` refers to it any more."""
+def _unreachable_components(schema: dict[str, Any]) -> set[str]:
+    """Return the names of the components no path's schema reaches."""
     components: dict[str, Any] = schema["components"]["schemas"]
-    if name not in components:
-        return
-    reference = f'"$ref": {json.dumps(_REF_TEMPLATE.format(model=name))}'
-    if reference not in json.dumps(schema):
-        del components[name]
+    reachable: set[str] = set()
+    pending = _referenced_names(node=schema["paths"])
+    while pending:
+        name = pending.pop()
+        if name in reachable or name not in components:
+            continue
+        reachable.add(name)
+        pending |= _referenced_names(node=components[name])
+    return set(components) - reachable
+
+
+def _referenced_names(node: Any) -> set[str]:
+    """Return the component names every ``$ref`` under ``node`` points at."""
+    return set(re.findall(r'"\$ref": "#/components/schemas/([^"]+)"', json.dumps(node)))

@@ -9,7 +9,7 @@ parser, and :mod:`glossogen.run_storage.event_parsing` picks the one for a run.
 """
 
 from enum import Enum, StrEnum
-from typing import Annotated, Any, Literal, TypeAlias, Union, cast
+from typing import Annotated, Any, Literal, TypeAlias, Union, cast, get_args, get_origin
 
 from pydantic import Discriminator, Field, TypeAdapter, model_validator
 
@@ -480,11 +480,15 @@ SimulationEvent: TypeAlias = EventBase
 def fixed_event_type(event_cls: type[EventBase]) -> str | None:
     """Return the ``event_type`` an event class always logs, or None when it has none.
 
-    A class that a parser can dispatch to declares ``event_type`` as a string
-    literal with that string as its default.
+    A class that a parser can dispatch to declares ``event_type`` as a
+    ``Literal`` of one string, with that string as its default.
     """
     field = event_cls.model_fields.get("event_type")
     if field is None or not isinstance(field.default, str):
+        return None
+    if get_origin(field.annotation) is not Literal or get_args(field.annotation) != (
+        field.default,
+    ):
         return None
     return field.default
 
