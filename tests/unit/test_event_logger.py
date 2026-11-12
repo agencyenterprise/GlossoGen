@@ -15,7 +15,7 @@ from typing import Literal
 import orjson
 import pytest
 
-from glossogen.models.event import MessageSent, core_event_types
+from glossogen.models.event import MessageSent, UnrecognizedEvent, core_event_types
 from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
 from glossogen.run_storage.run_archive import EventLocation, find_event_offset
@@ -204,7 +204,7 @@ class Undeclared(EventBase):
 async def test_an_event_the_logger_was_not_built_to_accept_is_refused(
     tmp_path: Path, event_bus: EventBus
 ) -> None:
-    """A run's reader skips what its scenario does not declare, so the writer refuses it.
+    """A run's reader cannot parse what its scenario does not declare, so the writer refuses it.
 
     Nothing is written and nothing is published, so the log stays readable as it is.
     """
@@ -219,6 +219,29 @@ async def test_an_event_the_logger_was_not_built_to_accept_is_refused(
 
     assert path.read_bytes() == b""
     assert queue.empty()
+
+
+async def test_an_unrecognized_event_is_refused_even_when_all_types_are_allowed(
+    tmp_path: Path, event_bus: EventBus
+) -> None:
+    """A line read back from a log is not an event of the running simulation."""
+    path = tmp_path / "run.jsonl"
+    logger = EventLogger(
+        log_path=path,
+        event_bus=event_bus,
+        allowed_event_types=PLATFORM_EVENTS | {UnrecognizedEvent},
+    )
+    await logger.open()
+    unrecognized = UnrecognizedEvent.from_record(
+        record={"event_id": "x", "event_type": "gone", "timestamp": FIXED_TIME.isoformat()},
+        round_number=1,
+    )
+
+    with pytest.raises(UndeclaredEventType, match="UnrecognizedEvent"):
+        await logger.log(event=unrecognized)
+    await logger.close()
+
+    assert path.read_bytes() == b""
 
 
 async def test_a_scenarios_declared_event_is_logged(tmp_path: Path, event_bus: EventBus) -> None:

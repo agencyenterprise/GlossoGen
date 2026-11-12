@@ -385,6 +385,7 @@ input  # unused variable (src/glossogen/thread_export/thread_export_models.py:34
 tool_use_id  # unused variable (src/glossogen/thread_export/thread_export_models.py:41)
 model_config  # unused variable (src/glossogen/thread_export/thread_export_models.py:103)
 _._serialize  # unused method (src/glossogen/thread_export/thread_export_models.py:109)
+_._serialize_as_logged  # unused method (src/glossogen/models/event.py:489)
 rounds_covered  # unused variable (src/glossogen/thread_export/thread_export_models.py:160)
 thinking_included  # unused variable (src/glossogen/thread_export/thread_export_models.py:163)
 tools_flattened  # unused variable (src/glossogen/thread_export/thread_export_models.py:164)

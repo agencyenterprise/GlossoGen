@@ -5,13 +5,26 @@ A scenario declares its own event types through ``event_types()``
 events plus the events its scenario declares: :func:`parser_for` builds that
 parser, and :mod:`glossogen.run_storage.event_parsing` picks the one for a run.
 
+A logged event of a type the run's parser does not read comes back as an
+:class:`UnrecognizedEvent`, which keeps the line as it was written.
+
 ``EventBase`` and ``TokenUsage`` live in :mod:`glossogen.models.event_base`.
 """
 
 from enum import Enum, StrEnum
-from typing import Annotated, Any, Literal, TypeAlias, Union, cast, get_args, get_origin
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Self,
+    TypeAlias,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
-from pydantic import Discriminator, Field, TypeAdapter, model_validator
+from pydantic import Discriminator, Field, TypeAdapter, model_serializer, model_validator
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.channel_visibility import ChannelVisibility
@@ -437,6 +450,46 @@ class AgentResumed(EventBase):
     wake_reasons: list[str]
     waited_seconds: float
     terminated: bool
+
+
+class UnrecognizedEvent(EventBase):
+    """A logged event of a type that neither the platform nor the run's loaded scenario declares.
+
+    A reader builds one for such a line instead of dropping it: the run's scenario
+    may not be loaded in this process, or may no longer declare the type.
+    ``payload`` is the whole line as it was logged, and serializing the event
+    gives back exactly that object. ``event_id`` and ``timestamp`` are read from
+    the line; ``round_number`` is the line's own, or the round a reader backfilled
+    for a legacy line that lacks it, which ``payload`` does not gain.
+
+    No parser dispatches to it and the event logger refuses it, so it is never
+    emitted live.
+    """
+
+    event_type: str
+    payload: dict[str, Any]
+
+    @classmethod
+    def from_record(cls, record: dict[str, Any], round_number: int) -> Self:
+        """Wrap one logged line whose ``event_type`` this process does not read.
+
+        Raises ``ValidationError`` when the line has no ``event_id`` or
+        ``timestamp``, which every logged event carries.
+        """
+        return cls.model_validate(
+            {
+                "event_id": record.get("event_id"),
+                "timestamp": record.get("timestamp"),
+                "round_number": round_number,
+                "event_type": record.get("event_type"),
+                "payload": record,
+            }
+        )
+
+    @model_serializer(mode="plain")
+    def _serialize_as_logged(self) -> dict[str, Any]:
+        """Serialize to the line as it was logged."""
+        return self.payload
 
 
 _CORE_EVENT_TYPES: tuple[type[EventBase], ...] = (

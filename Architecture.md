@@ -205,9 +205,9 @@ A run logs only the platform's events and its own scenario's, and its first line
 
 `run_storage` does not ask the catalog. When a catalog becomes the process's current one, it installs its `event_types_of` lookup in `event_parsing` with `install_scenario_event_types`, and installing another catalog (or restoring one after `scenario_catalog_installed`) replaces it and drops the cached parsers. A read before any catalog has loaded raises `ScenarioCatalogNotLoaded`, so an ordering bug fails at the first read instead of silently parsing with the platform's events alone.
 
-An event whose type is neither a platform event nor declared by the run's scenario is skipped and counted per type, with one warning per read, and the rest of the run stays readable. When the run's scenario is not in this process's catalog, every scenario event falls in that case, and the warning names the missing scenario. Because no reader holds two scenarios' events at once, two scenarios may declare the same `event_type`.
+An event whose type is neither a platform event nor declared by the run's scenario is read into an `UnrecognizedEvent` ([models/event.py](src/glossogen/models/event.py)). It holds the line's `event_type` and the whole line as `payload`, reads `event_id`, `timestamp` and `round_number` like any event, and serializes back to exactly the line it was read from. `load_events` counts them per type in one warning per read. When the run's scenario is not in this process's catalog, every scenario event is one, and the warning names the missing scenario. Code that dispatches on event classes passes over them; run detail returns them as `unrecognized_events`, and the run page shows them in its timeline at the time they were logged. A malformed event of a type the parser does read still raises. Because no reader holds two scenarios' events at once, two scenarios may declare the same `event_type`.
 
-The write side keeps logs readable: [runtime/event_logger.py](src/glossogen/runtime/event_logger.py) is built with the classes it may log, `loggable_event_types(scenario_cls)` from [scenario_contract/event_types.py](src/glossogen/scenario_contract/event_types.py), and raises `UndeclaredEventType` for any other class, a subclass of an accepted one included. The derivation flows copy a source run's JSONL lines as bytes and resume it under the same scenario, so the check applies only to what the resumed run logs.
+The write side keeps logs readable: [runtime/event_logger.py](src/glossogen/runtime/event_logger.py) is built with the classes it may log, `loggable_event_types(scenario_cls)` from [scenario_contract/event_types.py](src/glossogen/scenario_contract/event_types.py), and raises `UndeclaredEventType` for any other class, a subclass of an accepted one included, and for an `UnrecognizedEvent`, which is never emitted live. The derivation flows copy a source run's JSONL lines as bytes, unrecognized ones included, and resume it under the same scenario, so the check applies only to what the resumed run logs.
 
 The catalog refuses, at load, a declared event type with no fixed `event_type` literal, or one that repeats a platform event's or another of the scenario's own. `glossogen validate` also reports an event class defined in the scenario's module or package that `event_types()` leaves out, unless another loaded scenario declares it.
 
@@ -299,7 +299,7 @@ Agents do not know they are in a simulation. The MCP server is named `comms` and
 
 Every simulation event is serialized as one JSON object per line in a JSONL file (one file per run).
 
-A run is read back with the platform's event types plus those its scenario declares in `event_types()`, discriminated on `event_type` (see "Scenario Event Parsing"). The platform's include:
+A run is read back with the platform's event types plus those its scenario declares in `event_types()`, discriminated on `event_type`; a line of any other type reads back as an `UnrecognizedEvent` holding the line unchanged (see "Scenario Event Parsing"). The platform's include:
 
 - `simulation_started` — run ID, scenario name, scenario description, channel IDs, scenario config
 - `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names, model
@@ -357,7 +357,7 @@ The CLI `run` command computes the output path automatically from `--runs-dir`, 
 
 [`run_storage/`](src/glossogen/run_storage/) reads this tree without the web server or Postgres, so the CLI, the exports and the analysis read runs the same way the server does:
 
-- [`event_log_reader.py`](src/glossogen/run_storage/event_log_reader.py): `load_events(log_path)` parses a run's JSONL event log into typed events, skipping event types this build has no class for; `extract_agent_configs`, `extract_simulation_id` and `extract_scenario_config` read those events back into configs
+- [`event_log_reader.py`](src/glossogen/run_storage/event_log_reader.py): `load_events(log_path)` parses a run's JSONL event log into typed events, reading event types this build has no class for into `UnrecognizedEvent`; `extract_agent_configs`, `extract_simulation_id` and `extract_scenario_config` read those events back into configs
 - [`run_discovery.py`](src/glossogen/run_storage/run_discovery.py): `discover_runs(runs_dir)` walks the tree and `build_summary` builds one run's `RunSummary`, cached per run in `run_summary_cache.json`
 - [`run_summary_models.py`](src/glossogen/run_storage/run_summary_models.py): `RunSummary` and its parts (`AgentModelSummary`, the `*Source` provenance records, `EvaluationScore`, `RoundResultTally`). The runs list API returns `RunSummary` as is
 - [`derivation_manifest_reader.py`](src/glossogen/run_storage/derivation_manifest_reader.py): the derivation manifests read into `*Source` records

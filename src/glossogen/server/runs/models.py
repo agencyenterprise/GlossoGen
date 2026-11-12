@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Discriminator, SerializeAsAny
+from pydantic import BaseModel, Discriminator, JsonValue, SerializeAsAny
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
@@ -254,6 +254,20 @@ class AgentRunCycleFailedEntry(BaseModel):
     message: str
 
 
+class UnrecognizedEventEntry(BaseModel):
+    """A logged event that neither the platform nor the run's loaded scenario declares.
+
+    One entry per ``UnrecognizedEvent`` the run's log read back as. ``payload`` is
+    the whole line as logged.
+    """
+
+    event_id: str
+    event_type: str
+    round_number: int
+    timestamp: datetime
+    payload: dict[str, JsonValue]
+
+
 class ClosingExchangeStatus(str, Enum):
     """How an agent's closing exchange ended: with an answer, or with a failure."""
 
@@ -384,6 +398,9 @@ class RunDetailResponse(BaseModel):
     round_endings: list[RoundEnding]
     round_results: list[RoundResult]
     round_injections: list[RoundInjection]
+    # Events of types this server cannot parse for the run, in log order: its
+    # scenario is not loaded here, or no longer declares them.
+    unrecognized_events: list[UnrecognizedEventEntry]
     # Typed as the base so this model does not depend on which scenarios are
     # loaded; serialized as the subclass it holds. The API schema publishes the
     # union of every loaded scenario's extras (server/runs/scenario_openapi.py).

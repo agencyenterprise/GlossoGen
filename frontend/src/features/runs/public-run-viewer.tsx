@@ -87,6 +87,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       run.reasoning,
       run.tool_use,
       run.run_cycle_failures,
+      run.unrecognized_events,
       judgeMetadataByCallId,
       toolMetadataByCallId,
       notificationDisplaysByCallId(run.tool_use, scenarioPlugin)
@@ -96,6 +97,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
     run.reasoning,
     run.tool_use,
     run.run_cycle_failures,
+    run.unrecognized_events,
     run.scenario_extras,
     scenarioPlugin,
   ]);

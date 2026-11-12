@@ -4,7 +4,8 @@ A run logs the platform's events and the events its own scenario declares, and
 its first line, ``simulation_started``, names that scenario. A run is parsed with
 exactly those types: :func:`run_event_parser` returns the parser for a scenario
 name, and :func:`parse_event` / :func:`parse_event_bytes` parse one event of a
-run with it.
+run with it. A line of any other ``event_type`` is read into an
+:class:`~glossogen.models.event.UnrecognizedEvent` that keeps the line as logged.
 
 Which event types a scenario declares is answered by a lookup the scenario
 catalog installs when it loads (:func:`install_scenario_event_types`). This
@@ -28,6 +29,7 @@ from pydantic import TypeAdapter
 
 from glossogen.models.event import (
     SimulationEvent,
+    UnrecognizedEvent,
     core_event_types,
     fixed_event_type,
     parser_for,
@@ -48,7 +50,8 @@ class RunEventParser(NamedTuple):
     """The parser for one scenario's runs, and which event types it reads.
 
     ``scenario_loaded`` is False when this process has no scenario by that name:
-    the parser then reads the platform's events only.
+    the parser then reads the platform's events only, and every scenario event of
+    the run is an :class:`~glossogen.models.event.UnrecognizedEvent`.
     """
 
     scenario_name: str
@@ -63,6 +66,10 @@ class RunEventParser(NamedTuple):
     def parse(self, raw: dict[str, Any]) -> SimulationEvent:
         """Validate a raw event dict into a typed event, backfilling legacy round numbers.
 
+        An event whose ``event_type`` this parser does not declare is returned as an
+        :class:`~glossogen.models.event.UnrecognizedEvent` holding ``raw`` unchanged.
+        A declared event that does not validate raises.
+
         Backfills two fields that older JSONL logs may omit:
 
         - the event's own ``round_number`` (promoted to ``EventBase`` after the
@@ -75,6 +82,11 @@ class RunEventParser(NamedTuple):
         ``glossogen.run_storage.event_log_reader.load_events``) pass each record
         through :class:`RoundNumberBackfill` first.
         """
+        event_type = raw.get("event_type")
+        if isinstance(event_type, str) and not self.declares(event_type=event_type):
+            return UnrecognizedEvent.from_record(
+                record=raw, round_number=raw.get("round_number", 0)
+            )
         if "round_number" not in raw:
             raw = {**raw, "round_number": 0}
         if raw.get("event_type") == "message_sent":
