@@ -4,7 +4,7 @@ import { CheckCircle2, Info, Mail, Moon } from "lucide-react";
 
 /**
  * Notification types returned by the read_notifications tool.
- * Hand copy of `NotificationType` in `src/glossogen/runtime/activity_notification.py`;
+ * Hand copy of `NotificationType` in `src/glossogen/scenario_contract/activity_notification.py`;
  * the generated API types do not carry it, so update both together.
  */
 export const NOTIFICATION_TYPE = {

@@ -16,7 +16,10 @@ from pydantic_ai.models.function import (
 from glossogen.models.event import AgentRegistered
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.run_storage.event_log_reader import load_events
-from glossogen.runners.communication_protocol import INITIAL_PROMPT, runner_prompts_from_events
+from glossogen.scenario_contract.platform_runner_prompts import (
+    INITIAL_PROMPT,
+    runner_prompts_from_events,
+)
 from glossogen.testing import simulation_harness
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation

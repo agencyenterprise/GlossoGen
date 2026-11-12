@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import RoundNote
 from glossogen.evaluation.metrics.protocol_learned_after_swap_metric import ProtocolLearnedOutput
+from glossogen.scenario_contract.measurement import RoundNote
 from glossogen.testing.metric_harness import NO_OPTIONS, MetricRun, score_metrics
 from tests.metrics.conftest import (
     FIRST_AGENT_ID,

@@ -28,7 +28,7 @@ from glossogen.run_derivation.replace_agent import ReplaceAgentRequest, prepare_
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_replay.resume_state_loader import read_replace_manifest_info
 from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME
-from glossogen.runners.communication_protocol import platform_runner_prompts
+from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
 
 _AGENT = "player"
 

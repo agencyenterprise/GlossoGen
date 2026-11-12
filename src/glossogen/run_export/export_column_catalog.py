@@ -11,7 +11,6 @@ selection instead.
 
 from pathlib import Path
 
-from glossogen.evaluation.metric_core.measurement import Measurement
 from glossogen.models.event import RunStatus
 from glossogen.run_export import export_limits
 from glossogen.run_export.agent_identity_columns import (
@@ -36,6 +35,7 @@ from glossogen.run_export.metric_column_projection import measurements_by_name
 from glossogen.run_export.run_context_columns import collect_context_keys
 from glossogen.run_export.run_metadata_columns import IDENTITY_COLUMNS
 from glossogen.run_storage.archive_member_filter import should_include_in_archive
+from glossogen.scenario_contract.measurement import Measurement
 
 COLUMN_GROUP_IDENTITY = "identity"
 COLUMN_GROUP_RUN_METADATA = "run_metadata"

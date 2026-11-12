@@ -21,14 +21,7 @@ from typing import TextIO
 
 from pydantic_ai.messages import ModelMessage
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.mid_run_swap_overrides import apply_mid_run_swaps
-from glossogen.evaluation.metric_core.protocol_probe_config import (
-    ProbeQuestion,
-    load_probe_questions,
-)
 from glossogen.evaluation.metrics.probe_usage_report import (
     accumulate_probe_usage,
     build_probe_usage_report,
@@ -44,9 +37,16 @@ from glossogen.run_replay.message_history_builder import (
     build_message_history,
     resolve_history_timestamp,
 )
-from glossogen.runners.communication_protocol import (
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     runner_prompts_from_events,
+)
+from glossogen.scenario_contract.protocol_probe_config import (
+    ProbeQuestion,
+    load_probe_questions,
 )
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.template_renderer import TemplateRenderer

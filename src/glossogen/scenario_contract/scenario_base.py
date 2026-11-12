@@ -26,10 +26,6 @@ from typing import Any, ClassVar, NamedTuple, Protocol, Self, runtime_checkable
 import orjson
 from pydantic_core import PydanticUndefined
 
-from glossogen.evaluation.metric_core.protocol_boundary import ProtocolBoundaryWindow
-from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
-from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
-from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.llm.deferred_provider import DeferredLLMProvider
 from glossogen.llm.judge_cost import EvaluationCost
 from glossogen.model_catalog.provider_catalog import Provider
@@ -39,16 +35,19 @@ from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
-from glossogen.runtime.event_logger import EventLogger
-from glossogen.runtime.notification_payload import Wake, render_default_notification
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
-from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
-from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS, ParkedWait
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
+from glossogen.scenario_contract.notification_delivery import Wake, render_default_notification
+from glossogen.scenario_contract.parked_wait import DEFAULT_ANY_TIMEOUT_SECONDS, ParkedWait
+from glossogen.scenario_contract.protocol_boundary import ProtocolBoundaryWindow
+from glossogen.scenario_contract.protocol_explanation_config import ProtocolExplanationConfig
+from glossogen.scenario_contract.protocol_probe_config import ProtocolProbeConfig
+from glossogen.scenario_contract.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +105,12 @@ class PrimaryChannel(NamedTuple):
         return f"{base}_{self.team_id}"
 
 
+class ScenarioEventLog(Protocol):
+    """The run's event log, as a scenario writes to it. The runtime's ``EventLogger`` matches it."""
+
+    async def log(self, event: SimulationEvent) -> None: ...
+
+
 class ScenarioRuntimeHandle(Protocol):
     """The view of the simulation runtime exposed to scenarios.
 
@@ -116,7 +121,7 @@ class ScenarioRuntimeHandle(Protocol):
     """
 
     @property
-    def event_logger(self) -> EventLogger: ...
+    def event_logger(self) -> ScenarioEventLog: ...
 
     @property
     def current_round(self) -> int: ...

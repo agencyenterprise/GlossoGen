@@ -7,13 +7,13 @@ writes, so it is scenario-agnostic.
 
 import logging
 
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metrics.round_ended.trigger_detection import (
     count_rounds,
     find_round_end_triggers,
 )
 from glossogen.models.event import SimulationEvent
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
 
 logger = logging.getLogger(__name__)
 

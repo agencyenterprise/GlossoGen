@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import ChannelCreated, ToolResultReceived
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
 from glossogen.scenarios.spot_the_intersection.messaging import (
     DIRECT_MESSAGES_CLOSED_IN_DISCUSSION,
     LINK_IS_NOTICES_ONLY,

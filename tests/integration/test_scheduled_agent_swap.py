@@ -36,7 +36,7 @@ from glossogen.models.event import (
     SimulationEvent,
     ToolResultReceived,
 )
-from glossogen.runtime.scheduled_events import SwapAgent
+from glossogen.models.scheduled_events import SwapAgent
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

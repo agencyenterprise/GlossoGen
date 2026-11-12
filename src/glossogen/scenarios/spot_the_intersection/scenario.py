@@ -22,18 +22,17 @@ from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
-from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
-from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.models.event_base import EventBase
 from glossogen.models.mcp_responses import SendMessageResult
-from glossogen.runtime.scenario_tool import ScenarioTool
-from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.channel_noise import apply_character_noise
+from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
+from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.protocol_explanation_config import ProtocolExplanationConfig
+from glossogen.scenario_contract.protocol_probe_config import ProtocolProbeConfig
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import (
@@ -41,7 +40,8 @@ from glossogen.scenario_contract.scenario_base import (
     RoundResult,
     SendMessageExecutor,
 )
-from glossogen.scenarios.channel_noise import apply_character_noise
+from glossogen.scenario_contract.scenario_tool import ScenarioTool
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.spot_the_intersection.board_generation import generate_rounds
 from glossogen.scenarios.spot_the_intersection.board_model import column_letter
 from glossogen.scenarios.spot_the_intersection.evaluation.build_communication_rounds import (

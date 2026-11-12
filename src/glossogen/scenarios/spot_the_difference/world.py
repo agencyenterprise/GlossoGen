@@ -22,7 +22,7 @@ from typing import Any
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
-from glossogen.runtime.scenario_world import MessageEvent, WorldContext
+from glossogen.scenario_contract.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.spot_the_difference.ids import (
     BUDGET_EXCEEDED_MARKER,
     BUDGET_LOW_MARKER,

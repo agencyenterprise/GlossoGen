@@ -11,7 +11,7 @@ from typing import Self
 
 from pydantic import model_validator
 
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 
 
 class PrisonersDilemmaKnobs(BaseKnobs):

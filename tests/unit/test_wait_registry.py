@@ -9,20 +9,19 @@ import pytest
 from glossogen.models.channel import Channel
 from glossogen.models.message import SimulationMessage
 from glossogen.models.wait_for import WaitFor
-from glossogen.runtime.activity_notification import (
+from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import ChannelRouter
+from glossogen.runtime.session_notification_inbox import SessionNotificationInbox
+from glossogen.runtime.wait_registry import WaitRegistry, wait_deadline
+from glossogen.scenario_contract.activity_notification import (
     DoneNotification,
     NewInfoNotification,
     NewMessagesNotification,
 )
-from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.notification_payload import NotificationInbox
-from glossogen.runtime.wait_registry import (
+from glossogen.scenario_contract.parked_wait import (
     DEFAULT_ANY_TIMEOUT_SECONDS,
     ParkedWait,
-    WaitRegistry,
     WakeReason,
-    wait_deadline,
 )
 
 CHANNEL = "link"
@@ -234,7 +233,7 @@ def test_taking_lifecycle_leaves_message_notices_and_read_positions_alone() -> N
     fixture.post_from_b(text="unread")
     briefing = NewInfoNotification(text="round 2", kind="injection")
     fixture.sessions["a"].push_notification(notification=briefing)
-    inbox = NotificationInbox(session=fixture.sessions["a"], channel_router=fixture.router)
+    inbox = SessionNotificationInbox(session=fixture.sessions["a"], channel_router=fixture.router)
     assert inbox.take_lifecycle() == [briefing]
     assert fixture.sessions["a"].get_last_seen_count(channel_id=CHANNEL) == 0
     assert fixture.sessions["a"].pending_notifications() == [

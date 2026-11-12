@@ -16,7 +16,6 @@ from functools import partial
 from typing import NamedTuple, Protocol
 
 from glossogen.evaluation.metric_core.mean_and_std import mean, population_std
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
 from glossogen.evaluation.metric_core.primary_channel_messages import (
     RoundMessages,
     collect_primary_messages_by_round,
@@ -25,9 +24,10 @@ from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
 )
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, ScenarioBase
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
 
 logger = logging.getLogger(__name__)
 

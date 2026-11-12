@@ -19,19 +19,22 @@ from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel_visibility import ChannelVisibility, ChannelVisibilityNone
 from glossogen.models.event import AgentRegistered, AgentSwappedMidRun
+from glossogen.models.scheduled_events import SwapAgent
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_replay.resume_context_writer import write_swap_resume_context_file
 from glossogen.run_storage.event_log_reader import load_events
-from glossogen.runners.agent_runner_base import AgentRunner
-from glossogen.runners.communication_protocol import (
+from glossogen.runtime.agent_runner import AgentRunner
+from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_router import compute_per_channel_join_index
+from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.scenario_contract.activity_notification import (
+    DoneNotification,
+    NewMessagesNotification,
+)
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     registered_runner_prompts,
 )
-from glossogen.runtime.activity_notification import DoneNotification, NewMessagesNotification
-from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.channel_router import compute_per_channel_join_index
-from glossogen.runtime.scheduled_events import SwapAgent
-from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
 

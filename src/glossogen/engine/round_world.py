@@ -11,7 +11,7 @@ owed, and ``begin_round`` clears both at a round boundary.
 """
 
 from glossogen.engine.team_declaration import TeamSpec
-from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 
 
 class RoundWorld(ScenarioWorld):

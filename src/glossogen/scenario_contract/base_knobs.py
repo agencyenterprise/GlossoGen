@@ -5,10 +5,9 @@ declares what is specific to it. Round count, phase durations, per-agent model
 overrides, scheduled in-run swaps and history compaction all live here and work
 the same everywhere.
 
-The four fields with no default are the ones a run cannot be described without:
-round count, round duration, the per-agent model map, and the per-round
-communication budget. Everything else has a default that suits a scenario not
-using that feature.
+The fields with no default are the ones a run cannot be described without:
+round count, round duration and the per-agent model map. Everything else has a
+default that suits a scenario not using that feature.
 """
 
 from typing import Annotated, Any, cast
@@ -18,8 +17,8 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_valida
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.compaction_config import CompactionConfig
-from glossogen.runtime.scheduled_events import ScheduledEvent
-from glossogen.scenarios.channel_noise import NoiseReplacementMode
+from glossogen.models.scheduled_events import ScheduledEvent
+from glossogen.scenario_contract.channel_noise import NoiseReplacementMode
 
 
 def _strip_text(value: object) -> object:
@@ -103,7 +102,7 @@ class BaseKnobs(BaseModel):
     scenario itself consumes, such as its case-generation seed or which model
     judges its rounds, are declared by the scenario, because a default here
     would describe behaviour the platform does not have. That is why there is
-    no ``judge_model``: three scenarios resolve their rounds without an LLM.
+    no ``judge_model``: some scenarios resolve their rounds without an LLM.
     """
 
     model_config = ConfigDict(extra="forbid")

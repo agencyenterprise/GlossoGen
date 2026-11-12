@@ -15,7 +15,6 @@ mean the generic set.
 
 import logging
 
-from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metrics.communication.communication_feature_presence_metric import (
     CommunicationFeaturePresenceMetric,
 )
@@ -61,6 +60,7 @@ from glossogen.evaluation.metrics.round_success_after_resume_metric import (
 from glossogen.evaluation.metrics.round_success_metric import RoundSuccessMetric
 from glossogen.evaluation.metrics.shorthand_codes_metric import ShorthandCodesMetric
 from glossogen.evaluation.metrics.slang_emergence_metric import SlangEmergenceMetric
+from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)

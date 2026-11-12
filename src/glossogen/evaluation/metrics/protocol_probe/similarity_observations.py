@@ -18,8 +18,8 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ValidationError
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
 from glossogen.evaluation.metric_core.sidecar_reading import key_text
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
 
 logger = logging.getLogger(__name__)
 

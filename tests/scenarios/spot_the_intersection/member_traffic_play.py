@@ -11,9 +11,9 @@ from typing import NamedTuple
 
 import pytest
 
-from glossogen.evaluation.metric_core.measurement import Measurement
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+from glossogen.scenario_contract.measurement import Measurement
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import EventGate, GatedTurn, SayTurn, ScriptedTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation

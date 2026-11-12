@@ -18,7 +18,6 @@ from glossogen.models.event_base import TokenUsage
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_storage.event_log_reader import load_events
-from glossogen.runners.communication_protocol import platform_runner_prompts
 from glossogen.runners.pydantic_ai_runner import (
     _StreamingState,  # pyright: ignore[reportPrivateUsage]
 )
@@ -27,6 +26,7 @@ from glossogen.runners.pydantic_ai_runner import (
 )
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
+from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
 
 _AGENT = "seat"
 _DETAILS = {"encrypted_content": "encrypted-summary"}

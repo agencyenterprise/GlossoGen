@@ -28,13 +28,13 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
+from glossogen.models.communication_tool_names import READ_CHANNEL_TOOL_NAME
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
-from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME
-from glossogen.runtime.notification_payload import (
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
+from glossogen.scenario_contract.notification_delivery import (
     DELIVERED_NOTIFICATION_ADAPTER,
     DeliveredNoActivity,
 )
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 

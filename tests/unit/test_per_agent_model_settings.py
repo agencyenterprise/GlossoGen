@@ -20,7 +20,7 @@ from glossogen.run_derivation.replace_agent import (
     read_replacement_settings,
     read_user_model_overrides,
 )
-from glossogen.scenarios.base_knobs import AgentModelOverride, BaseKnobs
+from glossogen.scenario_contract.base_knobs import AgentModelOverride, BaseKnobs
 
 QWEN = "Qwen/Qwen3.8-27B"
 RUN_SETTINGS = AgentModelSettings(max_tokens=16384, thinking="medium")

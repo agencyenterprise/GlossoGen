@@ -4,7 +4,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenarios.signal_game.ids import FILLS, PALETTE, SHAPES
 from glossogen.scenarios.signal_game.word_list import WORDS
 

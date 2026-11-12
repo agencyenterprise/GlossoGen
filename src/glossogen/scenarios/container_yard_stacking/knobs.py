@@ -11,7 +11,7 @@ from typing import Self
 
 from pydantic import model_validator
 
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenarios.container_yard_stacking.ids import DEFAULT_YARD_SLOT_COUNT
 
 

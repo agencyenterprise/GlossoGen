@@ -18,9 +18,9 @@ import logging
 
 from pydantic import ValidationError
 
+from glossogen.models.communication_tool_names import SEND_MESSAGE_TOOL_NAME
 from glossogen.models.event import MessageSent, SimulationEvent, ToolResultReceived
 from glossogen.models.mcp_responses import RecordedSendReceipt, SendStatus
-from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 

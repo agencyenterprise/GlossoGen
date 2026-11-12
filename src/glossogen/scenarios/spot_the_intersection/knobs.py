@@ -11,7 +11,7 @@ from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenarios.spot_the_intersection.board_generation import (
     BoardSettings,
     planted_per_board,

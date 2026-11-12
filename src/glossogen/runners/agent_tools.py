@@ -8,8 +8,11 @@ parameters are the schema the model sees. A tool refuses a call by raising
 words; any other exception is logged here and reaches the model as
 ``Error executing tool <name>``.
 
-``list_tool_definitions`` describes the same tools without binding an agent,
-for the ``agent_registered`` event and the ATIF export.
+The tools themselves are the runtime's ``ToolSpec`` list
+(:mod:`glossogen.runtime.agent_tool_specs`). ``list_tool_definitions`` describes
+them without binding an agent, with the schema pydantic-ai sends the model; the
+entry point hands it to the supervisor for the ``agent_registered`` event, and
+the ATIF export calls it directly.
 """
 
 import asyncio
@@ -17,30 +20,19 @@ import inspect
 import logging
 import typing
 from collections.abc import Awaitable, Callable
-from typing import Any, NamedTuple
+from typing import Any
 
 from pydantic import BaseModel
 from pydantic_ai import ModelRetry, Tool
 
+from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
+from glossogen.models.read_notifications_schema import read_notifications_tool_definition
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.read_notifications_tool import (
     RunTermination,
     build_read_notifications_tool,
 )
-from glossogen.runtime.communication_tools import (
-    BASE_TOOL_NAMES,
-    GET_CHANNEL_MEMBERS_DESCRIPTION,
-    GET_CHANNEL_MEMBERS_TOOL_NAME,
-    LIST_CHANNELS_DESCRIPTION,
-    LIST_CHANNELS_TOOL_NAME,
-    READ_CHANNEL_DESCRIPTION,
-    READ_CHANNEL_TOOL_NAME,
-    SEND_MESSAGE_TOOL_NAME,
-    build_get_channel_members,
-    build_list_channels,
-    build_read_channel,
-)
-from glossogen.runtime.read_notifications_schema import read_notifications_tool_definition
+from glossogen.runtime.agent_tool_specs import Executor, ToolSpec, tool_specs
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -53,58 +45,6 @@ the run, so a cycle is not aborted however many an agent collects.
 """
 
 AGENT_ID_PARAMETER = "agent_id"
-
-Executor = Callable[..., Awaitable[Any]]
-
-
-class ToolSpec(NamedTuple):
-    """One tool as the runtime offers it: its executor takes ``agent_id`` first."""
-
-    name: str
-    description: str
-    executor: Executor
-    timeout_s: float | None
-
-
-def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
-    """Every tool the runtime offers other than ``read_notifications``, in listing order."""
-    scenario = runtime.scenario
-    specs = [
-        ToolSpec(
-            name=READ_CHANNEL_TOOL_NAME,
-            description=READ_CHANNEL_DESCRIPTION,
-            executor=build_read_channel(runtime=runtime),
-            timeout_s=None,
-        ),
-        ToolSpec(
-            name=SEND_MESSAGE_TOOL_NAME,
-            description=scenario.send_message_description(),
-            executor=scenario.send_message_executor(),
-            timeout_s=None,
-        ),
-        ToolSpec(
-            name=LIST_CHANNELS_TOOL_NAME,
-            description=LIST_CHANNELS_DESCRIPTION,
-            executor=build_list_channels(runtime=runtime),
-            timeout_s=None,
-        ),
-        ToolSpec(
-            name=GET_CHANNEL_MEMBERS_TOOL_NAME,
-            description=GET_CHANNEL_MEMBERS_DESCRIPTION,
-            executor=build_get_channel_members(runtime=runtime),
-            timeout_s=None,
-        ),
-    ]
-    for scenario_tool in scenario.get_tools():
-        specs.append(
-            ToolSpec(
-                name=scenario_tool.name,
-                description=scenario_tool.description,
-                executor=scenario_tool.executor,
-                timeout_s=scenario.scenario_tool_timeout_s(),
-            )
-        )
-    return specs
 
 
 def build_agent_tools(
@@ -157,18 +97,6 @@ def list_tool_definitions(runtime: SimulationRuntime) -> list[RecordedToolDefini
         )
     )
     return definitions
-
-
-def select_tool_definitions(
-    definitions: list[RecordedToolDefinition],
-    tool_names: list[str],
-) -> list[RecordedToolDefinition]:
-    """The definitions of ``tool_names``, in that order, once each.
-
-    A name with no definition is skipped, and a repeated name is listed once.
-    """
-    by_name = {definition.name: definition for definition in definitions}
-    return [by_name[name] for name in dict.fromkeys(tool_names) if name in by_name]
 
 
 def _bind(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> Tool[None]:

@@ -15,9 +15,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.usage import RunUsage
 
 from glossogen.runners.agent_run_retry import agent_run_retry
-
-CLOSING_PROMPT_TIMEOUT_SECONDS = 300.0
-"""The longest the closing prompt may take, retries included, before the agent goes unasked."""
+from glossogen.runtime.agent_runner import CLOSING_PROMPT_TIMEOUT_SECONDS
 
 
 async def answer_closing_prompt(

@@ -28,16 +28,11 @@ from typing import NamedTuple, Self
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
-from glossogen.evaluation.metric_core.keyed_observation import KeyedObservation
-from glossogen.evaluation.metric_core.measurement import Measurement, RoundObservation
-from glossogen.evaluation.metric_core.metric_protocol import Metric
-from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
 from glossogen.evaluation.metric_core.primary_channel_messages import group_messages_by_round
 from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
 )
-from glossogen.evaluation.metric_core.scored_channels import scored_channel_ids
 from glossogen.evaluation.metric_core.sidecar_reading import key_text, read_jsonl_sidecar
 from glossogen.evaluation.metrics.language_repetition_sidecar import (
     LANGUAGE_REPETITION_SIDECAR_FILENAME,
@@ -47,7 +42,12 @@ from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
+from glossogen.scenario_contract.keyed_observation import KeyedObservation
+from glossogen.scenario_contract.measurement import Measurement, RoundObservation
+from glossogen.scenario_contract.metric_protocol import Metric
+from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
+from glossogen.scenario_contract.scored_channels import scored_channel_ids
 
 logger = logging.getLogger(__name__)
 

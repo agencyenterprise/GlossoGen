@@ -1,11 +1,11 @@
-"""Shared prompts and constants for the agent communication protocol.
+"""The platform's runner prompts, and which prompts an agent ran with.
 
 Agent runners use one communication protocol: agents call read_notifications(),
 read channels, send messages, and loop until done. The platform's prompt text
-lives in Jinja2 templates under ``runners/prompts/``. A scenario can replace the
-runner prompts with its own through ``SimulationScenario.runner_prompts``; the
-registration records the replacement, so a reconstruction renders what the run
-used.
+lives in Jinja2 templates under ``runner_prompts/`` beside this module. A
+scenario can replace the runner prompts with its own through
+``ScenarioBase.runner_prompts``; the registration records the replacement, so a
+reconstruction renders what the run used.
 """
 
 from collections.abc import Sequence
@@ -15,7 +15,7 @@ from glossogen.models.event import AgentRegistered, SimulationEvent
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.template_renderer import TemplateRenderer
 
-PROMPTS_DIR = Path(__file__).parent / "prompts"
+PROMPTS_DIR = Path(__file__).parent / "runner_prompts"
 
 _renderer = TemplateRenderer(prompts_dirs=[PROMPTS_DIR])
 

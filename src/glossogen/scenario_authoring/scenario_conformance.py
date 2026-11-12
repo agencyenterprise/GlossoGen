@@ -29,15 +29,15 @@ from typing import Any, NamedTuple, get_args
 
 from glossogen.evaluation.metric_core.generic_metric_names import GENERIC_METRIC_NAMES
 from glossogen.evaluation.metric_core.metric_registry import available_metrics
-from glossogen.evaluation.metric_core.protocol_probe_config import load_probe_questions
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.event import core_event_types, fixed_event_type, parser_for
 from glossogen.models.event_base import EventBase
 from glossogen.run_config.provider_credentials import credential_variable_names
-from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.scenario_contract.primary_channel_resolution import resolve_recorded_primary_channels
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.protocol_probe_config import load_probe_questions
 from glossogen.scenario_contract.registration import registered_scenarios
 from glossogen.template_renderer import TemplateRenderer
 

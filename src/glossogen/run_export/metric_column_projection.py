@@ -30,12 +30,12 @@ the counts behind it were previously legible only inside the unit string
 count for a fraction metric, and every per-round value is on the round table.
 """
 
-from glossogen.evaluation.metric_core.measurement import (
+from glossogen.run_export.csv_cell_text import render_cell, render_number
+from glossogen.scenario_contract.measurement import (
     AgentObservation,
     Measurement,
     RoundObservation,
 )
-from glossogen.run_export.csv_cell_text import render_cell, render_number
 
 METRIC_COLUMN_PREFIX = "metric."
 METRIC_SUMMARY_COLUMN_PREFIX = "metric_summary."

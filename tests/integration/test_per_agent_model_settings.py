@@ -11,7 +11,7 @@ import pytest
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered
-from glossogen.scenarios.base_knobs import AgentModelOverride
+from glossogen.scenario_contract.base_knobs import AgentModelOverride
 from glossogen.testing.simulation_harness import never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,

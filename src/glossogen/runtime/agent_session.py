@@ -10,7 +10,7 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any
 
-from glossogen.runtime.activity_notification import ActivityNotification, DoneNotification
+from glossogen.scenario_contract.activity_notification import ActivityNotification, DoneNotification
 
 logger = logging.getLogger(__name__)
 

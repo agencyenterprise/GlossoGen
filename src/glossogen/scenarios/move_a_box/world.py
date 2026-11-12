@@ -13,7 +13,7 @@ with the readings, step counts and log of the round unchanged.
 
 from typing import NamedTuple
 
-from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.move_a_box.depot import Cell, RoundDepot, TargetLayout, step
 from glossogen.scenarios.move_a_box.ids import (
     BASE_TEMPERATURE,

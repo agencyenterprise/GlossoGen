@@ -16,8 +16,8 @@ from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.agent_tools import list_tool_definitions
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
-from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.world_context import RuntimeWorldContext
 from glossogen.scenario_contract.event_types import loggable_event_types
 from glossogen.scenario_contract.recorded_scenario_rebuild import rebuild_recorded_scenario
 
@@ -55,7 +55,7 @@ def reconstruct_tool_definitions(
         event_logger=event_logger,
         agent_sessions={},
         agent_tool_allowlists={},
-        world_context=WorldContext(agent_sessions={}, event_logger=event_logger),
+        world_context=RuntimeWorldContext(agent_sessions={}, event_logger=event_logger),
         agent_configs=[],
         simulation_start_time=datetime.now(tz=UTC),
     )

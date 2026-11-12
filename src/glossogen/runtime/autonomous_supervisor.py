@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
@@ -22,21 +23,19 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
+from glossogen.models.scheduled_events import SwapAgent
 from glossogen.run_replay.message_rewind import RewindState
-from glossogen.runners.agent_runner_base import AgentRunner
-from glossogen.runners.agent_tools import list_tool_definitions, select_tool_definitions
-from glossogen.runners.closing_prompt import CLOSING_PROMPT_TIMEOUT_SECONDS
-from glossogen.runtime.activity_notification import NewMessagesNotification
+from glossogen.runtime.agent_runner import CLOSING_PROMPT_TIMEOUT_SECONDS, AgentRunner
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
+from glossogen.runtime.agent_tool_specs import ToolDefinitionLister, select_tool_definitions
 from glossogen.runtime.channel_router import compute_per_channel_join_index
-from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
-from glossogen.runtime.scenario_world import WorldContext
-from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.runtime.world_context import RuntimeWorldContext
+from glossogen.scenario_contract.activity_notification import NewMessagesNotification
 from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
@@ -53,7 +52,13 @@ class _RunSpend(NamedTuple):
 
 
 class AutonomousSupervisor:
-    """Launches the game clock and the agent runners for a simulation."""
+    """Launches the game clock and the agent runners for a simulation.
+
+    The entry point supplies the agent framework: ``runner_factory`` builds one
+    ``AgentRunner`` per agent, and ``list_tool_definitions`` gives the tool
+    definitions that framework sends the model, which ``AgentRegistered``
+    records. The runtime imports no runner implementation.
+    """
 
     def __init__(
         self,
@@ -63,6 +68,7 @@ class AutonomousSupervisor:
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
         runner_factory: Callable[[], AgentRunner],
+        list_tool_definitions: ToolDefinitionLister,
         resume_state: RewindState | None,
         run_id: str,
         provider: str,
@@ -75,6 +81,7 @@ class AutonomousSupervisor:
         self._idle_round_may_end = idle_round_may_end
         self._phase_timed_out = phase_timed_out
         self._runner_factory = runner_factory
+        self._list_tool_definitions = list_tool_definitions
         self._resume_state = resume_state
         self._run_id = run_id
         self._provider = provider
@@ -286,7 +293,7 @@ class AutonomousSupervisor:
         }
 
         # Build the world context (needs sessions and logger, not the runtime).
-        world_context = WorldContext(
+        world_context = RuntimeWorldContext(
             agent_sessions=agent_sessions,
             event_logger=self._event_logger,
         )
@@ -422,7 +429,7 @@ class AutonomousSupervisor:
                     timestamp=simulation_start_time,
                 )
             )
-        tool_definitions = list_tool_definitions(runtime=runtime)
+        tool_definitions = self._list_tool_definitions(runtime=runtime)
         for config in self._agent_configs:
             # Sorted because BASE_TOOL_NAMES is a frozenset: unpacking it wrote a
             # different order on every run, so two identical runs logged

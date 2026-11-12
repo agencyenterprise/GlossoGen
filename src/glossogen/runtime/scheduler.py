@@ -10,7 +10,7 @@ new agent receives the round's injection just like any other.
 import logging
 from typing import Any, Protocol
 
-from glossogen.runtime.scheduled_events import ScheduledEvent, SetPostmortem, SwapAgent
+from glossogen.models.scheduled_events import ScheduledEvent, SetPostmortem, SwapAgent
 
 logger = logging.getLogger(__name__)
 

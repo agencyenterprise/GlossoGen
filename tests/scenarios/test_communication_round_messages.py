@@ -10,12 +10,12 @@ from typing import Protocol
 
 import pytest
 
-from glossogen.evaluation.metrics.communication.round_view import (
+from glossogen.models.event import MessageSent, SimulationEvent
+from glossogen.models.message import SimulationMessage
+from glossogen.scenario_contract.communication_round_view import (
     CommunicationMessageLine,
     CommunicationRoundView,
 )
-from glossogen.models.event import MessageSent, SimulationEvent
-from glossogen.models.message import SimulationMessage
 from glossogen.scenarios.container_yard_stacking.evaluation import (
     build_communication_rounds as container_yard_stacking,
 )

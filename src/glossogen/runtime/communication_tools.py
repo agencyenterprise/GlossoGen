@@ -4,7 +4,8 @@ Every agent is offered these unless the scenario withholds one through
 ``hidden_base_tools``. ``send_message`` is the scenario's
 ``send_message_executor`` and ``read_notifications`` lives in
 ``glossogen.runners.read_notifications_tool``; the three built here read
-channels and memberships. Each executor takes ``agent_id`` first, as a scenario
+channels and memberships. The tool names are in
+``glossogen.models.communication_tool_names``. Each executor takes ``agent_id`` first, as a scenario
 tool's does, and refuses with ``ValueError``, which the runner hands the agent
 as the tool's error.
 """
@@ -12,26 +13,9 @@ as the tool's error.
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from glossogen.models.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
-from glossogen.runtime.elapsed_time import elapsed_seconds_since_start
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.simulation_state import SimulationRuntime
-
-READ_CHANNEL_TOOL_NAME = "read_channel"
-SEND_MESSAGE_TOOL_NAME = "send_message"
-LIST_CHANNELS_TOOL_NAME = "list_channels"
-GET_CHANNEL_MEMBERS_TOOL_NAME = "get_channel_members"
-
-BASE_TOOL_NAMES: frozenset[str] = frozenset(
-    {
-        READ_NOTIFICATIONS_TOOL_NAME,
-        READ_CHANNEL_TOOL_NAME,
-        SEND_MESSAGE_TOOL_NAME,
-        LIST_CHANNELS_TOOL_NAME,
-        GET_CHANNEL_MEMBERS_TOOL_NAME,
-    }
-)
-"""The tools every agent is offered unless the scenario withholds one."""
 
 READ_CHANNEL_DESCRIPTION = (
     "Read the last N messages from a channel. Each message includes the name of the "

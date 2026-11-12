@@ -26,7 +26,7 @@ from glossogen.run_replay.resume_state_loader import (
     read_replace_manifest_info,
     replaced_seat_history_filter,
 )
-from glossogen.runners.communication_protocol import (
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     registered_runner_prompts,
 )

@@ -9,8 +9,8 @@ for it: its own event types, its own metrics and its run-detail extension.
 
 from collections.abc import Sequence
 
-from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.models.event_base import EventBase
+from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 

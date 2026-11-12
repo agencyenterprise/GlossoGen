@@ -228,7 +228,7 @@ directly in `scenario.py`. Every other shipped scenario declares.
 Subclass `RoundWorld`
 ([round_world.py](../src/glossogen/engine/round_world.py)) when the scenario
 meters a per-round budget, which almost all do. Plain `ScenarioWorld`
-([scenario_world.py](../src/glossogen/runtime/scenario_world.py)) only when it
+([scenario_world.py](../src/glossogen/scenario_contract/scenario_world.py)) only when it
 meters nothing. The world mutates state synchronously in `on_message`, reacts
 asynchronously in `on_message_async` (pushing notifications through
 `context.send_update_to_channel`), and holds the state the round verdict reads.
@@ -265,11 +265,11 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `knobs_model()`, `get_knobs()`, `create_from_config(config)` | Your knobs class; the held instance; the validating factory |
 | `get_agent_roles(knobs)` | The `(agent_id, role_name)` pairs preflight validates model overrides against. Takes the run's prepared config, or `None` for the baseline roster; read knob values by validating the dict through `cls.knobs_model()`, or one boolean flag with `cls.resolve_bool_knob(...)` |
 | `get_agents()`, `get_channels()` | Delegations to `team_structure.build_agent_configs(...)` and `team_structure.channels(...)`, never hand-written lists. You supply the `render_system_prompt` callback |
-| `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/runtime/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
+| `get_world()`, `get_tools()` | Construct the world from the same specs; one [`ScenarioTool`](../src/glossogen/scenario_contract/scenario_tool.py) per scenario tool. An executor takes `agent_id` first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising `ValueError`, and the agent reads its message as the tool's error; any other exception reaches the agent only as `Error executing tool <name>` |
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
-| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/runtime/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
+| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/models/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
 | `validate_outgoing_message(...)`, `transform_outgoing_message(...)` | Enforce and mutate messages: budget refusal, noise injection |
 | `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock. It must not spell a `RoundEndTrigger` value; the clock raises on one |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |
@@ -553,7 +553,7 @@ live answer with the one from a rebuilt history.
 A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. `schedule_wait_timeout` and `clock_now_s`
 default to the wall clock, `scenario_tool_timeout_s` to
-`SCENARIO_TOOL_TIMEOUT_SECONDS` from `runtime/scenario_tool.py`, and the rest to
+`SCENARIO_TOOL_TIMEOUT_SECONDS` from `scenario_contract/scenario_tool.py`, and the rest to
 doing nothing.
 
 | Hook | Called |

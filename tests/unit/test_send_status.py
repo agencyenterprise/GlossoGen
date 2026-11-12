@@ -3,9 +3,9 @@
 import json
 
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
+from glossogen.models.communication_tool_names import SEND_MESSAGE_TOOL_NAME
 from glossogen.models.event import SimulationEvent, ToolResultReceived
 from glossogen.models.mcp_responses import SendMessageResult, SendStatus
-from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.scenarios.textcraft_shared_workspace.tool_results import WorkspaceSendResult
 from glossogen.testing.simulation_harness import send_status_of
 

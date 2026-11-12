@@ -24,13 +24,13 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationEvent,
 )
+from glossogen.models.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest, prepare_replace_agent_run
 from glossogen.run_storage.derived_run_start import derived_run_started_at
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_discovery import scan_jsonl
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
-from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
 from glossogen.server.runs.detail_reader import load_run_detail
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import never_times_out, resume_simulation, run_simulation

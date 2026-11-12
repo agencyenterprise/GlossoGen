@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from glossogen.runtime.scheduled_events import InjectCase, ScheduledEvent, SetPostmortem
+from glossogen.models.scheduled_events import InjectCase, ScheduledEvent, SetPostmortem
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 
 

@@ -61,23 +61,23 @@ from glossogen.models.event import (
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
-from glossogen.runners.agent_run_result import AgentRunResult
 from glossogen.runners.agent_run_retry import agent_run_retry
-from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.closing_prompt import answer_closing_prompt
-from glossogen.runners.communication_protocol import (
-    COMPACTION_INSTRUCTIONS,
-    build_full_system_prompt,
-    runner_prompts_for,
-)
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.open_model_anti_corruption_layer import open_model_capabilities
 from glossogen.runners.read_notifications_tool import RunTermination
+from glossogen.runtime.agent_run_result import AgentRunResult
+from glossogen.runtime.agent_runner import AgentRunner
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.streaming_event import AgentCostUpdated
+from glossogen.scenario_contract.platform_runner_prompts import (
+    COMPACTION_INSTRUCTIONS,
+    build_full_system_prompt,
+    runner_prompts_for,
+)
 from glossogen.telemetry.telemetry_round_processor import current_round_source
 
 logger = logging.getLogger(__name__)

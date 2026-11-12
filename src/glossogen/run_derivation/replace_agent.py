@@ -65,8 +65,8 @@ from glossogen.run_storage.replace_manifest import (
 from glossogen.run_storage.run_archive import claim_run_dir, copy_run_at_event, find_event_offset
 from glossogen.run_storage.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_storage.run_identity import compose_run_id
+from glossogen.scenario_contract.base_knobs import AgentModelOverride
 from glossogen.scenario_contract.loader import get_scenario_class
-from glossogen.scenarios.base_knobs import AgentModelOverride
 
 logger = logging.getLogger(__name__)
 

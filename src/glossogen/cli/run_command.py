@@ -36,6 +36,7 @@ from glossogen.run_storage.derived_run_start import derived_run_started_at
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_archive import claim_run_dir
 from glossogen.run_storage.run_file_paths import debug_log_path, event_log_path
+from glossogen.runners.agent_tools import list_tool_definitions
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
 from glossogen.runtime.event_bus import EventBus
@@ -362,6 +363,7 @@ async def _run_simulation(
         idle_round_may_end=minimum_duration_elapsed,
         phase_timed_out=wall_clock_phase_timeout,
         runner_factory=_make_runner,
+        list_tool_definitions=list_tool_definitions,
         resume_state=resume_state,
         run_id=run_id,
         provider=args.provider,

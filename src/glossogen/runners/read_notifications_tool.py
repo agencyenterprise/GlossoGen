@@ -19,19 +19,17 @@ from pydantic_ai import RunContext, Tool
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
 from glossogen.models.event import AgentResumed, RunStatus, WaitRegistered
-from glossogen.runtime.notification_payload import (
-    NotificationInbox,
-    Wake,
-    render_parallel_rejection,
-)
-from glossogen.runtime.read_notifications_schema import (
+from glossogen.models.read_notifications_schema import (
     READ_NOTIFICATIONS_TOOL_NAME,
     ReadNotificationsArguments,
     read_notifications_arguments_model,
     read_notifications_description,
 )
+from glossogen.runtime.session_notification_inbox import SessionNotificationInbox
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.runtime.wait_registry import WakeReason, wait_deadline
+from glossogen.runtime.wait_registry import wait_deadline
+from glossogen.scenario_contract.notification_delivery import Wake, render_parallel_rejection
+from glossogen.scenario_contract.parked_wait import WakeReason
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +87,7 @@ def build_read_notifications_tool(
         session = runtime.resolve_session(agent_id=agent_id)
         if _called_with_siblings(messages=ctx.messages):
             logger.info("Agent %s read_notifications rejected: parallel call", agent_id)
-            inbox = NotificationInbox(session=session, channel_router=runtime.channel_router)
+            inbox = SessionNotificationInbox(session=session, channel_router=runtime.channel_router)
             return render_parallel_rejection(
                 current_round=runtime.current_round,
                 pending_count=inbox.remaining(),
@@ -147,7 +145,7 @@ async def _park_and_render(
         wait_for=arguments.wait_kind,
         reasons=signal.reasons,
         waited_seconds=signal.waited_seconds,
-        inbox=NotificationInbox(session=session, channel_router=runtime.channel_router),
+        inbox=SessionNotificationInbox(session=session, channel_router=runtime.channel_router),
         terminated=terminated,
         done_reason=session.done_reason,
         release_detail=signal.release_detail,
