@@ -11,16 +11,20 @@ scenario is not loaded.
 from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.scenario_contract.protocol import SimulationScenario
+from glossogen.scenario_contract.registration import same_scenario_definition
 from glossogen.scenario_contract.scenario_sources import (
     load_configured_scenario_catalog_unless_loaded,
 )
 
 
 def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> None:
-    """Assert the catalog resolves ``scenario_cls.name()`` to this exact class.
+    """Assert the catalog resolves ``scenario_cls.name()`` to this class.
 
-    Loads the catalog the working directory configures first if the test
-    process has not loaded one, so run it from the project root, as pytest is.
+    The class the catalog holds counts as this one when it is the same
+    definition: the same file imported under another module name, as a test that
+    imports its scenario by a shorter name than the project scan does. Loads the
+    catalog the working directory configures first if the test process has not
+    loaded one, so run it from the project root, as pytest is.
     """
     load_configured_scenario_catalog_unless_loaded()
     name = scenario_cls.name()
@@ -30,7 +34,7 @@ def assert_scenario_is_registered(scenario_cls: type[SimulationScenario]) -> Non
             f"the configured scenario sources do not load {name!r}. Add the file or "
             "folder defining it to [tool.glossogen] scenarios in pyproject.toml."
         )
-    if resolved is not scenario_cls:
+    if not same_scenario_definition(first=resolved, second=scenario_cls):
         raise AssertionError(
             f"{name!r} resolves to {resolved.__module__}.{resolved.__qualname__}, "
             f"not {scenario_cls.__module__}.{scenario_cls.__qualname__}."

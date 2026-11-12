@@ -18,8 +18,10 @@ Templates are rendered with `<<name>>` delimiters rather than Jinja's own, so th
 prompt templates they emit keep their `{{ }}` for the platform to render later.
 """
 
+import importlib.util
 import logging
 import sys
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import NamedTuple
 
@@ -57,7 +59,12 @@ def scenario_class_prefix(scenario_name: str) -> str:
 
 
 def check_scenario_name(scenario_name: str) -> None:
-    """Raise ``ScaffoldError`` unless the name can be used everywhere it is used."""
+    """Raise ``ScaffoldError`` unless the name can be used everywhere it is used.
+
+    Besides its shape, the name must not be a loaded scenario's, nor a module
+    this process can already import: the standard library, an installed
+    package, or a folder on the import path.
+    """
     if not is_valid_scenario_name(name=scenario_name):
         raise ScaffoldError(
             f"{scenario_name!r} is not usable as a scenario name. It becomes a Python "
@@ -70,20 +77,40 @@ def check_scenario_name(scenario_name: str) -> None:
             "registering one name stop every glossogen command that loads both. Pick "
             "another name."
         )
+    shadowed = importlib.util.find_spec(scenario_name)
+    if shadowed is not None:
+        raise ScaffoldError(
+            f"{scenario_name!r} is already an importable module here "
+            f"({_spec_location(spec=shadowed)}). The scenario folder would be imported "
+            f"under the same name, so it would hide that module, or that module would "
+            "hide the folder, and glossogen commands, tests and libraries that import "
+            f"{scenario_name!r} would break. Pick another name."
+        )
+
+
+def _spec_location(spec: ModuleSpec) -> str:
+    """Return where a module spec points: its file, its folders, or how it is provided."""
+    if spec.has_location and spec.origin is not None:
+        return spec.origin
+    if spec.submodule_search_locations:
+        return ", ".join(str(location) for location in spec.submodule_search_locations)
+    if spec.origin is not None:
+        return spec.origin
+    return "no file"
 
 
 def write_scenario_folder(scenario_name: str, target_dir: Path) -> ScaffoldedScenario:
     """Write the folder for ``scenario_name`` as ``target_dir/<scenario_name>/``.
 
-    Raises ``ScaffoldError`` when the name is unusable, when a loaded scenario
-    holds it, or when the destination already exists. Nothing is written until
+    Raises ``ScaffoldError`` when the destination already exists, when the name
+    is unusable, when a loaded scenario holds it, or when it is already an
+    importable module. Nothing is written until
     every check has passed, so a refusal leaves no partial folder.
     """
-    check_scenario_name(scenario_name)
-
     scenario_dir = target_dir / scenario_name
     if scenario_dir.exists():
         raise ScaffoldError(f"{scenario_dir} already exists. Move it aside or pick another name.")
+    check_scenario_name(scenario_name=scenario_name)
 
     variables = {
         "scenario_name": scenario_name,

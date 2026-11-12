@@ -419,11 +419,11 @@ def test_a_source_that_is_neither_a_path_nor_a_module_is_refused(tmp_path: Path)
 
 
 def test_a_file_that_fails_to_import_is_named(tmp_path: Path) -> None:
-    """The error says which file, from which source, and why."""
+    """The error says which file, from which configured source, and why."""
     write(
         root=tmp_path,
         files={
-            "pyproject.toml": "",
+            "pyproject.toml": '[tool.glossogen]\nscenarios = ["."]\n',
             "scen.py": decorated_module(name="broken") + "\nraise RuntimeError('boom')\n",
         },
     )
@@ -440,7 +440,7 @@ def test_two_files_registering_one_name_are_refused(tmp_path: Path) -> None:
     write(
         root=tmp_path,
         files={
-            "pyproject.toml": "",
+            "pyproject.toml": '[tool.glossogen]\nscenarios = ["a", "b"]\n',
             "a/scen.py": decorated_module(name="twice"),
             "b/scen.py": decorated_module(name="twice"),
         },
@@ -463,5 +463,5 @@ def test_a_scan_reading_many_files_suggests_configuring_sources(
     with caplog.at_level(logging.WARNING):
         load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
 
-    assert "read 3 .py files" in caplog.text
+    assert "after reading 2 .py files" in caplog.text
     assert "[tool.glossogen]" in caplog.text

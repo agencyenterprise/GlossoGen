@@ -10,7 +10,8 @@ set decides the rest:
 
 When none is set, the project directory is scanned: the directory holding that
 ``pyproject.toml``, or the working directory when there is none. An empty list in
-any of the three, ``scenarios = []`` included, means no scan.
+any of the three, ``scenarios = []`` and ``--scenarios ""`` included, means no
+scan.
 
 A source is a path when it names an existing file or directory, and a module
 name otherwise. Nothing here reads a run's data: what a process imports comes
@@ -22,6 +23,7 @@ parent loaded, and ``PYTHONPATH`` extended with the directories they import from
 same names whatever its working directory, without scanning.
 """
 
+import logging
 import os
 import tomllib
 from collections.abc import Mapping, Sequence
@@ -30,6 +32,7 @@ from typing import NamedTuple, cast
 
 import glossogen
 from glossogen.scenario_contract.catalog import (
+    SINGLE_MODULE_ENTRY_SUFFIX,
     ScenarioCatalog,
     ScenarioCatalogError,
     ScenarioSource,
@@ -42,8 +45,11 @@ from glossogen.scenario_contract.scenario_source_kinds import (
     DirectorySource,
     FileSource,
     ModuleSource,
+    SingleModuleSource,
     is_module_name_part,
 )
+
+logger = logging.getLogger(__name__)
 
 SCENARIOS_ENV_VAR = "GLOSSOGEN_SCENARIOS"
 PYTHON_PATH_ENV_VAR = "PYTHONPATH"
@@ -51,7 +57,8 @@ RUNS_DIR_ENV_VAR = "GLOSSOGEN_RUNS_DIR"
 PYPROJECT_NAME = "pyproject.toml"
 
 # The runs directory the CLI commands default to, relative to the working
-# directory. Skipped by every scan whether or not the command names it.
+# directory. Skipped by every scan whether or not the command names it, under the
+# project root as well as under the working directory.
 DEFAULT_RUNS_DIR_NAME = "runs"
 
 
@@ -85,17 +92,26 @@ def resolve_scenario_sources(
     """Return the sources this process loads: the built-ins, then the configured ones.
 
     ``runs_dirs`` are the runs directories the command reads or writes; every
-    directory source skips them, as it does the installed glossogen package.
+    directory source skips them, read relative to the working directory and to
+    the project root, as it does the installed glossogen package. Blank
+    ``--scenarios`` values are ignored, so ``--scenarios ""`` loads the built-ins
+    only.
     Raises :class:`ScenarioCatalogError` for a source that is neither an existing
     path nor a module name, or a ``[tool.glossogen]`` table that cannot be read.
     """
     project = find_project(working_dir=working_dir)
-    skipped = _skipped_paths(working_dir=working_dir, environ=environ, runs_dirs=runs_dirs)
+    skipped = _skipped_paths(
+        working_dir=working_dir,
+        project_root=project.root,
+        environ=environ,
+        runs_dirs=runs_dirs,
+    )
     builder = _SourceBuilder(project_root=project.root, skipped_paths=skipped)
     if cli_sources:
         configured = [
             builder.source_for(spec=spec, base_dir=working_dir, origin="--scenarios")
             for spec in cli_sources
+            if spec.strip()
         ]
     elif SCENARIOS_ENV_VAR in environ:
         configured = [
@@ -117,7 +133,12 @@ def path_source(path: Path, working_dir: Path, origin: str) -> ScenarioSource:
     project = find_project(working_dir=working_dir)
     builder = _SourceBuilder(
         project_root=project.root,
-        skipped_paths=_skipped_paths(working_dir=working_dir, environ=os.environ, runs_dirs=()),
+        skipped_paths=_skipped_paths(
+            working_dir=working_dir,
+            project_root=project.root,
+            environ=os.environ,
+            runs_dirs=(),
+        ),
     )
     resolved = (working_dir / path).resolve()
     if not resolved.exists():
@@ -174,14 +195,24 @@ def child_process_environment() -> dict[str, str]:
 
 
 def _skipped_paths(
-    working_dir: Path, environ: Mapping[str, str], runs_dirs: Sequence[Path]
+    working_dir: Path,
+    project_root: Path,
+    environ: Mapping[str, str],
+    runs_dirs: Sequence[Path],
 ) -> frozenset[Path]:
-    """Return the directories a directory source never descends into, resolved."""
-    candidates = [Path(glossogen.__file__).parent, working_dir / DEFAULT_RUNS_DIR_NAME]
-    candidates.extend(working_dir / runs_dir for runs_dir in runs_dirs)
+    """Return the directories a directory source never descends into, resolved.
+
+    Each runs directory is read relative to the working directory and to the
+    project root, so the project's ``runs/`` is skipped from any subdirectory.
+    An absolute one is the same path either way.
+    """
+    relative = [Path(DEFAULT_RUNS_DIR_NAME), *runs_dirs]
     configured_runs_dir = environ.get(RUNS_DIR_ENV_VAR)
     if configured_runs_dir:
-        candidates.append(working_dir / configured_runs_dir)
+        relative.append(Path(configured_runs_dir))
+    candidates = [Path(glossogen.__file__).parent]
+    for runs_dir in relative:
+        candidates.extend((working_dir / runs_dir, project_root / runs_dir))
     return frozenset(candidate.resolve() for candidate in candidates)
 
 
@@ -203,6 +234,7 @@ class _SourceBuilder(NamedTuple):
             return FileSource(
                 path=path,
                 import_root=self._import_root(path=path),
+                inside_project=self._inside_project(path=path),
                 spec=stripped,
                 origin=origin,
             )
@@ -211,10 +243,16 @@ class _SourceBuilder(NamedTuple):
                 path=path,
                 import_root=self._import_root(path=path),
                 skipped_paths=self.skipped_paths,
+                inside_project=self._inside_project(path=path),
+                is_project_scan=False,
                 spec=stripped,
                 origin=origin,
             )
         if stripped and all(is_module_name_part(part=part) for part in stripped.split(".")):
+            if stripped.endswith(SINGLE_MODULE_ENTRY_SUFFIX):
+                return SingleModuleSource(
+                    module=stripped.removesuffix(SINGLE_MODULE_ENTRY_SUFFIX), origin=origin
+                )
             return ModuleSource(module=stripped, origin=origin)
         raise ScenarioCatalogError(
             f"Scenario source {stripped!r} ({origin}) is not a file or directory under "
@@ -227,6 +265,8 @@ class _SourceBuilder(NamedTuple):
             path=self.project_root,
             import_root=self.project_root,
             skipped_paths=self.skipped_paths,
+            inside_project=True,
+            is_project_scan=True,
             spec=str(self.project_root),
             origin="scan of the project directory; no sources configured",
         )
@@ -238,20 +278,34 @@ class _SourceBuilder(NamedTuple):
         so a file outside the project imports as its own stem and a directory as
         its own name.
         """
-        if path == self.project_root:
-            return path
-        if self.project_root in path.parents:
+        if self._inside_project(path=path):
             return self.project_root
         return path.parent
 
+    def _inside_project(self, path: Path) -> bool:
+        """Return whether ``path`` is the project root or under it."""
+        return path == self.project_root or self.project_root in path.parents
+
 
 def _pyproject_sources(project: ProjectLocation, builder: _SourceBuilder) -> list[ScenarioSource]:
-    """Return the sources ``[tool.glossogen] scenarios`` lists, or the project scan."""
+    """Return the sources ``[tool.glossogen] scenarios`` lists, or the project scan.
+
+    With no ``pyproject.toml`` the scan starts at the working directory, which
+    may be far more than a project, so that is logged before the walk starts.
+    """
     if project.pyproject is None:
+        logger.warning(
+            "No pyproject.toml at or above %s, so the scan for scenarios starts there "
+            "and reads every .py file below it. Add a pyproject.toml with "
+            "[tool.glossogen] scenarios naming where scenarios live (scenarios = [] "
+            "for none), or set GLOSSOGEN_SCENARIOS.",
+            project.root,
+        )
         return [builder.directory_scan()]
     try:
         document = tomllib.loads(project.pyproject.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:
+        logger.exception("Could not parse %s", project.pyproject)
         raise ScenarioCatalogError(
             f"{project.pyproject} is not valid TOML, so its [tool.glossogen] scenarios "
             f"cannot be read: {exc}"

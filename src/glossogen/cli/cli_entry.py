@@ -54,6 +54,8 @@ from glossogen.scenario_contract.catalog import ScenarioCatalogError, ScenarioNo
 from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_contract.scenario_sources import load_configured_scenario_catalog
 
+logger = logging.getLogger(__name__)
+
 
 class _CommandHandler(Protocol):
     """A subcommand that runs to completion on its parsed flags."""
@@ -72,8 +74,8 @@ class _AsyncCommandHandler(Protocol):
 
 
 # The subcommands that parse every flag strictly. `run` and `evaluate` are absent:
-# they resolve the scenario first and parse a second time, keeping `run`'s trailing
-# key=value overrides.
+# `run` resolves the scenario first and parses a second time, keeping its trailing
+# key=value overrides; `evaluate` parses strictly, then resolves the scenario.
 _SYNC_COMMANDS: dict[str, _CommandHandler] = {
     "serve": handle_serve,
     "validate": handle_validate,
@@ -183,10 +185,12 @@ def main() -> None:
             cli_sources=source_arguments.scenarios, runs_dirs=source_arguments.runs_dirs
         )
     except ScenarioCatalogError as refusal:
+        logger.exception("Could not load scenarios")
         raise SystemExit(f"Could not load scenarios: {refusal}") from refusal
     try:
         _dispatch()
     except ScenarioNotLoaded as missing:
+        logger.exception("The command named a scenario this process has not loaded")
         raise SystemExit(str(missing)) from missing
 
 
@@ -206,12 +210,16 @@ def _dispatch() -> None:
         asyncio.run(async_handler(args=parser.parse_args()))
         return
 
+    if known_args.command == "evaluate":
+        # Strict before the scenario is resolved, so a misplaced flag such as
+        # `--scenarios` is reported as such rather than as a scenario not loaded.
+        args = parser.parse_args()
+        scenario_cls = get_scenario_class(name=args.scenario_name)
+        asyncio.run(handle_evaluate(args=args, scenario_cls=scenario_cls))
+        return
+
     scenario_cls = get_scenario_class(name=known_args.scenario_name)
 
     # Second pass: parse known flags and capture remaining key=value overrides.
     args, remaining = parser.parse_known_args()
-
-    if args.command == "run":
-        handle_run(parser=parser, args=args, remaining=remaining, scenario_cls=scenario_cls)
-    else:
-        asyncio.run(handle_evaluate(args=args, scenario_cls=scenario_cls))
+    handle_run(parser=parser, args=args, remaining=remaining, scenario_cls=scenario_cls)

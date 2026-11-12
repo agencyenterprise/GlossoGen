@@ -381,6 +381,38 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- `glossogen new-scenario` refuses a name that is already an importable module
+  (`signal`, `secrets`, an installed package, `glossogen`), before writing
+  anything. Such a folder hid that module and stopped every later command.
+- `validate <path>` on a src-layout project checks `package-data` under the
+  package's import name (`mypack.x`), not its path from the project root
+  (`src.mypack.x`).
+- One scenario file imported under two module names, such as `src.mypack.x` by
+  the project scan and `mypack.x` by the pack's tests, registers one scenario
+  instead of raising that the name is registered twice.
+- `glossogen evaluate` rejects arguments it does not know, so `--scenarios`
+  after the subcommand is an error, as for every other subcommand. The
+  scenario-not-loaded message says `--scenarios` goes before the subcommand.
+- `--scenarios ""` loads the built-ins only, like an empty
+  `GLOSSOGEN_SCENARIOS`, instead of scanning the working directory.
+- The project scan reads a project folder, or a configured folder, named like a
+  folder it skips (`tests`, `build`, `env`, `_lab`); the skip rules apply below
+  it. The project's `runs/` is skipped from any subdirectory.
+- The project scan skips a file that fails to import, or that registers a name
+  already taken, with a warning naming the file and the error, and carries on;
+  `--help` works whatever it finds. Configured sources still fail the command.
+- The project scan stops at its file limit instead of walking the whole tree,
+  warning when it does, and warns before walking when no `pyproject.toml` is
+  above the working directory.
+- A child process imports exactly the files its parent's scan imported, not the
+  whole package around a decorated `__init__.py`.
+- A line of an undeclared event type with no `event_id` or `timestamp` is
+  skipped and counted in the reader's warning instead of failing the read.
+- `event_types()` returning something that is not an `EventBase` subclass fails
+  the load with an error naming the scenario.
+- The `spot_the_intersection` `audit_recorded_boards` and `veyru`
+  `inspect_replaced_agent_input` scripts load the scenario catalog before
+  reading a run.
 - Signing in from a link into `/g/<slug>/...` lands on that link. The group
   layout sent a signed-out visitor to `/sign-in` without the requested URL, so
   the identity provider fell back to its default page after sign-in. The

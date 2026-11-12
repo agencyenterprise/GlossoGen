@@ -19,6 +19,9 @@ from pathlib import Path
 
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.scenario_contract.scenario_sources import (
+    load_configured_scenario_catalog_unless_loaded,
+)
 from glossogen.scenarios.spot_the_intersection.recorded_board_audit import audit_events
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
 
@@ -54,6 +57,7 @@ def main() -> None:
     )
     parser.add_argument("run_dirs", nargs="+", type=Path)
     args = parser.parse_args()
+    load_configured_scenario_catalog_unless_loaded()
     if not asyncio.run(audit_all(run_dirs=args.run_dirs)):
         sys.exit(1)
 
