@@ -144,6 +144,9 @@ Copy its shape. This one, saved as `word_count_metric.py` beside your scenario's
 module, runs as written:
 
 ```python
+"""A word-count metric for reactor_purge."""
+
+import logging
 from pathlib import Path
 
 from glossogen.evaluation.metric_core.primary_channel_messages import (
@@ -158,6 +161,8 @@ from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 from glossogen.scenario_contract.scored_channels import scored_channel_ids
+
+logger = logging.getLogger(__name__)
 
 
 class ExternalWordCountMetric(Metric):
@@ -186,6 +191,7 @@ class ExternalWordCountMetric(Metric):
                 for text in round_messages.texts
             ]
             if not counts:
+                logger.info("%s: no messages on %s, skipping", self.name, channel.channel_id)
                 continue
             mean = sum(counts) / len(counts)
             measurements.append(
@@ -239,7 +245,8 @@ runs and the API rejects.
 
 If the metric only makes sense for one scenario, neither list is touched. The
 scenario returns the class from `scenario_metrics()`, and the module defining it
-can live anywhere, usually that scenario's `evaluation/` directory:
+can live anywhere, usually that scenario's `evaluation/` directory. Add these
+imports to the scenario's module:
 
 ```python
 from collections.abc import Sequence
@@ -247,10 +254,12 @@ from collections.abc import Sequence
 from glossogen.scenario_contract.metric_protocol import Metric
 
 from .word_count_metric import ExternalWordCountMetric
+```
 
+and this method inside the existing scenario class, keeping everything else in
+it:
 
-@scenario(name="reactor_purge")
-class ReactorPurgeScenario(SimulationScenario):
+```python
     @classmethod
     def scenario_metrics(cls) -> Sequence[type[Metric]]:
         return (ExternalWordCountMetric,)
@@ -357,3 +366,6 @@ and that a scenario metric cannot take a generic metric's name.
       `read_keyed_observations` reads them back if they hold numbers worth charting.
 - [ ] `score_unit` says what `score` is, and `summary` reads as one sentence.
 - [ ] `make lint` clean, and a test that calls `compute` on a hand-built event list.
+
+Next: [Evaluation](evaluation.md) for the other metrics and the report, and
+[Analysis](analysis.md) to compare scores across runs.
