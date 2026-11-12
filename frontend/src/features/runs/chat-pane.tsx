@@ -10,11 +10,11 @@ import type { AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import { buildChatRows, withClosingRow } from "./chat-rows";
 import { ClosingExchangesSection } from "./closing-exchanges-section";
-import { humanize } from "./format";
 import { RoundTimelineModal } from "./round-timeline-modal";
 import { RoundInjectionRow, RoundOutcomeRow } from "./round-event-row";
 import type { ScenarioExtras, ScenarioTimelineMarker } from "./scenario-plugin";
 import { ScenarioMarkerDivider } from "./scenario-timeline-marker";
+import { channelLabel, channelTag } from "./channel-label";
 import { ChatEntryRow } from "./chat-entry-row";
 import { ChatHeader } from "./chat-header";
 import { ChatRoundBadge } from "./chat-round-badge";
@@ -299,7 +299,7 @@ export function ChatPane({
 
   let headerName = "all activity";
   if (selectedChannel !== null) {
-    headerName = humanize(selectedChannel);
+    headerName = channelLabel(selectedChannel, roleNameForAgent);
   }
 
   const channelMembers = useMemo(() => {
@@ -726,6 +726,7 @@ export function ChatPane({
                     agent={agentMap.get(row.turn.agentId)}
                     color={agentColorMap.get(row.turn.agentId)}
                     entryChColor={channelColorMap.get(row.entry.channel_id)}
+                    channelTag={channelTag(row.entry.channel_id, roleNameForAgent)}
                     isPreResume={
                       resumeCutoffTimestamp !== null && row.turn.timestamp < resumeCutoffTimestamp
                     }

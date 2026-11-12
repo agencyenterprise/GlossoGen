@@ -11,6 +11,7 @@ import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap, deriveInitials } from "../runs/agent-colors";
+import { channelLabel } from "../runs/channel-label";
 import { formatTime, humanize } from "../runs/format";
 import { BranchChildCard } from "./branch-child-card";
 
@@ -274,7 +275,11 @@ export function BranchesTimeline({ runId }: { runId: string }) {
                               channelColor?.fg ?? "text-gray-600"
                             )}
                           >
-                            #{humanize(msg.channel_id)}
+                            #
+                            {channelLabel(
+                              msg.channel_id,
+                              agentId => agentNameMap.get(agentId) ?? agentId
+                            )}
                           </span>
                           <span className="ml-auto text-muted-foreground">
                             {formatTime(msg.timestamp)}
