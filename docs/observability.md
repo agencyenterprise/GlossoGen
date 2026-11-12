@@ -28,8 +28,7 @@ LANGFUSE_HOST=http://localhost:3001
 ```
 
 Those exact values are what the stack seeds on first boot and what
-`.env.example` pre-fills, so an `.env` copied from it needs nothing. An `.env`
-written before these lines existed needs them added.
+`.env.example` pre-fills, so an `.env` copied from it needs nothing.
 
 ## Reading a run's traces
 
@@ -52,8 +51,15 @@ called it, tagged by `agent_id` / `role_name` / `model` / `provider` /
 ## When tracing is on
 
 Only for `glossogen run`. The judge and probe calls in `glossogen evaluate` are
-not traced, though a run's own round judge is. If the stack is down or the keys are blank, a run logs one warning
-and proceeds untraced. Telemetry never blocks a simulation.
+not traced, though a run's own round judge is. With the keys blank a run logs
+`Langfuse telemetry disabled` and runs untraced. With the stack down, or
+refusing the keys, it logs one warning and runs untraced. Telemetry never
+blocks a simulation.
+
+Without Langfuse, a run's stdout log opens with a pydantic-ai banner reading
+`observability: off` and suggesting Logfire. That is pydantic-ai's own tracing
+product, separate from the stack here. `PYDANTIC_AI_NO_BANNER=1` in your `.env`
+hides it.
 
 The `make` targets above assume a checkout. Running the stack from an installed
 package takes one extra step, in
