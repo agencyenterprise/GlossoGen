@@ -38,6 +38,10 @@ from glossogen.scenario_contract.catalog import (
     import_package_scenario_modules,
     uses_scenario_decorator,
 )
+from glossogen.scenario_contract.registration import (
+    registrations_snapshot,
+    restore_registrations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,13 +209,17 @@ class DirectorySource(NamedTuple):
         module_names: list[str] = []
         child_entries: list[str] = []
         for path in walk.found:
-            module_name = module_name_for(path=path, import_root=self.import_root, advice=advice)
             if self.is_project_scan:
-                if not _import_scanned_file(
-                    path=path, module_name=module_name, import_root=self.import_root, source=self
-                ):
+                scanned_name = _import_scanned_file(
+                    path=path, import_root=self.import_root, advice=advice, source=self
+                )
+                if scanned_name is None:
                     continue
+                module_name = scanned_name
             else:
+                module_name = module_name_for(
+                    path=path, import_root=self.import_root, advice=advice
+                )
                 import_file(
                     path=path, module_name=module_name, import_root=self.import_root, source=self
                 )
@@ -323,15 +331,51 @@ class _ScanWalk:
                 continue
             if not is_module_name_part(part=path.stem):
                 continue
-            if self.files_read >= LARGE_SCAN_FILE_COUNT:
-                self._stop()
-                return
-            self.files_read += 1
-            if uses_scenario_decorator(source=path.read_bytes(), origin=str(path)):
+            if self._read_counts_as_decorated(path=path):
                 self.found.append(path)
 
+    def _read_counts_as_decorated(self, path: Path) -> bool:
+        """Read one ``.py`` file against the walk's limit; return whether it uses ``@scenario``.
+
+        Stops the walk instead of reading once the limit is reached.
+        """
+        if self.files_read >= LARGE_SCAN_FILE_COUNT:
+            self._stop()
+            return False
+        self.files_read += 1
+        return uses_scenario_decorator(source=path.read_bytes(), origin=str(path))
+
+    def _decorated_file_within(self, directory: Path, depth: int) -> Path | None:
+        """Return the first file using ``@scenario`` within ``depth`` levels of ``directory``."""
+        try:
+            entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
+        except OSError:
+            logger.exception("Could not list %s while scanning for scenarios", directory)
+            return None
+        for entry in entries:
+            if self.stopped:
+                return None
+            path = Path(entry.path)
+            if not entry.name.endswith(".py") or not entry.is_file(follow_symlinks=False):
+                continue
+            if self._read_counts_as_decorated(path=path):
+                return path
+        if depth <= 1:
+            return None
+        for entry in entries:
+            if not entry.is_dir(follow_symlinks=False) or entry.name.startswith((".", "_")):
+                continue
+            if entry.name in SKIPPED_DIRECTORY_NAMES:
+                continue
+            found = self._decorated_file_within(directory=Path(entry.path), depth=depth - 1)
+            if found is not None:
+                return found
+        return None
+
     def _stop(self) -> None:
-        """Stop the walk at the file limit, and say so."""
+        """Stop the walk at the file limit, and say so once."""
+        if self.stopped:
+            return
         self.stopped = True
         logger.warning(
             "Stopped scanning %s for scenarios after reading %d .py files; scenarios in "
@@ -346,12 +390,14 @@ class _ScanWalk:
         """Log a folder skipped for its name when a file in it uses ``@scenario``.
 
         Folders the walk skips anyway (hidden, excluded by name, protected) are
-        not looked into.
+        not looked into, and the files read count against the walk's limit.
         """
         resolved = directory.resolve()
         if skipped_directory_reason(directory=resolved, skipped_paths=self._skipped_paths):
             return
-        decorated = _decorated_file_within(directory=resolved, depth=_UNIMPORTABLE_FOLDER_LOOKAHEAD)
+        decorated = self._decorated_file_within(
+            directory=resolved, depth=_UNIMPORTABLE_FOLDER_LOOKAHEAD
+        )
         if decorated is None:
             return
         logger.info(
@@ -362,31 +408,6 @@ class _ScanWalk:
             resolved.name,
             decorated,
         )
-
-
-def _decorated_file_within(directory: Path, depth: int) -> Path | None:
-    """Return the first file using ``@scenario`` within ``depth`` levels of ``directory``."""
-    try:
-        entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
-    except OSError:
-        logger.exception("Could not list %s while scanning for scenarios", directory)
-        return None
-    for entry in entries:
-        path = Path(entry.path)
-        if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
-            if uses_scenario_decorator(source=path.read_bytes(), origin=str(path)):
-                return path
-    if depth <= 1:
-        return None
-    for entry in entries:
-        if not entry.is_dir(follow_symlinks=False) or entry.name.startswith((".", "_")):
-            continue
-        if entry.name in SKIPPED_DIRECTORY_NAMES:
-            continue
-        found = _decorated_file_within(directory=Path(entry.path), depth=depth - 1)
-        if found is not None:
-            return found
-    return None
 
 
 def is_module_name_part(part: str) -> bool:
@@ -447,40 +468,61 @@ def import_file(
 
 
 def _import_scanned_file(
-    path: Path, module_name: str, import_root: Path, source: DirectorySource
-) -> bool:
-    """Import a file the project scan found; log and return False if it cannot be."""
+    path: Path, import_root: Path, advice: str, source: DirectorySource
+) -> str | None:
+    """Import a file the project scan found and return its module name.
+
+    Logs and returns None when the file has no module name under the root or
+    fails to import.
+    """
+    try:
+        module_name = module_name_for(path=path, import_root=import_root, advice=advice)
+    except ScenarioCatalogError:
+        logger.exception(
+            "Skipping a file the scan of the project directory found: %s has no module "
+            "name under %s. The scan carries on without it.",
+            path,
+            import_root,
+        )
+        return None
     problem = _import_problem(
         path=path, module_name=module_name, import_root=import_root, source=source
     )
     if problem is None:
-        return True
+        return module_name
     logger.warning(
         "Skipping a file the scan of the project directory found: %s The scan "
         "carries on without it. Name your scenario sources in [tool.glossogen] "
         "scenarios to have such a file stop the command instead.",
         problem,
     )
-    return False
+    return None
 
 
 def _import_problem(
     path: Path, module_name: str, import_root: Path, source: FileSource | DirectorySource
 ) -> str | None:
-    """Import ``path`` as ``module_name`` and return why that failed, or None."""
+    """Import ``path`` as ``module_name`` and return why that failed, or None.
+
+    A failed import keeps no registration it made: a class registered by a file
+    that then raised does not hold its name against a later file.
+    """
     root_entry = str(import_root)
     if root_entry not in sys.path:
         sys.path.insert(0, root_entry)
+    before = registrations_snapshot()
     try:
         module = importlib.import_module(module_name)
     except Exception as exc:
         logger.exception("%s failed to import as %s", path, module_name)
+        restore_registrations(snapshot=before)
         return (
             f"{path}, from scenario source {source.describe()}, failed to import as "
             f"{module_name}: {type(exc).__name__}: {exc}"
         )
     loaded_from = getattr(module, "__file__", None)
     if loaded_from is None or Path(loaded_from).resolve() != path.resolve():
+        restore_registrations(snapshot=before)
         return (
             f"{path}, from scenario source {source.describe()}, is imported as "
             f"{module_name}, but that name resolves to {loaded_from}. Another module "

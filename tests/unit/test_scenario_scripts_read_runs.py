@@ -14,6 +14,7 @@ from typing import Any
 
 import orjson
 
+from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_contract.scenario_sources import SCENARIOS_ENV_VAR
 
 FIXED_TIME = "2026-01-01T00:00:00+00:00"
@@ -34,7 +35,9 @@ def write_run(runs_dir: Path, scenario_name: str) -> Path:
         "channel_ids": ["link"],
         "provider": "anthropic",
     }
-    (run_dir / f"{scenario_name}.jsonl").write_bytes(orjson.dumps(start) + b"\n")
+    event_log_path(run_dir=run_dir, scenario_name=scenario_name).write_bytes(
+        orjson.dumps(start) + b"\n"
+    )
     return run_dir
 
 

@@ -7,6 +7,9 @@ import. Each test builds a project under ``tmp_path``.
 """
 
 import logging
+import os
+import subprocess
+import sys
 import textwrap
 from pathlib import Path
 
@@ -123,22 +126,25 @@ def test_the_project_runs_folder_is_skipped_from_a_subdirectory(tmp_path: Path) 
 def test_the_scan_skips_a_file_that_fails_to_import_and_carries_on(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """One broken draft under the project does not stop the command; the log names it."""
+    """One broken draft under the project does not stop the command; the log names it.
+
+    The draft registers the name before it raises, and a later file registers the
+    same name: the failed import keeps no registration, so the later file loads.
+    """
     write(
         root=tmp_path,
         files={
             "pyproject.toml": "",
-            "draft/draft.py": decorated_module(name="draft") + "\nraise RuntimeError('boom')\n",
-            "good/good.py": decorated_module(name="good"),
+            "a_draft/draft.py": decorated_module(name="shared") + "\nraise RuntimeError('boom')\n",
+            "z_good/good.py": decorated_module(name="shared"),
         },
     )
 
     with caplog.at_level(logging.WARNING):
         loaded = load(working_dir=tmp_path, cli_sources=(), environ={})
 
-    assert loaded.find(name="good") is not None
-    assert loaded.find(name="draft") is None
-    assert str(tmp_path.resolve() / "draft" / "draft.py") in caplog.text
+    assert loaded.get(name="shared").__module__ == "z_good.good"
+    assert str(tmp_path.resolve() / "a_draft" / "draft.py") in caplog.text
     assert "RuntimeError: boom" in caplog.text
 
 
@@ -198,11 +204,16 @@ def test_a_configured_source_stays_strict(tmp_path: Path) -> None:
 def test_help_works_whatever_the_scan_finds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """``glossogen --help`` prints and exits 0 with a broken file under the project."""
+    """``glossogen --help`` prints and exits 0 with broken files under the project.
+
+    One raises on import; the other is the project root's own ``__init__.py``,
+    which has no module name under the root.
+    """
     write(
         root=tmp_path,
         files={
             "pyproject.toml": "",
+            "__init__.py": decorated_module(name="root_init"),
             "draft/draft.py": decorated_module(name="draft") + "\nraise RuntimeError('boom')\n",
         },
     )
@@ -331,3 +342,74 @@ def test_event_types_holding_a_non_event_class_is_refused_naming_the_scenario(
 
     assert "Scenario 'bad'" in str(refused.value)
     assert "not an EventBase subclass" in str(refused.value)
+
+
+def test_the_lookahead_into_a_non_identifier_folder_counts_against_the_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Looking for a decorated file to explain a skipped folder reads within the walk's budget."""
+    monkeypatch.setattr(scenario_source_kinds, "LARGE_SCAN_FILE_COUNT", 2)
+    reads: list[str] = []
+    real_check = scenario_source_kinds.uses_scenario_decorator
+
+    def counting_check(source: bytes, origin: str) -> bool:
+        reads.append(origin)
+        return real_check(source=source, origin=origin)
+
+    monkeypatch.setattr(scenario_source_kinds, "uses_scenario_decorator", counting_check)
+    write(
+        root=tmp_path,
+        files={
+            "pyproject.toml": "",
+            **{f"not-identifier/f{index}.py": "" for index in range(12)},
+        },
+    )
+
+    with caplog.at_level(logging.WARNING):
+        load(working_dir=tmp_path, cli_sources=(), environ={})
+
+    assert len(reads) == 2
+    assert "Stopped scanning" in caplog.text
+
+
+def test_a_child_process_loads_what_the_parent_did_when_one_class_of_a_module_is_refused(
+    tmp_path: Path,
+) -> None:
+    """The scan refuses a whole module, so a real child neither gains nor loses a scenario."""
+    write(
+        root=tmp_path,
+        files={
+            "project/pyproject.toml": "",
+            "project/mixed/mixed.py": decorated_module(name="review_good") + textwrap.dedent("""
+
+                @scenario(name="review_bad")
+                class BadScenario(VeyruScenario):
+                    @classmethod
+                    def event_types(cls):
+                        return (int,)
+                """),
+            "elsewhere/.keep": "",
+        },
+    )
+    parent = load(working_dir=tmp_path / "project", cli_sources=(), environ={})
+    environment = child_process_environment()
+
+    child = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from glossogen.scenario_contract.scenario_sources import "
+            "load_configured_scenario_catalog\n"
+            "loaded = load_configured_scenario_catalog(cli_sources=(), runs_dirs=())\n"
+            "print(','.join(loaded.names()))\n",
+        ],
+        cwd=tmp_path / "elsewhere",
+        env={**os.environ, **environment},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert child.returncode == 0, child.stderr
+    assert parent.find(name="review_good") is None
+    assert child.stdout.strip().split(",") == parent.names()

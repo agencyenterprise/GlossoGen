@@ -258,8 +258,9 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
     under, whose ``event_types()`` the run readers cannot parse with, or that reads
     its prompts and presets from the same directory as another loaded scenario. A
     name registered by two classes has already raised while the second one was
-    imported. A source that is not strict has such a class logged and left out,
-    and a child process is not told to import its module.
+    imported. A source that is not strict has every scenario of such a class's
+    module logged and left out, and a child process is not told to import the
+    module, so a child loads what its parent did.
     """
     scenarios: dict[str, type[SimulationScenario]] = {}
     directory_owners: dict[str, tuple[str, type[SimulationScenario]]] = {}
@@ -268,24 +269,29 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
         imported = source.import_scenario_modules()
         from_source: dict[str, type[SimulationScenario]] = {}
         refused_modules: set[str] = set()
-        for name, scenario_cls in _registered_from(module_names=imported.module_names).items():
+        for defined in _registered_by_module(module_names=imported.module_names):
+            trial_owners = dict(directory_owners)
             try:
-                _check_registered_class(name=name, scenario_cls=scenario_cls)
-                _check_directory_is_unshared(
-                    name=name, scenario_cls=scenario_cls, owners=directory_owners
-                )
+                for name, scenario_cls in defined.scenarios:
+                    _check_registered_class(name=name, scenario_cls=scenario_cls)
+                    _check_directory_is_unshared(
+                        name=name, scenario_cls=scenario_cls, owners=trial_owners
+                    )
             except ScenarioCatalogError:
                 if imported.strict:
-                    logger.exception("Scenario %r from %s was refused", name, source.describe())
+                    logger.exception(
+                        "A scenario in %s from %s was refused", defined.module, source.describe()
+                    )
                     raise
                 logger.exception(
-                    "Skipping scenario %r from %s, and carrying on without it",
-                    name,
+                    "Skipping every scenario in %s from %s, and carrying on without them",
+                    defined.module,
                     source.describe(),
                 )
-                refused_modules.add(scenario_cls.__module__)
+                refused_modules.add(defined.module)
                 continue
-            from_source[name] = scenario_cls
+            directory_owners = trial_owners
+            from_source.update(defined.scenarios)
         scenarios.update(from_source)
         loaded_sources.append(
             LoadedSource(
@@ -358,8 +364,15 @@ def _check_registered_class(name: str, scenario_cls: type[SimulationScenario]) -
     _check_declared_event_types(name=name, where=where, event_types=scenario_cls.event_types())
 
 
-def _registered_from(module_names: tuple[str, ...]) -> dict[str, type[SimulationScenario]]:
-    """Return the registered classes defined in the modules a source imported.
+class _ModuleScenarios(NamedTuple):
+    """The scenarios registered from one module, as ``(name, class)`` pairs."""
+
+    module: str
+    scenarios: tuple[tuple[str, type[SimulationScenario]], ...]
+
+
+def _registered_by_module(module_names: tuple[str, ...]) -> list[_ModuleScenarios]:
+    """Return the registered classes defined in the modules a source imported, by module.
 
     A class counts when its module is one of them, or when it was defined in the
     same file as one of them under another module name: the registry keeps one
@@ -371,12 +384,16 @@ def _registered_from(module_names: tuple[str, ...]) -> dict[str, type[Simulation
         for module_name in names
         if (location := getattr(sys.modules.get(module_name), "__file__", None)) is not None
     }
-    return {
-        name: scenario_cls
-        for name, scenario_cls in registered_scenarios().items()
-        if scenario_cls.__module__ in names
-        or scenario_defining_file(scenario_cls=scenario_cls) in files
-    }
+    grouped: dict[str, list[tuple[str, type[SimulationScenario]]]] = {}
+    for name, scenario_cls in registered_scenarios().items():
+        if scenario_cls.__module__ in names or (
+            scenario_defining_file(scenario_cls=scenario_cls) in files
+        ):
+            grouped.setdefault(scenario_cls.__module__, []).append((name, scenario_cls))
+    return [
+        _ModuleScenarios(module=module, scenarios=tuple(scenarios))
+        for module, scenarios in grouped.items()
+    ]
 
 
 def _check_directory_is_unshared(

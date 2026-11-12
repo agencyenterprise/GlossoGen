@@ -66,6 +66,21 @@ def registered_scenarios() -> Mapping[str, type[SimulationScenario]]:
     return MappingProxyType(_REGISTERED)
 
 
+def registrations_snapshot() -> dict[str, type[SimulationScenario]]:
+    """Return a copy of the registrations, for :func:`restore_registrations`."""
+    return dict(_REGISTERED)
+
+
+def restore_registrations(snapshot: Mapping[str, type[SimulationScenario]]) -> None:
+    """Put the registrations back as they were when ``snapshot`` was taken.
+
+    For an import that failed part way: the classes it registered before failing
+    must not keep their names from a later file.
+    """
+    _REGISTERED.clear()
+    _REGISTERED.update(snapshot)
+
+
 def scenario_defining_file(scenario_cls: type[SimulationScenario]) -> Path | None:
     """Return the resolved file ``scenario_cls`` was defined in, or None if unknown.
 
