@@ -1,6 +1,7 @@
 """Scripted turns and a runner for signal_game round-loop tests."""
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,7 @@ import pytest
 
 from glossogen.scenarios.signal_game.scenario import SignalGameScenario
 from glossogen.testing.scenario_runtime import assert_no_agent_crashed, build_scenario
-from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import GatedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 
 ONE_ROUND: dict[str, Any] = {"round_count": 1}
@@ -44,7 +45,7 @@ def end_round() -> ToolTurn:
 
 async def play(
     scenario: SignalGameScenario,
-    scripts: dict[str, list[ScriptedTurn]],
+    scripts: Mapping[str, Sequence[GatedTurn]],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> SimulationResult:
