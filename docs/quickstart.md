@@ -8,20 +8,26 @@ assumes only that.
 
 ## 1. Install
 
-Both installation types work here. Needs Python 3.14. As a dependency, in a
-project of your own:
+In a new project of your own, with `<tag>` a release from
+[the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
+uv init --python 3.14 my-study && cd my-study
 uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
+source .venv/bin/activate
+echo 'ANTHROPIC_API_KEY=<your key>' > .env
+mkdir runs
 ```
 
-with a `.env` in that project holding an API key for your provider. This
-walkthrough runs Anthropic models, so it needs `ANTHROPIC_API_KEY`. Another
-provider works the same way, with its key set and `--model` / `--provider`
-swapped in the commands below. [Running simulations](running-simulations.md)
-lists the providers. Working from a clone
-of this repository instead: `make install`, then `cp .env.example .env`, and each
-`glossogen ...` command below is spelled
+glossogen needs Python 3.14, which `uv init --python 3.14` sets. Activating the
+environment puts `glossogen` on your `PATH`. Without it, write `uv run glossogen`
+wherever this page writes `glossogen`. This walkthrough runs Anthropic models,
+so `.env` holds `ANTHROPIC_API_KEY`. Another provider works the same way, with
+its key set and `--model` / `--provider` swapped in the commands below.
+[Running simulations](running-simulations.md#providers) lists the providers.
+
+Working from a clone of this repository instead: `make install`, then
+`cp .env.example .env`, and each `glossogen ...` command below is spelled
 `VIRTUAL_ENV= uv run --no-sync python -m glossogen ...`.
 [Installation](installation.md) has both paths in full, including the optional
 extras.
@@ -52,8 +58,10 @@ glossogen run warehouse_robot_recovery \
 
 If your environment has no key for the provider you named, the run is refused at
 the command line rather than starting and failing once the clock has run out.
+The launch log, `./runs/quickstart.log`, says why. Three rounds of this preset
+took under two minutes and $0.28 on `claude-haiku-4-5-20251001`.
 
-Wait for the run to finish before scoring it:
+Wait for the run to finish before scoring it. This prints `1` once it has:
 
 ```bash
 grep -c '"simulation_ended"' ./runs/warehouse_robot_recovery/*/warehouse_robot_recovery.jsonl
@@ -73,9 +81,12 @@ RUN=$(ls -td ./runs/warehouse_robot_recovery/*/ | head -1)   # the newest run
 python -c "
 import collections, json, sys
 kinds = collections.Counter(json.loads(l)['event_type'] for l in open(sys.argv[1]) if l.strip())
-for kind, count in kinds.most_common(8): print(f'{count:5} {kind}')
+for kind, count in kinds.most_common(): print(f'{count:5} {kind}')
 " "$RUN/warehouse_robot_recovery.jsonl"
 ```
+
+That counts the events by type. Most of them are the agents' own model calls,
+tool calls and waits. These are the ones that describe the game:
 
 | Event | What it records |
 |---|---|
