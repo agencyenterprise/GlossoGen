@@ -23,6 +23,7 @@ import logging
 import os
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple, Protocol, Self
@@ -355,7 +356,7 @@ def _check_files_directories_are_unshared(
     """
     owners: dict[str, tuple[str, type[SimulationScenario]]] = {}
     for name, scenario_cls in scenarios.items():
-        directory = str(scenario_cls.scenario_package_files())
+        directory = _directory_identity(files=scenario_cls.scenario_package_files())
         first = owners.get(directory)
         if first is None:
             owners[directory] = (name, scenario_cls)
@@ -370,6 +371,17 @@ def _check_files_directories_are_unshared(
             f"folder, such as <folder>/{first_name}/{first_name}.py and "
             f"<folder>/{name}/{name}.py, each with its own prompts/ and knobs_*.json."
         )
+
+
+def _directory_identity(files: Traversable) -> str:
+    """Return the string two spellings of one directory share.
+
+    A filesystem path is resolved, so ``..`` segments and symlinks name the
+    directory they reach. Any other ``Traversable`` is compared as its string.
+    """
+    if isinstance(files, Path):
+        return str(files.resolve())
+    return str(files)
 
 
 def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], ...]) -> None:

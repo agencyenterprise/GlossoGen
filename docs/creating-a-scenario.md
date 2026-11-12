@@ -671,13 +671,16 @@ What differs from an in-repo scenario:
 
 - **A name another loaded scenario holds is an error**, naming both modules,
   when the second one is imported. Pick another name.
-- **Presets and prompts sit beside your module**, so two scenarios cannot share
-  a folder: they would list each other's presets and share any prompt template
-  with the same file name. Loading two scenarios whose modules are in one folder
-  fails with an error naming both scenarios, their modules and the folder. Give
-  each scenario a folder of its own, such as `scenarios/<name>/<name>.py` with its
-  own `prompts/` and `knobs_*.json`. `package-data` in the generated
-  `pyproject.toml` ships them only if you build a wheel.
+- **Presets and prompts sit beside your module.** A scenario reads them from the
+  directory `scenario_package_files()` returns, which by default is the folder
+  holding its module. Two loaded scenarios for which it returns the same
+  directory would list each other's presets and share any prompt template with
+  the same file name, so loading them fails with an error naming both scenarios,
+  their modules and the directory. With the default, that means two scenario
+  modules in one folder: give each scenario a folder of its own, such as
+  `scenarios/<name>/<name>.py` with its own `prompts/` and `knobs_*.json`.
+  `package-data` in the generated `pyproject.toml` ships them only if you build
+  a wheel.
 - **No frontend plug-in.** The platform UI renders everything it derives from
   your knobs schema and event log.
 - **Configuration is read from your project**: the `.env` sits beside your
