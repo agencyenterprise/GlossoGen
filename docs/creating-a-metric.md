@@ -278,8 +278,9 @@ and how `evaluation_cost` accumulates.
 Other ways to reach the same runner:
 
 - **REST**: `POST /api/g/<slug>/runs/<scenario>/<run_dir_name>/evaluate` with a
-  metric list. Validated against `available_metric_names(scenario_cls)`, so an
-  external metric works once installed. Gated by `ENABLE_EVALUATIONS`.
+  metric list. Validated against `available_metric_names(scenario_cls)`, so a
+  metric your scenario returns from `scenario_metrics()` works once the server
+  loads that scenario. Gated by `ENABLE_EVALUATIONS`.
 - **The frontend's "Run Eval" button**, which calls that endpoint.
 
 A metric that raises is logged with its traceback and recorded as failed. The
