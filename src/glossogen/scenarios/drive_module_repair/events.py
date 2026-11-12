@@ -1,9 +1,4 @@
-"""Pydantic event types specific to the drive_module_repair scenario.
-
-Imports only from :mod:`glossogen.models.event_base` so the discovered-union
-JSONL parser can load this module without triggering the event-discovery
-import cycle.
-"""
+"""Pydantic event types specific to the drive_module_repair scenario."""
 
 from typing import Literal
 

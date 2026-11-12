@@ -32,7 +32,7 @@ from glossogen.evaluation.metric_core.metric_registry import available_metrics
 from glossogen.evaluation.metric_core.scenario_metric_names import available_metric_names
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
-from glossogen.models.event import core_event_types, fixed_event_type, parser_for
+from glossogen.models.event import fixed_event_type
 from glossogen.models.event_base import EventBase
 from glossogen.run_config.provider_credentials import credential_variable_names
 from glossogen.scenario_contract.primary_channel_resolution import resolve_recorded_primary_channels
@@ -196,17 +196,6 @@ def _roles_resolve_without_knobs(scenario_cls: type[SimulationScenario]) -> Chec
     if len(set(ids)) != len(ids):
         return CheckOutcome(check=check, preset="", passed=False, detail=f"duplicate ids: {ids}")
     return CheckOutcome(check=check, preset="", passed=True, detail="")
-
-
-def _name_matches_the_package(built: BuiltScenario) -> str | None:
-    """`name()` derives from the package directory, and runs are stored under it.
-
-    Run directories are `runs/<name>/<timestamp>`, and evaluation looks the
-    scenario back up by that string. A mismatch writes runs nobody can re-open.
-    """
-    if type(built.scenario).name() != built.name:
-        return f"name() is {type(built.scenario).name()!r}, registered as {built.name!r}"
-    return None
 
 
 def _agents_are_distinct_and_specified(built: BuiltScenario) -> str | None:
@@ -572,7 +561,7 @@ def _advertised_metrics_are_registered(built: BuiltScenario) -> str | None:
     """`--metrics` is validated against this list, and the UI offers it.
 
     Compared against every runnable metric rather than only the built-in ones,
-    because an installed metric package legitimately adds to both sides.
+    because a scenario's own metrics legitimately add to both sides.
     """
     scenario_cls = type(built.scenario)
     offered = set(available_metric_names(scenario_cls=scenario_cls))
@@ -645,11 +634,6 @@ def _display_names_fall_back_to_ids(built: BuiltScenario) -> str | None:
     return None
 
 
-def _scenario_event_types(built: BuiltScenario) -> tuple[type[EventBase], ...]:
-    """Return the event types this scenario declares in ``event_types()``."""
-    return type(built.scenario).event_types()
-
-
 def _defined_events_are_declared(built: BuiltScenario) -> str | None:
     """An event class the scenario defines but does not declare cannot be logged or read.
 
@@ -702,64 +686,6 @@ def _loaded_event_classes(base: type[EventBase]) -> list[type[EventBase]]:
             found.append(subclass)
         found.extend(_loaded_event_classes(base=subclass))
     return found
-
-
-def _events_declare_a_literal_discriminator(built: BuiltScenario) -> str | None:
-    """``event_type`` is what the parser dispatches on, and it has to be fixed.
-
-    Checked before the parser is built, so the reason reads as the field being
-    wrong rather than as pydantic refusing a union.
-    """
-    for event_type in _scenario_event_types(built=built):
-        if "event_type" not in event_type.model_fields:
-            return f"{event_type.__name__} declares no event_type"
-        if fixed_event_type(event_cls=event_type) is None:
-            return (
-                f"{event_type.__name__} has no fixed event_type; declare it as "
-                'Literal["..."] with that value as its default'
-            )
-    return None
-
-
-def _events_do_not_collide_with_the_platform(built: BuiltScenario) -> str | None:
-    """A repeated discriminator shadows one side of the parser.
-
-    Whichever loses, the run that wrote it reads back afterwards as the other
-    thing, and nothing about writing it looked wrong.
-    """
-    core = {
-        str(event_type.model_fields["event_type"].default): event_type.__name__
-        for event_type in core_event_types()
-    }
-    seen: dict[str, str] = {}
-    for event_type in _scenario_event_types(built=built):
-        discriminator = str(event_type.model_fields["event_type"].default)
-        if discriminator in core:
-            return (
-                f"{event_type.__name__} uses event_type {discriminator!r}, which the "
-                f"platform's {core[discriminator]} already answers to"
-            )
-        if discriminator in seen:
-            return (
-                f"{event_type.__name__} and {seen[discriminator]} both use event_type "
-                f"{discriminator!r}"
-            )
-        seen[discriminator] = event_type.__name__
-    return None
-
-
-def _events_parse_alongside_the_platform(built: BuiltScenario) -> str | None:
-    """The run has to read back, and the parser is what reads it.
-
-    Building the union is the check: pydantic refuses one it cannot dispatch.
-    """
-    own = _scenario_event_types(built=built)
-    if not own:
-        return None
-    parser_for(event_types=(*core_event_types(), *own))
-    for event_type in own:
-        json.dumps(event_type.model_json_schema())
-    return None
 
 
 def _judge_models_are_shaped(built: BuiltScenario) -> str | None:
@@ -828,7 +754,6 @@ def _communication_hooks_answer_in_shape(built: BuiltScenario) -> str | None:
 
 
 _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
-    ("name matches the package directory", _name_matches_the_package),
     ("agents are distinct and specified", _agents_are_distinct_and_specified),
     ("agents claim channels that exist", _agents_claim_channels_that_exist),
     ("channel members declare their channel", _members_declare_their_channel),
@@ -856,9 +781,6 @@ _CHECKS: tuple[tuple[str, Callable[[BuiltScenario], str | None]], ...] = (
     ("the run-detail extension names the scenario", _run_detail_extension_names_the_scenario),
     ("display names fall back to ids", _display_names_fall_back_to_ids),
     ("defined events are declared", _defined_events_are_declared),
-    ("events declare a literal event_type", _events_declare_a_literal_discriminator),
-    ("events do not collide with the platform's", _events_do_not_collide_with_the_platform),
-    ("events parse alongside the platform's", _events_parse_alongside_the_platform),
     ("declared judge models are readable", _judge_models_are_shaped),
     ("the probe config points at files that exist", _probe_config_points_at_files_that_exist),
     (

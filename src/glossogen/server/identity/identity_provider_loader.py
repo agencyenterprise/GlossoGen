@@ -3,12 +3,9 @@
 Returns ``None`` when nothing is declared, which is single-tenant mode. Every other
 unexpected situation raises rather than falling back to ``None``.
 
-That is the one place this loader deliberately differs from
-:mod:`glossogen.scenario_contract.loader` and
-:mod:`glossogen.evaluation.metric_core.metric_registry`, which warn and carry on.
-For a scenario or a metric, an unreadable declaration means a missing feature. For
-an identity provider it means the server boots performing no authentication while an
-operator believes it is protected, so every ambiguity is fatal instead.
+An unreadable declaration means the server would boot performing no authentication
+while an operator believes it is protected, so every ambiguity is fatal rather than
+a warning.
 """
 
 import logging

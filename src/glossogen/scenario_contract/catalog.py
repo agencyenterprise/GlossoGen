@@ -21,12 +21,11 @@ import ast
 import importlib
 import logging
 import os
-from collections.abc import Generator, Mapping
-from contextlib import contextmanager
+from collections.abc import Mapping
 from importlib.resources.abc import Traversable
 from pathlib import Path
 from types import MappingProxyType
-from typing import NamedTuple, Protocol, Self
+from typing import NamedTuple, Protocol
 
 from pydantic import PydanticUserError
 
@@ -221,13 +220,6 @@ class ScenarioCatalog:
             return None
         return scenario_cls.event_types()
 
-    def including(self, name: str, scenario_cls: type[SimulationScenario]) -> Self:
-        """Return a copy of this catalog with ``scenario_cls`` under ``name``, replacing any."""
-        return type(self)(
-            scenarios={**self._scenarios, name: scenario_cls},
-            loaded_sources=self._loaded_sources,
-        )
-
     def get(self, name: str) -> type[SimulationScenario]:
         """Return the scenario class called ``name``.
 
@@ -302,17 +294,6 @@ def current_scenario_catalog() -> ScenarioCatalog:
             "glossogen.scenario_contract.catalog.load_scenario_catalog first."
         )
     return _current
-
-
-@contextmanager
-def scenario_catalog_installed(catalog: ScenarioCatalog) -> Generator[None]:
-    """Make ``catalog`` the current one for the duration of the block, then restore."""
-    previous = _current
-    _install(catalog=catalog)
-    try:
-        yield
-    finally:
-        _install(catalog=previous)
 
 
 def _install(catalog: ScenarioCatalog | None) -> None:

@@ -6,18 +6,22 @@ Nothing here reaches the network. Tests that need an LLM use the fakes in
 
 import sys
 from collections.abc import Iterator
+from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 from glossogen.runtime.event_bus import EventBus
-from glossogen.scenario_contract import catalog, registration
+from glossogen.scenario_contract import registration
 from glossogen.scenario_contract.catalog import (
     built_in_scenario_sources,
     current_scenario_catalog,
     load_scenario_catalog,
 )
+from tests.fakes.catalog_installation import scenario_catalog_installed
 
 METRICS_ML_OPTION = "--metrics-ml"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -71,17 +75,46 @@ def event_bus() -> EventBus:
 def isolated_scenario_imports(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Let a test load scenarios from ``tmp_path`` without the rest of the suite seeing them.
 
-    Restores the registry, the current catalog and ``sys.path``, and forgets the
-    modules the test imported, so two tests can each import a module called
-    ``scenarios.reactor_purge`` from their own directories.
+    Restores the registry, ``sys.path``, the current catalog and the run readers'
+    event-type lookup, and forgets the modules the test imported from outside the
+    repository, so two tests can each import a module called
+    ``scenarios.reactor_purge`` from their own directories. Modules from the
+    repository (``tests.fakes.*``) stay, so a later test does not import a second
+    copy of their classes.
     """
     monkeypatch.setattr(registration, "_REGISTERED", dict(registration.registered_scenarios()))
-    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
     monkeypatch.setattr(sys, "path", list(sys.path))
     before = set(sys.modules)
-    yield
-    for name in set(sys.modules) - before:
+    with scenario_catalog_installed(catalog=current_scenario_catalog()):
+        yield
+    outside_repository = [
+        name
+        for name in set(sys.modules) - before
+        if not _lives_in_repository(module=sys.modules[name])
+    ]
+    for name in outside_repository:
         del sys.modules[name]
+
+
+def _lives_in_repository(module: ModuleType) -> bool:
+    """Whether ``module`` was imported from a file or package directory under the repository."""
+    locations = [getattr(module, "__file__", None), *getattr(module, "__path__", [])]
+    return any(
+        location is not None and Path(location).is_relative_to(REPOSITORY_ROOT)
+        for location in locations
+    )
+
+
+@pytest.fixture(autouse=True)
+def no_scenario_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove the variables that choose which scenarios and runs a command loads.
+
+    A developer with ``GLOSSOGEN_SCENARIOS`` or ``GLOSSOGEN_RUNS_DIR`` exported
+    would otherwise change what every test that drives ``main()`` loads. A test
+    that needs one sets it itself.
+    """
+    monkeypatch.delenv("GLOSSOGEN_SCENARIOS", raising=False)
+    monkeypatch.delenv("GLOSSOGEN_RUNS_DIR", raising=False)
 
 
 @pytest.fixture(autouse=True)

@@ -36,8 +36,8 @@ class SimulationScenario(ScenarioBase):
         """Return the metrics that apply only to this scenario's runs.
 
         They are offered and runnable for this scenario alongside the generic
-        metrics and any installed ones, and for no other scenario. A name must not
-        repeat a generic metric's. The default declares none.
+        metrics, and for no other scenario. A name must not repeat a generic
+        metric's. The default declares none.
         """
         return ()
 

@@ -3,7 +3,6 @@
 import importlib
 import sys
 import textwrap
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -17,12 +16,12 @@ from glossogen.scenario_contract.catalog import (
     ScenarioCatalogNotLoaded,
     current_scenario_catalog,
     load_scenario_catalog,
-    scenario_catalog_installed,
     uses_scenario_decorator,
 )
 from glossogen.scenario_contract.loader import available_scenario_names, get_scenario_class
 from glossogen.scenario_contract.registration import ScenarioNameTaken, scenario
 from glossogen.scenarios.veyru.scenario import VeyruScenario
+from tests.fakes.catalog_installation import catalog_including, scenario_catalog_installed
 
 BUILT_IN_PACKAGES = sorted(
     path.name
@@ -32,15 +31,15 @@ BUILT_IN_PACKAGES = sorted(
 
 
 @pytest.fixture
-def empty_registry(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
-    """Give the test a registry of its own, and restore the process catalog afterwards.
+def empty_registry(monkeypatch: pytest.MonkeyPatch, isolated_scenario_imports: None) -> None:
+    """Give the test a registry of its own.
 
-    Restoring through ``scenario_catalog_installed`` puts back the run readers'
-    event-type lookup too, which loading a catalog replaces.
+    ``isolated_scenario_imports`` restores the registry, the process catalog, the
+    run readers' lookup and ``sys.path`` afterwards, and forgets the packages the
+    test imported from its ``tmp_path``, so a package name can be used again.
     """
+    _ = isolated_scenario_imports
     monkeypatch.setattr(registration, "_REGISTERED", {})
-    with scenario_catalog_installed(catalog=current_scenario_catalog()):
-        yield
 
 
 def test_the_catalog_holds_every_built_in_under_its_package_name() -> None:
@@ -440,7 +439,7 @@ def test_installing_a_catalog_for_a_block_restores_the_run_readers_lookup() -> N
     """A widened catalog for checks must not leave the readers on it afterwards."""
     before = current_scenario_catalog()
     with scenario_catalog_installed(
-        catalog=before.including(name="borrowed", scenario_cls=VeyruScenario)
+        catalog=catalog_including(base=before, name="borrowed", scenario_cls=VeyruScenario)
     ):
         assert run_event_parser(scenario_name="borrowed").scenario_loaded
     assert not run_event_parser(scenario_name="borrowed").scenario_loaded

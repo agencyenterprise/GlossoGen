@@ -104,7 +104,7 @@ def test_with_nothing_configured_the_project_directory_is_scanned(tmp_path: Path
     assert {"deeper", "reactor"} <= set(loaded.names())
     assert loaded.get(name="reactor").__module__ == "experiments.reactor"
     assert loaded.get(name="deeper").__module__ == "experiments.sub.deeper"
-    assert loaded_from(loaded) == [
+    assert loaded_from(loaded=loaded) == [
         f"{tmp_path.resolve()} (scan of the project directory; no sources configured)"
     ]
 
@@ -113,13 +113,10 @@ def test_with_nothing_configured_the_project_directory_is_scanned(tmp_path: Path
     "skipped",
     [
         "tests",
-        ".venv",
         "venv",
         "env",
         "node_modules",
-        "site-packages",
         "_private",
-        ".hidden",
         "build",
         "dist",
     ],
@@ -137,6 +134,18 @@ def test_the_scan_skips_directories_that_hold_no_scenarios(tmp_path: Path, skipp
     loaded = load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
 
     assert loaded.find(name="should_not_load") is None
+
+
+@pytest.mark.parametrize("skipped", [".venv", "site-packages", ".hidden"])
+def test_the_walk_skips_names_that_are_not_module_names(tmp_path: Path, skipped: str) -> None:
+    """A folder the walk could not import anything from is named as skipped, not just ignored.
+
+    The walk never imports below a name that is not an identifier, so a scan test
+    cannot tell whether these rules ran. They are asserted on the rule itself.
+    """
+    reason = skipped_directory_reason(directory=tmp_path / skipped, skipped_paths=frozenset())
+
+    assert reason is not None
 
 
 def test_a_scenario_file_inside_a_run_directory_is_never_imported(tmp_path: Path) -> None:
@@ -226,7 +235,7 @@ def test_tool_glossogen_paths_are_relative_to_the_pyproject(tmp_path: Path) -> N
 
     assert loaded.find(name="listed") is not None
     assert loaded.find(name="unlisted") is None
-    assert loaded_from(loaded) == [
+    assert loaded_from(loaded=loaded) == [
         f"scenarios ([tool.glossogen] in {tmp_path.resolve() / 'pyproject.toml'})"
     ]
 
@@ -248,7 +257,7 @@ def test_an_empty_list_turns_the_scan_off(tmp_path: Path, configured_by: str) ->
     loaded = load(working_dir=tmp_path, cli_sources=(), environ=environ, runs_dirs=())
 
     assert loaded.find(name="found") is None
-    assert loaded_from(loaded) == []
+    assert loaded_from(loaded=loaded) == []
 
 
 def test_the_flag_replaces_the_variable_which_replaces_the_pyproject(tmp_path: Path) -> None:
@@ -266,10 +275,10 @@ def test_the_flag_replaces_the_variable_which_replaces_the_pyproject(tmp_path: P
 
     by_flag = load(working_dir=tmp_path, cli_sources=("from_flag",), environ=environ, runs_dirs=())
     assert {"from_flag"} == set(by_flag.names()) - set(by_flag.loaded_sources[0].scenario_names)
-    assert loaded_from(by_flag) == ["from_flag (--scenarios)"]
+    assert loaded_from(loaded=by_flag) == ["from_flag (--scenarios)"]
 
     by_env = load(working_dir=tmp_path, cli_sources=(), environ=environ, runs_dirs=())
-    assert loaded_from(by_env) == [f"from_env ({SCENARIOS_ENV_VAR})"]
+    assert loaded_from(loaded=by_env) == [f"from_env ({SCENARIOS_ENV_VAR})"]
     assert by_env.find(name="from_pyproject") is None
 
 
@@ -304,15 +313,19 @@ def test_a_file_outside_the_project_imports_as_its_own_stem(tmp_path: Path) -> N
     assert loaded.get(name="lone").__module__ == "lone_scenario"
 
 
-def test_a_child_gets_module_names_and_their_import_root(
+def test_the_child_environment_names_modules_and_their_import_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The child imports the same modules under the same names, with no scan."""
+    """The environment for a child lists module names, not paths, and puts their root first.
+
+    It replaces whatever scan setting the parent had. The child process itself is
+    started in the test below.
+    """
     write(
         root=tmp_path,
         files={"pyproject.toml": "", "experiments/reactor.py": decorated_module(name="reactor")},
     )
-    parent = load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
+    load(working_dir=tmp_path, cli_sources=(), environ={}, runs_dirs=())
     monkeypatch.setenv(SCENARIOS_ENV_VAR, "ignored by the child")
     monkeypatch.setenv("PYTHONPATH", "/already/there")
 
@@ -320,13 +333,6 @@ def test_a_child_gets_module_names_and_their_import_root(
 
     assert environment[SCENARIOS_ENV_VAR] == "experiments.reactor"
     assert environment["PYTHONPATH"] == os.pathsep.join([str(tmp_path.resolve()), "/already/there"])
-    child = load(
-        working_dir=tmp_path,
-        cli_sources=(),
-        environ={SCENARIOS_ENV_VAR: environment[SCENARIOS_ENV_VAR]},
-        runs_dirs=(),
-    )
-    assert child.get(name="reactor") is parent.get(name="reactor")
 
 
 def test_a_fresh_child_in_another_directory_keeps_the_package_context(tmp_path: Path) -> None:

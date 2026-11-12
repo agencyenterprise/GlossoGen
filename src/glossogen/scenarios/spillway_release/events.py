@@ -1,9 +1,4 @@
-"""Pydantic event types specific to the spillway_release scenario.
-
-Imports only from :mod:`glossogen.models.event_base` so the discovered-union
-JSONL parser can load this module without triggering the event-discovery
-import cycle.
-"""
+"""Pydantic event types specific to the spillway_release scenario."""
 
 from typing import Literal
 

@@ -25,8 +25,9 @@ from glossogen.run_storage.event_parsing import (
     run_event_parser,
 )
 from glossogen.scenario_contract import catalog
-from glossogen.scenario_contract.catalog import current_scenario_catalog, scenario_catalog_installed
+from glossogen.scenario_contract.catalog import current_scenario_catalog
 from glossogen.scenarios.veyru.scenario import VeyruScenario
+from tests.fakes.catalog_installation import catalog_including, scenario_catalog_installed
 
 FIXED_TIME = "2026-01-01T00:00:00+00:00"
 
@@ -64,11 +65,10 @@ class BetaScenario(VeyruScenario):
 @pytest.fixture(autouse=True)
 def alpha_and_beta_loaded() -> Generator[None]:
     """Make the process catalog hold ``alpha`` and ``beta`` besides the built-ins."""
-    loaded = (
-        current_scenario_catalog()
-        .including(name="alpha", scenario_cls=AlphaScenario)
-        .including(name="beta", scenario_cls=BetaScenario)
+    with_alpha = catalog_including(
+        base=current_scenario_catalog(), name="alpha", scenario_cls=AlphaScenario
     )
+    loaded = catalog_including(base=with_alpha, name="beta", scenario_cls=BetaScenario)
     with scenario_catalog_installed(catalog=loaded):
         yield
 
