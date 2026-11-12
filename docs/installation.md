@@ -7,7 +7,8 @@ and start at [Working on glossogen itself](#working-on-glossogen-itself).
 ## As a dependency
 
 glossogen needs Python 3.14, and the project you install it into has to allow
-that: a `requires-python` of at least 3.14, and in a uv project
+that. A new uv project gets it from `uv init --python 3.14`. An existing one
+needs a `requires-python` of at least 3.14 and, in a uv project,
 `uv python pin 3.14`. On a project pinned lower, the install fails with a
 resolution error naming the conflict.
 
@@ -16,10 +17,16 @@ Replace `<tag>` with a release from
 [the releases page](https://github.com/agencyenterprise/GlossoGen/releases):
 
 ```bash
+uv init --python 3.14 my-study && cd my-study    # skip in an existing project
 uv add "glossogen @ git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
-# or, with pip:
+# or, with pip, into an active Python 3.14 environment:
 pip install "git+https://github.com/agencyenterprise/GlossoGen.git@<tag>"
 ```
+
+`uv add` installs into the project's `.venv`. Activate it with
+`source .venv/bin/activate` so `glossogen` is on your `PATH`, or put `uv run` in
+front of each command (`uv run glossogen run ...`). The pages here write the
+bare `glossogen`.
 
 In a `pyproject.toml`, the same thing as a PEP 508 direct reference:
 
@@ -38,10 +45,9 @@ Two extras matter here: `glossogen[testing]` adds the pytest harness
 [Testing a scenario](testing-a-scenario.md) uses, and `glossogen[metrics-ml]`
 adds the torch backend behind `perplexity` and the n-gram surprisal metrics.
 
-Installing brings the `glossogen` command, so `glossogen run ...` and
-`glossogen evaluate ...` work without `python -m`. The web UI comes from the same
-command: `glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the
-API and starts the published frontend image against it, which needs Docker but no
+The web UI comes from the same `glossogen` command:
+`glossogen serve --runs-dir ./runs --port 8000 --ui-port 3000` serves the API and
+starts the published frontend image against it, which needs Docker but no
 checkout. See [Web UI](web-ui.md).
 
 ## Configure environment
