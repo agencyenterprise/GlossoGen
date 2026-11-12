@@ -1868,7 +1868,7 @@ LookupError: Unable to find model with model_ref='scripted::fleet_safety_coordin
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>497 events at /tmp/tmphk7gp0s4/smoke.jsonl
+<pre>497 events at /tmp/tmpaw9k74tv/smoke.jsonl
 </pre>
 </div>
 </div>
@@ -1907,7 +1907,7 @@ same answer every time.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.evaluation.metric_core.metric_run_options</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetricRunOptions</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenario_contract.metric_run_options</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetricRunOptions</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetricRun</span><span class="p">,</span> <span class="n">score_metrics</span>
 
 <span class="n">DETERMINISTIC</span> <span class="o">=</span> <span class="p">[</span>
@@ -1939,7 +1939,7 @@ same answer every time.</p>
 <span class="k">for</span> <span class="n">measurement</span> <span class="ow">in</span> <span class="n">scored</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">measurements</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">measurement</span><span class="o">.</span><span class="n">metric_name</span><span class="si">:</span><span class="s2">24</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">measurement</span><span class="o">.</span><span class="n">score</span><span class="si">:</span><span class="s2">&gt;8.2f</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">measurement</span><span class="o">.</span><span class="n">score_unit</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-3">from glossogen.evaluation.metric_core.metric_run_options import MetricRunOptions
+<div class="clipboard-copy-txt" id="cell-3">from glossogen.scenario_contract.metric_run_options import MetricRunOptions
 from glossogen.testing import MetricRun, score_metrics
 
 DETERMINISTIC = [

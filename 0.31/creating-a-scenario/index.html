@@ -2206,7 +2206,7 @@ directly in <code>scenario.py</code>. Every other shipped scenario declares.</p>
 <p>Subclass <code>RoundWorld</code>
 (<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/engine/round_world.py">round_world.py</a>) when the scenario
 meters a per-round budget, which almost all do. Plain <code>ScenarioWorld</code>
-(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_world.py">scenario_world.py</a>) only when it
+(<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/scenario_world.py">scenario_world.py</a>) only when it
 meters nothing. The world mutates state synchronously in <code>on_message</code>, reacts
 asynchronously in <code>on_message_async</code> (pushing notifications through
 <code>context.send_update_to_channel</code>), and holds the state the round verdict reads.
@@ -2274,7 +2274,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>get_world()</code>, <code>get_tools()</code></td>
-<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/scenario_tool.py"><code>ScenarioTool</code></a> per scenario tool. An executor takes <code>agent_id</code> first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising <code>ValueError</code>, and the agent reads its message as the tool's error; any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
+<td>Construct the world from the same specs; one <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/scenario_tool.py"><code>ScenarioTool</code></a> per scenario tool. An executor takes <code>agent_id</code> first, which the runner supplies for the calling agent; its other parameters, with their annotations, are the tool's schema. It refuses a call by raising <code>ValueError</code>, and the agent reads its message as the tool's error; any other exception reaches the agent only as <code>Error executing tool &lt;name&gt;</code></td>
 </tr>
 <tr>
 <td><code>get_injection(round_number, agent_id)</code></td>
@@ -2290,7 +2290,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 </tr>
 <tr>
 <td><code>on_round_ended(round_number, trigger)</code></td>
-<td>Settle round-end state. <code>trigger</code> is a <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/runtime/round_end_trigger.py"><code>RoundEndTrigger</code></a> value when the clock ended the round, or your own early-end string; compare against the enum's members</td>
+<td>Settle round-end state. <code>trigger</code> is a <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/models/round_end_trigger.py"><code>RoundEndTrigger</code></a> value when the clock ended the round, or your own early-end string; compare against the enum's members</td>
 </tr>
 <tr>
 <td><code>validate_outgoing_message(...)</code>, <code>transform_outgoing_message(...)</code></td>
@@ -2629,7 +2629,7 @@ live answer with the one from a rebuilt history.</p>
 <p>A scenario that orders agents by simulated time, rather than by when a model
 server answered, implements these hooks. <code>schedule_wait_timeout</code> and <code>clock_now_s</code>
 default to the wall clock, <code>scenario_tool_timeout_s</code> to
-<code>SCENARIO_TOOL_TIMEOUT_SECONDS</code> from <code>runtime/scenario_tool.py</code>, and the rest to
+<code>SCENARIO_TOOL_TIMEOUT_SECONDS</code> from <code>scenario_contract/scenario_tool.py</code>, and the rest to
 doing nothing.</p>
 <table>
 <thead>
@@ -2768,11 +2768,16 @@ as an installed scenario pack, has its directory searched the same way.</p>
 holding that <code>pyproject.toml</code>, skipping environments (<code>.venv</code>, <code>venv</code>, <code>env</code>,
 <code>site-packages</code>, <code>node_modules</code>), <code>tests</code>, <code>build</code>, <code>dist</code>, hidden and
 <code>_</code>-prefixed folders, and the runs directory. <code>scenarios = []</code> turns the scan
-off. Naming the folders keeps what glossogen imports explicit.</p>
+off. A file the scan finds that fails to import, or registers a name another
+scenario holds, is skipped with a warning naming the file and the error; a
+source you name fails the command instead. The scan stops after a few thousand
+<code>.py</code> files, with a warning. Naming the folders keeps what glossogen imports
+explicit.</p>
 <p>What differs from an in-repo scenario:</p>
 <ul>
 <li><strong>A name another loaded scenario holds is an error</strong>, naming both modules,
-  when the second one is imported. Pick another name.</li>
+  when the second one is imported from a source you configured; the project
+  scan skips the second file with a warning. Pick another name.</li>
 <li><strong>Presets and prompts sit beside your module.</strong> A scenario reads them from the
   directory <code>scenario_package_files()</code> returns, which by default is the folder
   holding its module. Two loaded scenarios for which it returns the same

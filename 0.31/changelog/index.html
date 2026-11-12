@@ -2043,6 +2043,135 @@ the commit log.</p>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Moved modules: imports in scenario and metric packages change.</strong> The old
+  paths are gone, with no aliases left behind. For scenario and metric authors:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Old import</th>
+<th>New import</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>glossogen.scenarios.base_knobs</code> (<code>BaseKnobs</code>, <code>AgentModelOverride</code>)</td>
+<td><code>glossogen.scenario_contract.base_knobs</code></td>
+</tr>
+<tr>
+<td><code>glossogen.scenarios.channel_noise</code> (<code>apply_character_noise</code>, <code>NoiseReplacementMode</code>)</td>
+<td><code>glossogen.scenario_contract.channel_noise</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.round_end_trigger</code> (<code>RoundEndTrigger</code>)</td>
+<td><code>glossogen.models.round_end_trigger</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.scheduled_events</code> (<code>ScheduledEvent</code>, <code>SwapAgent</code>, ...)</td>
+<td><code>glossogen.models.scheduled_events</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.read_notifications_schema</code></td>
+<td><code>glossogen.models.read_notifications_schema</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.elapsed_time</code></td>
+<td><code>glossogen.models.elapsed_time</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.communication_tools</code> (<code>SEND_MESSAGE_TOOL_NAME</code>, <code>READ_CHANNEL_TOOL_NAME</code>, <code>LIST_CHANNELS_TOOL_NAME</code>, <code>GET_CHANNEL_MEMBERS_TOOL_NAME</code>, <code>BASE_TOOL_NAMES</code>)</td>
+<td><code>glossogen.models.communication_tool_names</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runners.communication_protocol</code></td>
+<td><code>glossogen.scenario_contract.platform_runner_prompts</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.scenario_world</code> (<code>ScenarioWorld</code>, <code>WorldContext</code>, <code>MessageEvent</code>, <code>RoundAdvancedEvent</code>)</td>
+<td><code>glossogen.scenario_contract.scenario_world</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.scenario_tool</code> (<code>ScenarioTool</code>, <code>SCENARIO_TOOL_TIMEOUT_SECONDS</code>)</td>
+<td><code>glossogen.scenario_contract.scenario_tool</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.activity_notification</code></td>
+<td><code>glossogen.scenario_contract.activity_notification</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.notification_payload</code> (<code>Wake</code>, <code>NotificationInbox</code>, <code>render_default_notification</code>, ...)</td>
+<td><code>glossogen.scenario_contract.notification_delivery</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runtime.wait_registry</code> (<code>WakeReason</code>, <code>ParkedWait</code>, <code>DEFAULT_ANY_TIMEOUT_SECONDS</code>)</td>
+<td><code>glossogen.scenario_contract.parked_wait</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.metric_protocol</code> (<code>Metric</code>)</td>
+<td><code>glossogen.scenario_contract.metric_protocol</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.measurement</code></td>
+<td><code>glossogen.scenario_contract.measurement</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.keyed_observation</code></td>
+<td><code>glossogen.scenario_contract.keyed_observation</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.metric_run_options</code></td>
+<td><code>glossogen.scenario_contract.metric_run_options</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.protocol_boundary</code></td>
+<td><code>glossogen.scenario_contract.protocol_boundary</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.protocol_explanation_config</code></td>
+<td><code>glossogen.scenario_contract.protocol_explanation_config</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.protocol_probe_config</code></td>
+<td><code>glossogen.scenario_contract.protocol_probe_config</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metric_core.scored_channels</code></td>
+<td><code>glossogen.scenario_contract.scored_channels</code></td>
+</tr>
+<tr>
+<td><code>glossogen.evaluation.metrics.communication.round_view</code> (<code>CommunicationRoundView</code>, <code>CommunicationMessageLine</code> only; the helpers stay)</td>
+<td><code>glossogen.scenario_contract.communication_round_view</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runners.agent_runner_base</code> (<code>AgentRunner</code>)</td>
+<td><code>glossogen.runtime.agent_runner</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runners.agent_run_result</code></td>
+<td><code>glossogen.runtime.agent_run_result</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runners.closing_prompt</code> (<code>CLOSING_PROMPT_TIMEOUT_SECONDS</code>)</td>
+<td><code>glossogen.runtime.agent_runner</code></td>
+</tr>
+<tr>
+<td><code>glossogen.runners.agent_tools</code> (<code>ToolSpec</code>, <code>Executor</code>, <code>tool_specs</code>, <code>select_tool_definitions</code>)</td>
+<td><code>glossogen.runtime.agent_tool_specs</code></td>
+</tr>
+</tbody>
+</table>
+<p>The platform's runner prompt templates move with it, from
+  <code>glossogen/runners/prompts/*.jinja</code> to <code>glossogen/scenario_contract/runner_prompts/*.jinja</code>.</p>
+<p><code>WorldContext</code> and <code>NotificationInbox</code> are now abstract. The runtime's
+  implementations are <code>glossogen.runtime.world_context.RuntimeWorldContext</code> and
+  <code>glossogen.runtime.session_notification_inbox.SessionNotificationInbox</code>, which
+  code that built a context or an inbox directly, such as a test, constructs
+  instead. <code>ScenarioRuntimeHandle.event_logger</code> is typed as the new
+  <code>ScenarioEventLog</code> protocol, which only has <code>log(event=...)</code>.
+  <code>AutonomousSupervisor</code> takes a <code>list_tool_definitions</code> argument next to
+  <code>runner_factory</code>, a <code>glossogen.runtime.agent_tool_specs.ToolDefinitionLister</code>:
+  <code>glossogen.runners.agent_tools.list_tool_definitions</code> for the pydantic-ai runner.</p>
+<ul>
 <li><strong>A run's events of a type no loaded scenario declares are kept, not skipped.</strong>
   <code>load_events</code> returns each as an <code>UnrecognizedEvent</code>
   (<code>glossogen.models.event</code>), which holds the line's <code>event_type</code> and the whole
@@ -2321,6 +2450,38 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>glossogen new-scenario</code> refuses a name that is already an importable module
+  (<code>signal</code>, <code>secrets</code>, an installed package, <code>glossogen</code>), before writing
+  anything. Such a folder hid that module and stopped every later command.</li>
+<li><code>validate &lt;path&gt;</code> on a src-layout project checks <code>package-data</code> under the
+  package's import name (<code>mypack.x</code>), not its path from the project root
+  (<code>src.mypack.x</code>).</li>
+<li>One scenario file imported under two module names, such as <code>src.mypack.x</code> by
+  the project scan and <code>mypack.x</code> by the pack's tests, registers one scenario
+  instead of raising that the name is registered twice.</li>
+<li><code>glossogen evaluate</code> rejects arguments it does not know, so <code>--scenarios</code>
+  after the subcommand is an error, as for every other subcommand. The
+  scenario-not-loaded message says <code>--scenarios</code> goes before the subcommand.</li>
+<li><code>--scenarios ""</code> loads the built-ins only, like an empty
+  <code>GLOSSOGEN_SCENARIOS</code>, instead of scanning the working directory.</li>
+<li>The project scan reads a project folder, or a configured folder, named like a
+  folder it skips (<code>tests</code>, <code>build</code>, <code>env</code>, <code>_lab</code>); the skip rules apply below
+  it. The project's <code>runs/</code> is skipped from any subdirectory.</li>
+<li>The project scan skips a file that fails to import, or that registers a name
+  already taken, with a warning naming the file and the error, and carries on;
+  <code>--help</code> works whatever it finds. Configured sources still fail the command.</li>
+<li>The project scan stops at its file limit instead of walking the whole tree,
+  warning when it does, and warns before walking when no <code>pyproject.toml</code> is
+  above the working directory.</li>
+<li>A child process imports exactly the files its parent's scan imported, not the
+  whole package around a decorated <code>__init__.py</code>.</li>
+<li>A line of an undeclared event type with no <code>event_id</code> or <code>timestamp</code> is
+  skipped and counted in the reader's warning instead of failing the read.</li>
+<li><code>event_types()</code> returning something that is not an <code>EventBase</code> subclass fails
+  the load with an error naming the scenario.</li>
+<li>The <code>spot_the_intersection</code> <code>audit_recorded_boards</code> and <code>veyru</code>
+  <code>inspect_replaced_agent_input</code> scripts load the scenario catalog before
+  reading a run.</li>
 <li>Signing in from a link into <code>/g/&lt;slug&gt;/...</code> lands on that link. The group
   layout sent a signed-out visitor to <code>/sign-in</code> without the requested URL, so
   the identity provider fell back to its default page after sign-in. The

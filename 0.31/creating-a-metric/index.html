@@ -1653,7 +1653,7 @@ refusals. <a href="../evaluation/#metrics">Evaluation</a> lists them all with wh
 </ul>
 <h2 id="the-contract">The contract<a class="headerlink" href="#the-contract" title="Permanent link">&para;</a></h2>
 <p>One method, defined in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/metric_protocol.py">metric_protocol.py</a>:</p>
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/metric_protocol.py">metric_protocol.py</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Metric</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -1827,7 +1827,7 @@ Copy its shape.</p>
 <a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>        <span class="k">return</span> <span class="n">measurements</span>
 </code></pre></div>
 <p>Build the channel set with <code>scored_channel_ids</code> from
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/evaluation/metric_core/scored_channels.py">scored_channels.py</a>,
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/scored_channels.py">scored_channels.py</a>,
 not from <code>channel_id</code> alone. A primary channel with <code>includes_direct_channels</code>
 also owns the direct channels its members open during the run, and a metric that
 reads only <code>channel_id</code> misses that traffic.
