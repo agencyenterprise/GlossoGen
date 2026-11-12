@@ -77,8 +77,9 @@ shipped presets use an Anthropic judge wherever a scenario has one, so those nee
 `ANTHROPIC_API_KEY`.
 `.env.example` documents every variable (provider keys, authentication, CORS,
 runs directory, log level) and pre-fills the local Langfuse keys, so a clone that copies it as-is
-traces once `make langfuse-up` runs. Blank both `LANGFUSE_*` keys to disable
-telemetry.
+traces once `make langfuse-up` runs. Delete or comment out the
+`LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` lines to disable telemetry. Set to
+empty strings, they still turn it on, and every run logs a Langfuse warning.
 
 Keep `DATABASE_URL` unset unless you want the Postgres-backed runs index, because
 with it set the run list is a database table rather than the directory

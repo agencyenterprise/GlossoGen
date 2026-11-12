@@ -57,6 +57,11 @@ nearest `.env` at or above the directory they run in. The examples below run
 Anthropic models, so they need `ANTHROPIC_API_KEY`. Another provider works the
 same way, with its key set and its model passed instead, as in
 `--model gpt-5.4 --provider openai`.
+
+The shipped presets judge their rounds
+with an Anthropic model, so they also need `ANTHROPIC_API_KEY` unless you
+override `judge_model` and `judge_provider`
+([Configure environment](installation.md#configure-environment)).
 [Running simulations](running-simulations.md) covers the providers,
 mixed-provider teams and self-hosted endpoints.
 

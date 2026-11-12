@@ -148,9 +148,8 @@ said. The columns are the roster, so a sheet reads one agent's briefings down a
 column instead of pivoting.
 
 It stays separate from `round_level.csv` even though both are keyed on
-`(run, round)`. These cells are the largest text in the export, and a table
-people join to and filter on should not carry them: in the exporter this mirrors,
-repeating the briefings was ~86% of a file. Join on `run_id` + `round_number`.
+`(run, round)`. These cells are the largest text in the export, so they stay out of the table
+people join to and filter on. Join on `run_id` + `round_number`.
 
 ### How the event-log tables read
 
@@ -160,10 +159,9 @@ memory does not grow with the selection. Asking for both reads each log twice.
 
 Only `message_sent`, `tool_result_received`, `injection_delivered` and
 `channel_created` are parsed. The round number and the postmortem phase are
-tracked from `round_advanced` and `postmortem_started`. Parsing every line
-would fail the export on an event these tables discard, the moment a run predates
-a required field some scenario event gained. A line that fails anyway is skipped
-and counted in the log, so one damaged run costs its own rows and not the export.
+tracked from `round_advanced` and `postmortem_started`. A line that fails to
+parse is skipped and counted in the log, so one damaged run costs its own rows
+and not the export.
 
 `is_primary_channel` and `team_id` come from rebuilding the scenario from the
 run's recorded config. A config predating a newer required knob is backfilled

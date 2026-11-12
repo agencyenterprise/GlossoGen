@@ -349,7 +349,7 @@ declare -a GPT_SPECS=("<source_a> <knobs.json>" "<source_b> <knobs.json>")
 declare -a SONNET_SPECS=("<source_c> <knobs.json>" "<source_d> <knobs.json>")
 
 count_running_for_model() {
-  pgrep -f "[Pp]ython -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
+  pgrep -f "[Pp]ython[0-9.]* -m glossogen run veyru --model $1" 2>/dev/null | wc -l | tr -d ' '
 }
 
 launch_one() {
@@ -361,7 +361,6 @@ launch_one() {
     --replaced-agent-id field_observer \
     --model "$model" --provider "$provider" \
     --runs-dir runs --knobs "$knobs" >> "$LOG" 2>&1
-  sleep 2  # run directories are named by unix second
 }
 
 process_queue() {
@@ -385,7 +384,7 @@ it outlives your terminal. Then watch the log and count the live simulations:
 ```bash
 nohup bash sweep.sh > sweep.stdout 2>&1 &
 tail -20 sweep.log
-pgrep -f "[Pp]ython -m glossogen run veyru" | wc -l
+pgrep -f "[Pp]ython[0-9.]* -m glossogen run veyru" | wc -l
 ```
 
 Each `replace-agent`, `cross-run-replace-agent` and `fork-at-round` call prepares
@@ -395,8 +394,9 @@ directory. A fresh `glossogen run` does not detach, so a queue of them launches
 each with `&`.
 
 **Anchor the `pgrep` pattern on the interpreter.** A fork's simulation runs as
-`python -m glossogen run ...`, which Homebrew's Python on macOS spells `Python`,
-so `[Pp]ython -m glossogen run` matches simulations on either system. A loose
+`<interpreter> -m glossogen run ...`, under the interpreter that launched it:
+`python`, `python3.14`, or `Python` on Homebrew's macOS build. The pattern
+`[Pp]ython[0-9.]* -m glossogen run` matches each of them. A loose
 pattern such as `glossogen run veyru` also matches any shell whose command line
 quotes it, the counting shell included. Keep the count in a function rather
 than inlined into a wrapping command for the same reason. A `glossogen run` you

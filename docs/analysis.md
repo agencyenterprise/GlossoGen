@@ -200,16 +200,8 @@ Runs the selection names that no longer exist come back on the answer under
 `missing_run_ids`, since a dashboard outlives the runs it was built on. A selection
 over the export's run ceiling is refused with 413.
 
-Sidecars are read only for a keyed query. They cost one file open per metric per run,
-and no other grain can use them, so the record cache holds two versions of a selection,
-with and without them, rather than paying that cost on every chart.
-
-Loaded runs are cached in-process for a minute per selection, so editing a chart does
-not re-read every run's report on each change. What is cached is a projection of each
-run down to its dimension cells and its numbers, about an eighth of what its full
-record costs, which is what lets a scenario-wide cohort stay in the cache
-while someone works on it. The cache budget is counted in runs, and a selection
-wider than the whole budget is answered without being kept.
+Loaded runs are cached in the server process for a minute per selection, so a run
+evaluated or added since can take up to a minute to show in a chart.
 
 ## Limits
 

@@ -318,6 +318,21 @@ flowchart LR
     O --> V3
 ```
 
+Step 2 is a script in the repository's `scripts/`, which an installed package
+does not carry. Fetch it into your project's own `scripts/`, pinned to the tag
+you installed. It reads the `.env` one directory above itself, so that is where
+it finds your keys:
+
+```bash
+mkdir -p scripts
+curl -o scripts/consolidate_communication_ontology.py \
+  https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/scripts/consolidate_communication_ontology.py
+```
+
+From a checkout the script is already there. Run it with the environment's
+Python: `uv run python ...` without an activated environment, and
+`VIRTUAL_ENV= uv run --no-sync python ...` in a checkout.
+
 ```bash
 # 1. Open coding: one LLM call per run. Free-form labels plus evidence citations,
 #    written to runs/<scenario>/<id>/communication_open_coding.json
@@ -328,7 +343,7 @@ glossogen evaluate <scenario> \
 
 # 2. Consolidation: one LLM call across N runs of one scenario, producing a
 #    versioned taxonomy under runs/<scenario>/_ontology/<version>.json
-python consolidate_communication_ontology.py \
+python scripts/consolidate_communication_ontology.py \
   --scenario-name <scenario> \
   --run-id <scenario>/<id1> --run-id <scenario>/<id2> --run-id <scenario>/<id3> \
   --runs-dir ./runs \
@@ -343,25 +358,16 @@ glossogen evaluate <scenario> \
   --model claude-haiku-4-5-20251001 --provider anthropic
 ```
 
-Step 2 is a script in the repository's `scripts/`, which an installed package
-does not carry. Fetch it pinned to the tag you installed, and run it with the
-environment's Python (`uv run python ...` without an activated environment):
-
-```bash
-curl -O https://raw.githubusercontent.com/agencyenterprise/GlossoGen/<tag>/scripts/consolidate_communication_ontology.py
-```
-
-From a checkout, run `scripts/consolidate_communication_ontology.py` as
-`VIRTUAL_ENV= uv run --no-sync python scripts/consolidate_communication_ontology.py`.
-
 Step 3 resolves the most recently modified ontology under
 `runs/<scenario>/_ontology/` on its own. `--ontology-path` pins a specific one.
 Both passes read the same per-round view (primary-channel messages plus the
 scenario-rendered ground truth), so labels and confidences are commensurable.
 
-Ontology JSONs live under `runs/<scenario>/_ontology/` so they travel with any
-export of the runs tree. They are regenerable from the open-coding sidecars, so
-pass them around alongside the runs they came from rather than committing them.
+Ontology JSONs live under `runs/<scenario>/_ontology/`, so a copy of the whole
+runs tree carries them. `glossogen export --raw` and the UI's raw export pack
+only run directories, so send `_ontology/` alongside such a zip. They are
+regenerable from the open-coding sidecars, so pass them around with the runs
+they came from rather than committing them.
 
 Run all three with `LOG_LEVEL=DEBUG` and a stderr redirect while developing.
 
