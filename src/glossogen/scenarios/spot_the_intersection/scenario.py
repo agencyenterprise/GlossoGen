@@ -16,11 +16,13 @@ solvable without every board. Scoring is deterministic.
 """
 
 import random
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
 from glossogen.engine.team_declaration import RoleSpec
+from glossogen.evaluation.metric_core.metric_protocol import Metric
 from glossogen.evaluation.metric_core.protocol_explanation_config import ProtocolExplanationConfig
 from glossogen.evaluation.metric_core.protocol_probe_config import ProtocolProbeConfig
 from glossogen.evaluation.metrics.communication.round_view import CommunicationRoundView
@@ -44,6 +46,12 @@ from glossogen.scenarios.spot_the_intersection.board_generation import generate_
 from glossogen.scenarios.spot_the_intersection.board_model import column_letter
 from glossogen.scenarios.spot_the_intersection.evaluation.build_communication_rounds import (
     build_communication_rounds,
+)
+from glossogen.scenarios.spot_the_intersection.evaluation.busiest_member_share_metric import (
+    BusiestMemberShareMetric,
+)
+from glossogen.scenarios.spot_the_intersection.evaluation.message_routes_metric import (
+    MessageRoutesMetric,
 )
 from glossogen.scenarios.spot_the_intersection.events import (
     IntersectionSubmissionRecorded,
@@ -112,6 +120,11 @@ class SpotTheIntersectionScenario(SimulationScenario):
     def run_detail_extension(cls) -> ScenarioRunDetailExtension:
         """Each round's boards and submissions, for the run page."""
         return SpotTheIntersectionRunDetailExtension()
+
+    @classmethod
+    def scenario_metrics(cls) -> Sequence[type[Metric]]:
+        """The metrics that split a team's count by member."""
+        return (BusiestMemberShareMetric, MessageRoutesMetric)
 
     @classmethod
     def knobs_model(cls) -> type[SpotTheIntersectionKnobs]:

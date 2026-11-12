@@ -195,7 +195,10 @@ async def test_a_scripted_round_evaluates_and_serves(
     assert scored.judge.calls == [], "a deterministic metric called the judge"
     assert any(name.startswith("round_success") for name in scored.names())
     for metric_name in own_metric_names:
-        assert scored.has(metric_name=metric_name), f"{metric_name} wrote no measurement"
+        names = {metric_name} | {
+            channel.metric_name(metric_name) for channel in result.scenario.get_primary_channels()
+        }
+        assert names & set(scored.names()), f"{metric_name} wrote no measurement"
 
     async with local_client(app=build_local_app(runs_dir=runs_dir)) as client:
         detail = await client.get(f"/api/g/{GROUP}/runs/{scenario_name}/{RUN_DIR_NAME}")
@@ -252,6 +255,7 @@ def test_each_scenario_lists_only_its_own_metrics() -> None:
     assert owners == {
         "move_a_box": ["bay_match", "thermal_excess"],
         "signal_game": ["excess_moves", "longest_streak"],
+        "spot_the_intersection": ["busiest_member_share", "message_routes"],
     }
 
 
