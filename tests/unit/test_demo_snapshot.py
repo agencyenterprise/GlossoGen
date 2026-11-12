@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from glossogen.server.runs.models import RunDetailResponse
+from glossogen.server.runs.scenario_extension import scenario_extension
 
 DEMO_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "demo"
 
@@ -40,6 +41,14 @@ def test_the_snapshot_validates_against_the_response_model(demo_dir: Path) -> No
     detail = RunDetailResponse.model_validate(snapshot)
     assert detail.messages
     assert detail.agents
+
+
+def test_the_snapshot_extras_validate_against_the_scenarios_extras_model(demo_dir: Path) -> None:
+    """The response model types extras as the base, so the scenario's own model checks them."""
+    snapshot = json.loads((demo_dir / "run.json").read_text())
+    extension = scenario_extension(scenario_name=snapshot["scenario_name"])
+    assert extension is not None
+    extension.extras_model_cls.model_validate(snapshot["scenario_extras"])
 
 
 def test_the_snapshot_download_is_a_readable_archive(demo_dir: Path) -> None:

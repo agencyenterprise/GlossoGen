@@ -30,14 +30,8 @@ from fastapi.encoders import jsonable_encoder
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
-
-# The run-detail models build their scenario unions from the scenario catalog
-# when they are imported, so the catalog is loaded before anything from
-# glossogen.server is imported.
-load_scenario_catalog(sources=built_in_scenario_sources())
-
-from glossogen.server.runs.detail_reader import load_run_detail  # noqa: E402
-from glossogen.server.runs.models import RunDetailResponse  # noqa: E402
+from glossogen.server.runs.detail_reader import load_run_detail
+from glossogen.server.runs.models import RunDetailResponse
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +119,7 @@ def main() -> None:
         help="Output directory for run.json + run.zip, e.g. frontend/public/demo",
     )
     args = parser.parse_args()
+    load_scenario_catalog(sources=built_in_scenario_sources())
     try:
         asyncio.run(
             write_demo_snapshot(

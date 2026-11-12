@@ -40,7 +40,7 @@ Each check catches a failure that is silent at the time it happens:
 | Agents claim only channels that exist; `get_agent_roles` agrees with the agents built | A roster the web UI and the metrics disagree on |
 | Every preset validates; every round's injection renders | A misspelled template variable renders a briefing with a hole in it, and the run looks plausible for fifteen rounds |
 | Every event declares a unique `event_type`, and the parser builds over platform events plus yours | A repeated name shadows one side of the parser: the run writes fine and reads back as the other thing |
-| `events.py` imports only `glossogen.models.event_base` (checked in source, not by importing) | The event union imports your `events.py` while mid-import, so a wider import fails the whole platform at startup |
+| Every event class defined in the scenario's module or package is returned by `event_types()` | The event logger refuses an undeclared class mid-run, and a reader skips its lines |
 | A probe or explanation config points at files that exist | A missing question bank makes that metric family report nothing, exactly like a run with nothing to measure |
 | `get_judge_models` is readable | The launch check asks it which credentials a run needs |
 | Directory form only: `package-data` covers prompts and presets | Your editable install works and the wheel you hand out renders nothing |

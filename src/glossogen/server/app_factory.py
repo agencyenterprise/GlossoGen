@@ -34,6 +34,8 @@ from glossogen.server.runs.label_description_router import router as label_descr
 from glossogen.server.runs.label_mirror import backfill_run_label_mirror
 from glossogen.server.runs.multi_export_router import router as multi_export_router
 from glossogen.server.runs.router import router as runs_router
+from glossogen.server.runs.scenario_extension import collect_scenario_extensions
+from glossogen.server.runs.scenario_openapi import publish_scenario_schemas
 from glossogen.server.scenarios.router import router as scenarios_router
 from glossogen.server.server_runtime_config import ServerRuntimeConfig
 
@@ -188,6 +190,9 @@ def create_app(
     State the routers read is set here rather than in the lifespan wherever it is
     known at construction time, so a caller that never runs the lifespan still
     gets an app whose unauthenticated endpoints answer.
+
+    The scenario catalog must be loaded first: the API schema describes the
+    run-detail extras and live events of the scenarios it holds.
     """
     app = FastAPI(
         title="GlossoGen Simulation Server",
@@ -210,6 +215,7 @@ def create_app(
         allowed_origins=runtime_config.allowed_origins,
     )
     _include_api_routers(app=app, identity_provider=identity_provider)
+    publish_scenario_schemas(app=app, extensions=collect_scenario_extensions())
 
     if runtime_config.oauth_issuer_url is None:
         logger.warning(

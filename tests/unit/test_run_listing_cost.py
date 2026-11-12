@@ -181,3 +181,15 @@ async def test_a_response_without_usage_fails_the_scan_naming_its_line(tmp_path:
         ValueError, match=r"veyru\.jsonl line 3 is not a valid llm_response_received"
     ):
         await scan_jsonl(file_path=log_path)
+
+
+async def test_a_log_that_does_not_open_with_its_start_event_fails_the_scan(
+    tmp_path: Path,
+) -> None:
+    """The first line names the scenario the scanned events are parsed with."""
+    lines = [event.model_dump(mode="json") for event in _swapped_run_events()][1:]
+    log_path = tmp_path / "veyru.jsonl"
+    _write_log(log_path=log_path, lines=lines)
+
+    with pytest.raises(ValueError, match="First event is not SimulationStarted"):
+        await scan_jsonl(file_path=log_path)

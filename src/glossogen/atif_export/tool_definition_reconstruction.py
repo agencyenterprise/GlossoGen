@@ -18,6 +18,7 @@ from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
+from glossogen.scenario_contract.event_types import loggable_event_types
 from glossogen.scenario_contract.recorded_scenario_rebuild import rebuild_recorded_scenario
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,11 @@ def reconstruct_tool_definitions(
     if scenario is None:
         return None
     # Never opened: registering tools logs no event.
-    event_logger = EventLogger(log_path=Path("/dev/null"), event_bus=EventBus(max_queue_size=1))
+    event_logger = EventLogger(
+        log_path=Path("/dev/null"),
+        event_bus=EventBus(max_queue_size=1),
+        allowed_event_types=loggable_event_types(scenario_cls=type(scenario)),
+    )
     runtime = SimulationRuntime(
         scenario=scenario,
         channels=[],

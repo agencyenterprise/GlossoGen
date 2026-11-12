@@ -66,7 +66,7 @@ def _read_origin_run_id(run_dir: Path, scenario_name: str, fallback: str) -> str
         with jsonl_path.open("rb") as handle:
             first_line = first_nonblank_line(lines=handle)
         if first_line is not None:
-            event = parse_event_bytes(raw_bytes=first_line)
+            event = parse_event_bytes(raw_bytes=first_line, scenario_name=scenario_name)
             if isinstance(event, SimulationStarted):
                 return event.run_id
     except Exception:
@@ -211,7 +211,7 @@ def _validate_jsonl_first_event(tar: tarfile.TarFile, scenario_name: str) -> Sim
     first_line = first_nonblank_line(lines=extracted)
     if first_line is None:
         raise ValueError(f"{jsonl_name} is empty")
-    event = parse_event_bytes(raw_bytes=first_line)
+    event = parse_event_bytes(raw_bytes=first_line, scenario_name=scenario_name)
     if not isinstance(event, SimulationStarted):
         raise ValueError(f"First event in {jsonl_name} is not SimulationStarted")
     if event.scenario_name != scenario_name:

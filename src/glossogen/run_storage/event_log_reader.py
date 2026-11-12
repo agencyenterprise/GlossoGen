@@ -10,11 +10,12 @@ What the events do not carry cannot come back. ``AgentRegistered`` records no
 compaction settings, so a rebuilt ``AgentConfig`` reports the default rather
 than what the agent ran with.
 
-An event this build has no class for is skipped and counted, not raised on: a
-log can name a scenario that is not installed here, or an event whose name
-changed since the run, and neither should cost the reader the other 99% of the
-run. A malformed event of a type the build does know still raises, so this does
-not quietly swallow a corrupt log.
+A log is parsed with the platform's events and the events its own scenario
+declares, the scenario its first line names. Any other event is skipped and
+counted, not raised on: a log can name a scenario this process has not loaded,
+or an event its scenario no longer declares, and neither should cost the reader
+the other 99% of the run. A malformed event of a type the parser does read still
+raises, so this does not quietly swallow a corrupt log.
 """
 
 import asyncio
@@ -26,13 +27,13 @@ from typing import Any
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.compaction_config import CompactionConfig
-from glossogen.models.event import (
-    AgentRegistered,
-    SimulationEvent,
-    SimulationStarted,
-    known_event_types,
+from glossogen.models.event import AgentRegistered, SimulationEvent, SimulationStarted
+from glossogen.run_storage.event_parsing import (
+    RoundNumberBackfill,
+    RunEventParser,
+    run_event_parser,
+    scenario_name_of_run,
 )
-from glossogen.run_storage.event_parsing import RoundNumberBackfill, parse_event
 from glossogen.run_storage.jsonl_lines import JsonObjectLines
 from glossogen.run_storage.run_archive import strip_legacy_git_dir
 
@@ -44,31 +45,54 @@ def _read_and_parse_events(log_path: Path) -> list[SimulationEvent]:
 
     Both the file read and the per-line ``orjson`` + Pydantic parse are
     CPU-bound; :func:`load_events` runs this in a worker thread so the parse
-    never blocks the server event loop.
+    never blocks the server event loop. Raises ValueError when the first line is
+    not a ``simulation_started``, since that line names the scenario whose events
+    the rest is parsed with.
     """
     strip_legacy_git_dir(run_dir=log_path.parent)
     events: list[SimulationEvent] = []
-    unreadable: Counter[str] = Counter()
-    known = known_event_types()
+    skipped: Counter[str] = Counter()
+    parser: RunEventParser | None = None
     round_numbers = RoundNumberBackfill()
     with open(log_path, mode="rb") as f:
         for record in JsonObjectLines(lines=f):
+            if parser is None:
+                parser = run_event_parser(
+                    scenario_name=scenario_name_of_run(first_record=record, origin=str(log_path))
+                )
             event_type = record.get("event_type")
-            if isinstance(event_type, str) and event_type not in known:
+            if isinstance(event_type, str) and not parser.declares(event_type=event_type):
                 round_numbers.observe(record=record)
-                unreadable[event_type] += 1
+                skipped[event_type] += 1
                 continue
-            events.append(parse_event(raw=round_numbers.apply(record=record)))
+            events.append(parser.parse(raw=round_numbers.apply(record=record)))
     logger.info("Loaded %d events from %s", len(events), log_path)
-    if unreadable:
-        logger.warning(
-            "Skipped %d event(s) of %s: no class in this build declares them, so the run "
-            "reads back without them. Counts by type: %s",
-            sum(unreadable.values()),
-            log_path,
-            dict(sorted(unreadable.items())),
-        )
+    if parser is not None and skipped:
+        _warn_skipped(log_path=log_path, parser=parser, skipped=skipped)
     return events
+
+
+def _warn_skipped(log_path: Path, parser: RunEventParser, skipped: Counter[str]) -> None:
+    """Log one warning for the events a read skipped, with their counts by type."""
+    if not parser.scenario_loaded:
+        logger.warning(
+            "Skipped %d event(s) of %s: the run was made by scenario %r, which this "
+            "process has not loaded, so the run reads back with the platform's events "
+            "only. Counts by type: %s",
+            sum(skipped.values()),
+            log_path,
+            parser.scenario_name,
+            dict(sorted(skipped.items())),
+        )
+        return
+    logger.warning(
+        "Skipped %d event(s) of %s: scenario %r does not declare them in event_types(), "
+        "so the run reads back without them. Counts by type: %s",
+        sum(skipped.values()),
+        log_path,
+        parser.scenario_name,
+        dict(sorted(skipped.items())),
+    )
 
 
 async def load_events(log_path: Path) -> list[SimulationEvent]:
@@ -79,10 +103,14 @@ async def load_events(log_path: Path) -> list[SimulationEvent]:
     lacks it, tracking the most recent ``RoundAdvanced`` while walking the
     log so each event receives the round it was emitted in. Lifecycle
     events emitted before round 1 (``simulation_started``,
-    ``agent_registered``) get ``round_number=0``. ``parse_event`` further
+    ``agent_registered``) get ``round_number=0``. The parser further
     backfills the ``round_number`` on the nested ``message`` payload of
     ``message_sent`` events from the parent event's ``round_number`` for
     runs that predate per-message round tagging.
+
+    The log is parsed with the platform's events and those of the scenario its
+    first line names; an event of any other type is skipped and counted in one
+    warning.
 
     Runs the read + parse in a worker thread so the CPU-bound work does not
     block the event loop.

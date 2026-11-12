@@ -13,14 +13,8 @@ import os
 from fastapi import FastAPI
 
 from glossogen.scenario_contract.catalog import built_in_scenario_sources, load_scenario_catalog
-
-# The run-detail models build their scenario unions from the scenario catalog
-# when they are imported, so the catalog is loaded before anything from
-# glossogen.server is imported.
-load_scenario_catalog(sources=built_in_scenario_sources())
-
-from glossogen.server.app_factory import create_app  # noqa: E402
-from glossogen.server.server_runtime_config import load_server_runtime_config  # noqa: E402
+from glossogen.server.app_factory import create_app
+from glossogen.server.server_runtime_config import load_server_runtime_config
 
 # The MCP consent and whoami routes are mounted only when OAUTH_ISSUER_URL is
 # set, so it is pinned to keep the exported schema covering the full MCP surface.
@@ -34,9 +28,10 @@ _EXPORT_IDENTITY_PROVIDER = None
 
 
 def build_export_app() -> FastAPI:
-    """Build an app whose route set is a property of this repository alone."""
+    """Build an app whose route set and scenarios are a property of this repository alone."""
     os.environ.setdefault("OAUTH_ISSUER_URL", _EXPORT_OAUTH_ISSUER_URL)
     os.environ.setdefault("GLOSSOGEN_RUNS_DIR", "./runs")
+    load_scenario_catalog(sources=built_in_scenario_sources())
     return create_app(
         identity_provider=_EXPORT_IDENTITY_PROVIDER,
         runtime_config=load_server_runtime_config(),

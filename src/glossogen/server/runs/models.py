@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Discriminator
+from pydantic import BaseModel, Discriminator, SerializeAsAny
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
@@ -24,23 +24,6 @@ from glossogen.run_storage.run_summary_models import (
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunExtrasBase
 from glossogen.scenario_contract.run_detail_types import AgentDetail, ChannelMessage
 from glossogen.server.response_models import LaunchStatus
-from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
-
-_SCENARIO_EXTRAS_TYPES: tuple[type[ScenarioRunExtrasBase], ...] = tuple(
-    ext.extras_model_cls for ext in SCENARIO_RUN_EXTENSIONS.values()
-)
-
-# ``ScenarioRunExtras`` is a runtime-built discriminated union over every
-# ``ScenarioRunExtrasBase`` subclass a scenario's ``run_detail_extension()``
-# declares. ``Union`` accepts a tuple at runtime;
-# the ``Any`` cast hides this from the static type checker since the
-# tuple is only known at runtime. When no scenario advertises extras the
-# union falls back to the base class so the OpenAPI schema stays valid.
-if _SCENARIO_EXTRAS_TYPES:
-    _scenario_extras_union: Any = Union[_SCENARIO_EXTRAS_TYPES]
-else:
-    _scenario_extras_union = ScenarioRunExtrasBase
-ScenarioRunExtras = Annotated[_scenario_extras_union, Discriminator("scenario_name")]
 
 
 class DerivedRunReference(BaseModel):
@@ -401,7 +384,10 @@ class RunDetailResponse(BaseModel):
     round_endings: list[RoundEnding]
     round_results: list[RoundResult]
     round_injections: list[RoundInjection]
-    scenario_extras: ScenarioRunExtras | None
+    # Typed as the base so this model does not depend on which scenarios are
+    # loaded; serialized as the subclass it holds. The API schema publishes the
+    # union of every loaded scenario's extras (server/runs/scenario_openapi.py).
+    scenario_extras: SerializeAsAny[ScenarioRunExtrasBase] | None
 
 
 class DebugLogsResponse(BaseModel):
@@ -680,7 +666,7 @@ class SSEAgentRunCycleFailed(BaseModel):
     message: str
 
 
-_CORE_SSE_TYPES: tuple[type[BaseModel], ...] = (
+PLATFORM_SSE_EVENT_TYPES: tuple[type[BaseModel], ...] = (
     SSESimulationStarted,
     SSEAgentRegistered,
     SSEAgentConnected,
@@ -696,9 +682,8 @@ _CORE_SSE_TYPES: tuple[type[BaseModel], ...] = (
     SSEAgentRunCycleFailed,
 )
 
-_SCENARIO_SSE_TYPES: tuple[type[BaseModel], ...] = tuple(
-    cls for ext in SCENARIO_RUN_EXTENSIONS.values() for cls in ext.sse_event_classes
-)
-
-_sse_event_union: Any = Union[(*_CORE_SSE_TYPES, *_SCENARIO_SSE_TYPES)]
-SSEEvent = Annotated[_sse_event_union, Discriminator("event_type")]
+# The platform's SSE events. A scenario's run-detail extension can add its own;
+# the app factory publishes the union with those in the API schema
+# (server/runs/scenario_openapi.py).
+_platform_sse_event_union: Any = Union[PLATFORM_SSE_EVENT_TYPES]
+PlatformSSEEvent = Annotated[_platform_sse_event_union, Discriminator("event_type")]

@@ -66,9 +66,9 @@ from glossogen.server.runs.models import (
     EvalLogsResponse,
     EvalReportResponse,
     NoteResponse,
+    PlatformSSEEvent,
     RunDetailResponse,
     RunListResponse,
-    SSEEvent,
     StartEvaluationRequest,
     StartEvaluationResponse,
     UpdateEvaluationResponse,
@@ -576,7 +576,7 @@ async def _proxy_simulation_sse(
         200: {
             "description": "SSE event stream. Each SSE frame has an `event` field matching "
             "the event_type discriminator and a `data` field containing the JSON payload.",
-            "model": SSEEvent,
+            "model": PlatformSSEEvent,
         },
     },
 )

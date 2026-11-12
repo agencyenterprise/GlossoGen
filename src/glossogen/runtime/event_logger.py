@@ -1,7 +1,9 @@
 """Async event logger that writes simulation events as newline-delimited JSON to a file.
 
 Publishes each logged event to the ``EventBus`` it is constructed with, for
-real-time delivery to SSE subscribers.
+real-time delivery to SSE subscribers. Logs only the event classes it is built
+with, the platform's and the running scenario's declared ones, so every line it
+writes is one a reader of the run can parse.
 """
 
 import asyncio
@@ -11,18 +13,35 @@ from pathlib import Path
 import aiofiles
 import orjson
 
-from glossogen.models.event import SimulationEvent
+from glossogen.models.event import SimulationEvent, fixed_event_type
+from glossogen.models.event_base import EventBase
 from glossogen.runtime.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
 
-class EventLogger:
-    """Writes ``SimulationEvent`` objects as newline-delimited JSON (JSONL) to a binary file."""
+class UndeclaredEventType(TypeError):
+    """Raised when an event's class is not one the logger was built to accept."""
 
-    def __init__(self, log_path: Path, event_bus: EventBus) -> None:
+
+class EventLogger:
+    """Writes ``SimulationEvent`` objects as newline-delimited JSON (JSONL) to a binary file.
+
+    ``allowed_event_types`` are the classes it logs: the platform's events and the
+    ones the running scenario declares in ``event_types()``
+    (:func:`glossogen.scenario_contract.event_types.loggable_event_types`). A run
+    is read back with exactly those, so any other class is refused.
+    """
+
+    def __init__(
+        self,
+        log_path: Path,
+        event_bus: EventBus,
+        allowed_event_types: frozenset[type[EventBase]],
+    ) -> None:
         """Store the target log file path. The file is not opened until ``open()`` is called."""
         self._log_path = log_path
+        self._allowed_event_types = allowed_event_types
         self._file: aiofiles.threadpool.binary.AsyncBufferedIOBase | None = None
         self._event_bus = event_bus
         self._write_lock = asyncio.Lock()
@@ -51,8 +70,18 @@ class EventLogger:
         """Serialize ``event`` to JSON, write it as a single line, and flush.
 
         Also publishes the event to the event bus for live streaming.
-        Raises ``RuntimeError`` if the logger has not been opened.
+        Raises :class:`UndeclaredEventType` for an event class the logger does not
+        accept, and ``RuntimeError`` if the logger has not been opened.
         """
+        event_cls = type(event)
+        if event_cls not in self._allowed_event_types:
+            raise UndeclaredEventType(
+                f"Refusing to log {event_cls.__module__}.{event_cls.__qualname__} "
+                f"(event_type {fixed_event_type(event_cls=event_cls)!r}): it is neither "
+                "a platform event nor one the running scenario returns from "
+                "event_types(), so a reader of this run would skip it. Add it to the "
+                "scenario's event_types()."
+            )
         if self._file is None:
             raise RuntimeError("EventLogger is not open. Call open() first.")
         event_dict = event.model_dump(mode="json")

@@ -50,22 +50,16 @@ reactor-purge/
 ├── pyproject.toml               # entry point + package-data
 ├── tests/                       # the scripted round loop; see Testing a scenario
 └── reactor_purge/
-    ├── __init__.py              # stays empty (below)
+    ├── __init__.py
     ├── ids.py                   # agent ids, channel ids, tool names, markers
     ├── knobs.py                 # Pydantic knobs extending BaseKnobs
     ├── knobs_default.json       # the canonical preset
-    ├── events.py                # EventBase subclasses, auto-discovered
+    ├── events.py                # EventBase subclasses, returned by event_types()
     ├── team_declaration.py      # teams, roles, channels, as data
     ├── world.py                 # live state + reactions
     ├── scenario.py              # the SimulationScenario contract
     └── prompts/                 # every word an agent or judge reads
 ```
-
-**The package `__init__.py` stays empty, and `events.py` imports only
-[`glossogen.models.event_base`](../src/glossogen/models/event_base.py).** Event
-discovery imports your `events` module while `glossogen.models.event` is itself
-mid-import, so anything that pulls the wider module in closes that cycle and the
-platform fails at startup. `validate` checks both.
 
 ## The files, and what to change in each
 
@@ -77,7 +71,7 @@ follows it.
 | `ids.py` | Every literal string used more than once: agent and channel ids, role names, tool names, world marker strings | Anything with behaviour. If it needs an `if`, it belongs elsewhere |
 | `knobs.py` | Scenario-specific fields, plus validators rejecting impossible combinations. `seed` belongs here: `BaseKnobs` has none | Anything `BaseKnobs` already declares; redeclaring one shadows the platform's |
 | `knobs_default.json` | The canonical preset, the values "by default" means | Experiment presets, which are separate `knobs_*.json` files |
-| `events.py` | The scenario's own event types | Imports from `glossogen.models.event` |
+| `events.py` | The scenario's own event types | Event types the scenario does not return from `event_types()` |
 | `team_declaration.py` | The teams, and for each its task channel, debrief policy and roles | Prompt text, and anything that varies within a round |
 | `world.py` | State that changes during a round, and the reactions to it | Anything read only at round boundaries |
 | `scenario.py` | The platform contract: injections, tools, scoring. Structure it derives from the declaration | Mutable per-round state (world's), prose (prompts'), rosters (the declaration's) |
@@ -141,8 +135,17 @@ none of them.
 
 ### `events.py`
 
-One `EventBase` subclass per scenario event, each with a unique `event_type`
-literal. The discovered-union parser picks them up. You never edit
+One `EventBase` subclass per scenario event, each with a fixed `event_type`
+literal that no platform event and none of your other events uses. The file name
+is a convention: the events can live anywhere, including the scenario module.
+
+What makes them yours is `event_types()` on the scenario class, which returns
+every one of them (see [In this repo, or in your own package](#in-this-repo-or-in-your-own-package)).
+A run is read back with the platform's events plus the ones its scenario returns
+there, and nothing else. The event logger raises when the scenario logs a class
+it does not return, so a forgotten one fails the first test run rather than
+vanishing from every later read. `validate` reports an event class defined in
+your package that `event_types()` leaves out. You never edit
 `glossogen/models/event.py`.
 
 ```python
@@ -636,8 +639,9 @@ class ReactorPurgeScenario(SimulationScenario):
 ```
 
 The catalog finds the class by scanning `glossogen/scenarios/`, so no file outside
-your package changes. `event_types()` must list every event class your
-`events.py` defines; a test checks this for every scenario in the repo.
+your package changes. `event_types()` must list every event class the scenario
+logs; the event logger refuses any other, and the conformance suite checks every
+scenario in the repo for event classes it defines and leaves out.
 
 **In your own package**: registration is the entry point the generator already
 declared. The key is the name callers pass to `glossogen run` and the API, the
@@ -748,9 +752,8 @@ The report should hold one Measurement per metric with sensible `score` and
 
 ## Common pitfalls
 
-- **`ImportError` naming your scenario at platform startup.** Check that
-  `__init__.py` is empty and `events.py` does not import
-  `glossogen.models.event`.
+- **`UndeclaredEventType` the first time the scenario logs an event.** Add the
+  class to what `event_types()` returns.
 - **A late-arriving agent saw the traffic it was meant to arrive after.** Check
   `starts_as_member` on that role. The run completes and only the experiment's
   meaning changed.

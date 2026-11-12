@@ -25,6 +25,7 @@ from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_registry import WakeReason
+from glossogen.scenario_contract.event_types import loggable_event_types
 from glossogen.scenarios.move_a_box.events import MoveABoxActionTaken, MoveABoxOperatorFinished
 from glossogen.scenarios.move_a_box.ids import OPERATOR_A, OPERATOR_B, Direction, HaulMethod
 from glossogen.scenarios.move_a_box.planned_action import CrateAction, PlannedStep
@@ -43,7 +44,11 @@ class HeldLogger(EventLogger):
     """Keeps logged events in memory and holds the first action logged until let through."""
 
     def __init__(self, log_path: Path) -> None:
-        super().__init__(log_path=log_path, event_bus=EventBus(max_queue_size=100))
+        super().__init__(
+            log_path=log_path,
+            event_bus=EventBus(max_queue_size=100),
+            allowed_event_types=loggable_event_types(scenario_cls=MoveABoxScenario),
+        )
         self.events: list[SimulationEvent] = []
         self.holding = asyncio.Event()
         self.let_through = asyncio.Event()

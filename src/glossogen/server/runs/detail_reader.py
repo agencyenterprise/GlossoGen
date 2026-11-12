@@ -71,7 +71,7 @@ from glossogen.server.runs.models import (
     ToolUseEntry,
 )
 from glossogen.server.runs.reasoning_entries import reasoning_entries_of
-from glossogen.server.runs.scenario_extension import SCENARIO_RUN_EXTENSIONS
+from glossogen.server.runs.scenario_extension import scenario_extension
 
 logger = logging.getLogger(__name__)
 
@@ -507,7 +507,7 @@ async def load_run_detail(
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()
 
-    extension = SCENARIO_RUN_EXTENSIONS.get(scenario_name)
+    extension = scenario_extension(scenario_name=scenario_name)
     if extension is not None:
         scenario_extras = extension.build_extras(
             events=events, agents_by_id=agents_by_id, messages=messages

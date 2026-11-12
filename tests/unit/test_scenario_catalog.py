@@ -1,9 +1,9 @@
 """The ``@scenario`` decorator, the directory scan and the scenario catalog."""
 
 import importlib
-import inspect
 import sys
 import textwrap
+from collections.abc import Generator
 from importlib.metadata import EntryPoint
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import glossogen.scenarios
-from glossogen.models.event_base import EventBase
+from glossogen.run_storage.event_parsing import run_event_parser
 from glossogen.scenario_contract import catalog, registration
 from glossogen.scenario_contract.catalog import (
     PackageScanSource,
@@ -19,6 +19,7 @@ from glossogen.scenario_contract.catalog import (
     ScenarioCatalogNotLoaded,
     current_scenario_catalog,
     load_scenario_catalog,
+    scenario_catalog_installed,
     uses_scenario_decorator,
 )
 from glossogen.scenario_contract.entry_points import SCENARIO_ENTRY_POINT_GROUP
@@ -38,10 +39,15 @@ BUILT_IN_PACKAGES = sorted(
 
 
 @pytest.fixture
-def empty_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Give the test a registry of its own, and restore the process catalog afterwards."""
+def empty_registry(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
+    """Give the test a registry of its own, and restore the process catalog afterwards.
+
+    Restoring through ``scenario_catalog_installed`` puts back the run readers'
+    event-type lookup too, which loading a catalog replaces.
+    """
     monkeypatch.setattr(registration, "_REGISTERED", {})
-    monkeypatch.setattr(catalog, "_current", current_scenario_catalog())
+    with scenario_catalog_installed(catalog=current_scenario_catalog()):
+        yield
 
 
 def test_the_catalog_holds_every_built_in_under_its_package_name() -> None:
@@ -52,29 +58,6 @@ def test_the_catalog_holds_every_built_in_under_its_package_name() -> None:
     for name, scenario_cls in loaded.classes():
         assert scenario_cls.name() == name
         assert scenario_cls.__module__ == f"glossogen.scenarios.{name}.scenario"
-
-
-@pytest.mark.parametrize("name", BUILT_IN_PACKAGES)
-def test_event_types_are_exactly_what_the_events_module_defines(name: str) -> None:
-    """``event_types()`` matches the classes the ``events`` module discovery reads.
-
-    Once parsing relies on ``event_types()`` alone, an event class left out here
-    would stop parsing back from every log that holds one.
-    """
-    events_module = importlib.import_module(f"glossogen.scenarios.{name}.events")
-    defined = {
-        attribute
-        for attribute in vars(events_module).values()
-        if isinstance(attribute, type)
-        and issubclass(attribute, EventBase)
-        and attribute is not EventBase
-        and attribute.__module__ == events_module.__name__
-        and not inspect.isabstract(attribute)
-    }
-    declared = get_scenario_class(name=name).event_types()
-
-    assert len(declared) == len(set(declared)), "an event type is declared twice"
-    assert set(declared) == defined
 
 
 @pytest.mark.usefixtures("empty_registry")
@@ -311,6 +294,115 @@ def test_an_undecorated_subclass_of_a_built_in_answers_with_its_own_package() ->
         ),
         loaded=FromAnotherPackage,
     )
+
+
+@pytest.mark.usefixtures("empty_registry")
+def test_loading_a_catalog_installs_its_event_types_for_the_run_readers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Runs are parsed with the events of the catalog that is current, and only it."""
+    write_package(
+        root=tmp_path,
+        package="events_pkg",
+        files={"scen.py": scenario_module_with_events(name="with_events", event_type="probe_ping")},
+    )
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    loaded = load_scenario_catalog(sources=(PackageScanSource(package="events_pkg"),))
+
+    declared = loaded.event_types_of(name="with_events")
+    assert declared is not None
+    assert [cls.__name__ for cls in declared] == ["Ping"]
+    assert loaded.event_types_of(name="veyru") is None
+    assert run_event_parser(scenario_name="with_events").declares(event_type="probe_ping")
+    assert not run_event_parser(scenario_name="veyru").scenario_loaded
+
+
+def test_installing_a_catalog_for_a_block_restores_the_run_readers_lookup() -> None:
+    """A widened catalog for checks must not leave the readers on it afterwards."""
+    before = current_scenario_catalog()
+    with scenario_catalog_installed(
+        catalog=before.including(name="borrowed", scenario_cls=VeyruScenario)
+    ):
+        assert run_event_parser(scenario_name="borrowed").scenario_loaded
+    assert not run_event_parser(scenario_name="borrowed").scenario_loaded
+
+
+@pytest.mark.usefixtures("empty_registry")
+@pytest.mark.parametrize(
+    ("event_type", "reason"),
+    [
+        ("message_sent", "MessageSent already uses"),
+        ("probe_twice", "Ping already uses"),
+    ],
+)
+def test_the_catalog_refuses_an_event_type_a_parser_could_not_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event_type: str, reason: str
+) -> None:
+    """A discriminator the platform or the scenario already uses cannot share its parser."""
+    module = scenario_module_with_events(
+        name="clashing", event_type="probe_twice"
+    ) + textwrap.dedent(
+        f"""
+
+        class Clash(EventBase):
+            event_type: Literal[{event_type!r}] = {event_type!r}
+
+
+        Scenario.event_types = classmethod(lambda cls: (Ping, Clash))
+        """
+    )
+    # A package name per case: an imported module is cached, and would not register again.
+    package = f"clash_{event_type}_pkg"
+    write_package(root=tmp_path, package=package, files={"scen.py": module})
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    with pytest.raises(ScenarioCatalogError, match=reason):
+        load_scenario_catalog(sources=(PackageScanSource(package=package),))
+
+
+@pytest.mark.usefixtures("empty_registry")
+def test_the_catalog_refuses_an_event_without_a_fixed_event_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing can dispatch to an event whose ``event_type`` varies."""
+    module = scenario_module_with_events(name="unfixed", event_type="probe_ok") + textwrap.dedent(
+        """
+
+        class Unfixed(EventBase):
+            event_type: str
+
+
+        Scenario.event_types = classmethod(lambda cls: (Unfixed,))
+        """
+    )
+    write_package(root=tmp_path, package="unfixed_pkg", files={"scen.py": module})
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    with pytest.raises(ScenarioCatalogError, match="no fixed event_type"):
+        load_scenario_catalog(sources=(PackageScanSource(package="unfixed_pkg"),))
+
+
+def scenario_module_with_events(name: str, event_type: str) -> str:
+    """Return a module defining scenario ``name``, which declares one event, ``Ping``."""
+    return textwrap.dedent(f"""
+        from typing import Literal
+
+        from glossogen.models.event_base import EventBase
+        from glossogen.scenario_contract.registration import scenario
+        from glossogen.scenarios.veyru.scenario import VeyruScenario
+
+
+        class Ping(EventBase):
+            event_type: Literal[{event_type!r}] = {event_type!r}
+
+
+        @scenario(name={name!r})
+        class Scenario(VeyruScenario):
+            @classmethod
+            def event_types(cls):
+                return (Ping,)
+        """)
 
 
 def decorated_scenario_module(name: str) -> str:

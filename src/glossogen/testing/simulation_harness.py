@@ -40,7 +40,7 @@ from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck
 from glossogen.runtime.simulation_state import SimulationRuntime
-from glossogen.scenario_contract.event_types import run_event_parser
+from glossogen.scenario_contract.event_types import loggable_event_types, run_event_parser
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.testing.scripted_agent import (
     EventGate,
@@ -415,7 +415,11 @@ async def _run_supervised(
     the waiter.
     """
     event_bus = EventBus(max_queue_size=10_000)
-    event_logger = EventLogger(log_path=log_path, event_bus=event_bus)
+    event_logger = EventLogger(
+        log_path=log_path,
+        event_bus=event_bus,
+        allowed_event_types=loggable_event_types(scenario_cls=type(scenario)),
+    )
 
     agent_configs = scenario.get_agents(
         default_model="scripted-model",

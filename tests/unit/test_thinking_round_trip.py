@@ -28,6 +28,7 @@ from glossogen.models.event import (
     StopReason,
     ToolCallInvoked,
     ToolResultReceived,
+    core_event_types,
 )
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
@@ -174,9 +175,22 @@ async def test_stream_records_each_part_with_the_identifiers_it_receives(tmp_pat
         telemetry_enabled=False,
     )
     event_logger = EventLogger(
-        log_path=tmp_path / "smoke.jsonl", event_bus=EventBus(max_queue_size=8)
+        log_path=tmp_path / "smoke.jsonl",
+        event_bus=EventBus(max_queue_size=8),
+        allowed_event_types=frozenset(core_event_types()),
     )
     await event_logger.open()
+    await event_logger.log(
+        event=SimulationStarted(
+            round_number=0,
+            run_id="smoke/1",
+            scenario_name="smoke",
+            scenario_description="",
+            channel_ids=["link"],
+            scenario_config={},
+            provider="openai",
+        )
+    )
     state = _StreamingState()
     stream = [
         PartStartEvent(index=0, part=ThinkingPart(content="", id="rs_1", provider_name="openai")),

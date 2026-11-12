@@ -180,7 +180,7 @@ def test_a_round_recorded_with_one_shared_bay_list_reads_back_as_square_bays() -
         "crate_ids": {f"{OPERATOR_A}#1": "CR-1111", f"{OPERATOR_B}#1": "CR-2222"},
         "crate_masses": {f"{OPERATOR_A}#1": 30, f"{OPERATOR_B}#1": 40},
     }
-    event = parse_event(raw=record)
+    event = parse_event(raw=record, scenario_name="move_a_box")
 
     assert isinstance(event, MoveABoxRoundStarted)
     assert event.bay_identity == "square"

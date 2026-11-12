@@ -10,16 +10,22 @@ are asserted here directly rather than inferred from the code.
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import orjson
 import pytest
 
-from glossogen.models.event import MessageSent
+from glossogen.models.event import MessageSent, core_event_types
+from glossogen.models.event_base import EventBase
 from glossogen.models.message import SimulationMessage
 from glossogen.run_storage.run_archive import EventLocation, find_event_offset
 from glossogen.runtime.event_bus import EventBus
-from glossogen.runtime.event_logger import EventLogger
+from glossogen.runtime.event_logger import EventLogger, UndeclaredEventType
+from glossogen.scenario_contract.event_types import loggable_event_types
+from glossogen.scenarios.move_a_box.events import MoveABoxOperatorFinished
+from glossogen.scenarios.move_a_box.scenario import MoveABoxScenario
 
+PLATFORM_EVENTS = frozenset(core_event_types())
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
@@ -57,7 +63,7 @@ async def log_all(*, logger: EventLogger, events: list[MessageSent]) -> None:
 async def test_writes_one_json_line_per_event(tmp_path: Path, event_bus: EventBus) -> None:
     """Each logged event is exactly one parseable line, in the order written."""
     path = tmp_path / "run.jsonl"
-    logger = EventLogger(log_path=path, event_bus=event_bus)
+    logger = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await logger.open()
     await log_all(
         logger=logger,
@@ -80,7 +86,7 @@ async def test_event_offsets_do_not_move_when_more_events_arrive(
     in the wrong place.
     """
     path = tmp_path / "run.jsonl"
-    logger = EventLogger(log_path=path, event_bus=event_bus)
+    logger = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await logger.open()
 
     await log_all(
@@ -108,18 +114,18 @@ async def test_open_truncates_but_append_preserves(tmp_path: Path, event_bus: Ev
     """``open`` starts a clean run; ``open_for_append`` continues one."""
     path = tmp_path / "run.jsonl"
 
-    first = EventLogger(log_path=path, event_bus=event_bus)
+    first = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await first.open()
     await first.log(event=build_message(event_id="e0", round_number=1, content="first"))
     await first.close()
 
-    resumed = EventLogger(log_path=path, event_bus=event_bus)
+    resumed = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await resumed.open_for_append()
     await resumed.log(event=build_message(event_id="e1", round_number=2, content="second"))
     await resumed.close()
     assert len(path.read_bytes().splitlines()) == 2
 
-    restarted = EventLogger(log_path=path, event_bus=event_bus)
+    restarted = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await restarted.open()
     await restarted.close()
     assert path.read_bytes() == b""
@@ -127,14 +133,18 @@ async def test_open_truncates_but_append_preserves(tmp_path: Path, event_bus: Ev
 
 async def test_append_to_missing_file_fails_loudly(tmp_path: Path, event_bus: EventBus) -> None:
     """Resuming a run whose log is gone raises rather than starting an empty one."""
-    logger = EventLogger(log_path=tmp_path / "absent.jsonl", event_bus=event_bus)
+    logger = EventLogger(
+        log_path=tmp_path / "absent.jsonl", event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS
+    )
     with pytest.raises(FileNotFoundError):
         await logger.open_for_append()
 
 
 async def test_logging_before_open_fails_loudly(tmp_path: Path, event_bus: EventBus) -> None:
     """Writing to an unopened logger raises instead of dropping the event."""
-    logger = EventLogger(log_path=tmp_path / "run.jsonl", event_bus=event_bus)
+    logger = EventLogger(
+        log_path=tmp_path / "run.jsonl", event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS
+    )
     with pytest.raises(RuntimeError):
         await logger.log(event=build_message(event_id="e0", round_number=1, content="m"))
 
@@ -148,7 +158,7 @@ async def test_concurrent_writes_never_interleave(tmp_path: Path, event_bus: Eve
     depends on are computed from it.
     """
     path = tmp_path / "run.jsonl"
-    logger = EventLogger(log_path=path, event_bus=event_bus)
+    logger = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
     await logger.open()
 
     # Payloads large enough that a partial write would be visible.
@@ -171,7 +181,9 @@ async def test_concurrent_writes_never_interleave(tmp_path: Path, event_bus: Eve
 async def test_logged_events_reach_the_event_bus(tmp_path: Path, event_bus: EventBus) -> None:
     """Live SSE viewers see an event only if the logger publishes it."""
     queue = event_bus.create_subscriber_queue()
-    logger = EventLogger(log_path=tmp_path / "run.jsonl", event_bus=event_bus)
+    logger = EventLogger(
+        log_path=tmp_path / "run.jsonl", event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS
+    )
     await logger.open()
     await logger.log(event=build_message(event_id="e0", round_number=1, content="hello"))
     await logger.close()
@@ -181,3 +193,77 @@ async def test_logged_events_reach_the_event_bus(tmp_path: Path, event_bus: Even
     message = published["message"]
     assert isinstance(message, dict)
     assert message["text"] == "hello"
+
+
+class Undeclared(EventBase):
+    """An event no scenario and no platform declares."""
+
+    event_type: Literal["nobody_declares_this"] = "nobody_declares_this"
+
+
+async def test_an_event_the_logger_was_not_built_to_accept_is_refused(
+    tmp_path: Path, event_bus: EventBus
+) -> None:
+    """A run's reader skips what its scenario does not declare, so the writer refuses it.
+
+    Nothing is written and nothing is published, so the log stays readable as it is.
+    """
+    path = tmp_path / "run.jsonl"
+    queue = event_bus.create_subscriber_queue()
+    logger = EventLogger(log_path=path, event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS)
+    await logger.open()
+
+    with pytest.raises(UndeclaredEventType, match="nobody_declares_this"):
+        await logger.log(event=Undeclared(round_number=1))
+    await logger.close()
+
+    assert path.read_bytes() == b""
+    assert queue.empty()
+
+
+async def test_a_scenarios_declared_event_is_logged(tmp_path: Path, event_bus: EventBus) -> None:
+    """The scenario's ``event_types()`` are what widen the platform's set."""
+    path = tmp_path / "run.jsonl"
+    logger = EventLogger(
+        log_path=path,
+        event_bus=event_bus,
+        allowed_event_types=loggable_event_types(scenario_cls=MoveABoxScenario),
+    )
+    await logger.open()
+    await logger.log(
+        event=MoveABoxOperatorFinished(
+            round_number=1,
+            agent_id="operator_a",
+            crate_id="operator_a#1",
+            crate_marking="CR-1111",
+            cell=(1, 1),
+            bay=None,
+            temperature=20,
+            steps_used=3,
+            reasoning=None,
+        )
+    )
+    await logger.close()
+
+    assert orjson.loads(path.read_bytes())["event_type"] == "move_a_box_operator_finished"
+
+
+async def test_a_subclass_of_an_accepted_event_is_refused(
+    tmp_path: Path, event_bus: EventBus
+) -> None:
+    """It would parse back as its parent, losing whatever it adds, so it must be declared itself."""
+
+    class Narrowed(MessageSent):
+        """A scenario's variant of a platform event."""
+
+    logger = EventLogger(
+        log_path=tmp_path / "run.jsonl", event_bus=event_bus, allowed_event_types=PLATFORM_EVENTS
+    )
+    await logger.open()
+    narrowed = Narrowed.model_validate(
+        build_message(event_id="e0", round_number=1, content="m").model_dump()
+    )
+
+    with pytest.raises(UndeclaredEventType, match="Narrowed"):
+        await logger.log(event=narrowed)
+    await logger.close()

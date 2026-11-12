@@ -2,9 +2,9 @@
 
 Every check here guards a failure that is silent at the time it happens. A repeated
 `event_type` shadows one side of the parser, so the run writes fine and reads back
-afterwards as something else. An `events` module that raises is logged and skipped
-by discovery, on purpose, so a third-party plug-in cannot stop the platform reading
-unrelated logs, which also means its author is never told. A probe config naming a
+afterwards as something else. An event class the scenario defines but leaves out
+of `event_types()` is refused by the event logger and skipped by every reader, and
+the first sign is a failed run. A probe config naming a
 file that is not there makes every metric in that family report having nothing to
 measure, which is what a run with nothing to measure reports too.
 
@@ -15,9 +15,7 @@ every preset.
 """
 
 import inspect
-import shutil
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, Literal
 
 import pytest
@@ -37,7 +35,7 @@ SCENARIO = "prisoners_dilemma"
 COLLISION = "events do not collide with the platform's"
 LITERAL = "events declare a literal event_type"
 PARSER = "events parse alongside the platform's"
-BASE_IMPORT = "events.py imports only the event base"
+DECLARED = "defined events are declared"
 JUDGES = "declared judge models are readable"
 PROBE = "the probe config points at files that exist"
 
@@ -65,35 +63,36 @@ def passes(check_name: str, scenario_name: str) -> bool:
     return all(outcome.passed for outcome in outcomes_for(check_name, scenario_name))
 
 
-def scenario_package_dir() -> Path:
-    """The directory `prisoners_dilemma` ships from."""
-    scenario_cls = get_scenario_class(name=SCENARIO)
-    prepared = scenario_cls.prepare_config(
-        config=dict(scenario_cls.load_knobs_preset(preset_name="knobs_default"))
-    )
-    scenario = scenario_cls.create_from_config(config=dict(prepared))
-    return Path(str(scenario.scenario_package_files()))
-
-
 @pytest.fixture(name="declare_event")
-def declare_event_fixture() -> Any:
-    """Add an event class to the scenario's events module, and remove it after.
+def declare_event_fixture(monkeypatch: pytest.MonkeyPatch) -> Callable[[type[EventBase]], None]:
+    """Add an event class to what the scenario returns from `event_types()`.
 
-    Declared in the module rather than by patching a discovery result, because the
-    module is what the check reads: `EventBase.__subclasses__` holds every
-    scenario's events at once and cannot say whose is whose.
+    The class is also placed in the scenario's events module, as an author would
+    write it, so the check for undeclared events sees it as the scenario's own.
     """
-    added: list[type[EventBase]] = []
+    scenario_cls = get_scenario_class(name=SCENARIO)
+    declared = list(scenario_cls.event_types())
+
+    def event_types(cls: type[SimulationScenario]) -> tuple[type[EventBase], ...]:
+        _ = cls
+        return tuple(declared)
+
+    monkeypatch.setattr(scenario_cls, "event_types", classmethod(event_types))
 
     def declare(event_cls: type[EventBase]) -> None:
-        event_cls.__module__ = pd_events.__name__
-        setattr(pd_events, event_cls.__name__, event_cls)
-        added.append(event_cls)
+        define_in_the_events_module(event_cls=event_cls, monkeypatch=monkeypatch)
+        declared.append(event_cls)
 
-    yield declare
+    return declare
 
-    for event_cls in added:
-        delattr(pd_events, event_cls.__name__)
+
+def define_in_the_events_module(
+    event_cls: type[EventBase], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Make ``event_cls`` a class of the scenario's events module until the test ends."""
+    event_cls.__module__ = pd_events.__name__
+    event_cls.__qualname__ = event_cls.__name__
+    monkeypatch.setattr(pd_events, event_cls.__name__, event_cls, raising=False)
 
 
 def test_an_event_stealing_a_platform_discriminator_is_reported(
@@ -162,48 +161,57 @@ def test_an_event_without_a_fixed_discriminator_is_reported(
     assert "Unfixed" in failed(LITERAL, SCENARIO).detail
 
 
-def test_an_events_module_importing_the_event_union_is_reported(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_an_event_the_scenario_defines_but_does_not_declare_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The documented deadlock, checked from the source rather than by importing.
+    """The logger would refuse it at the first emit, minutes into a paid run."""
 
-    `models.event` builds its union by importing every scenario's `events` while it
-    is itself mid-import, so an `events` module importing back from it closes the
-    cycle. By the time that import would fail the platform has failed to start,
-    which is why the check reads the file instead of importing it.
+    class Forgotten(EventBase):
+        """Defined beside the scenario's other events and left out of event_types()."""
 
-    The break is applied to a copy of the package, with the scenario pointed at the
-    copy, rather than to the file the package ships. Writing to the shipped file
-    races: test processes share one filesystem, so any test reading that file while
-    the break was in place saw it and reported the scenario as broken. Every other
-    check reads from this directory too, which is why the whole package is copied
-    rather than just the one file.
-    """
-    package_copy = tmp_path / SCENARIO
-    shutil.copytree(scenario_package_dir(), package_copy)
-    events_file = package_copy / "events.py"
-    events_file.write_text(
-        "from glossogen.models.event import MessageSent\n"
-        + events_file.read_text(encoding="utf-8"),
-        encoding="utf-8",
+        event_type: Literal["pd_forgotten"] = "pd_forgotten"
+
+    define_in_the_events_module(event_cls=Forgotten, monkeypatch=monkeypatch)
+
+    assert f"{pd_events.__name__}.Forgotten" in failed(DECLARED, SCENARIO).detail
+
+
+def test_an_event_declared_by_the_scenario_passes(
+    declare_event: Callable[[type[EventBase]], None],
+) -> None:
+    """Declaring the same class is the fix the failure above asks for."""
+
+    class Remembered(EventBase):
+        """Defined beside the scenario's other events and declared."""
+
+        event_type: Literal["pd_remembered"] = "pd_remembered"
+
+    declare_event(Remembered)
+
+    assert passes(DECLARED, SCENARIO)
+
+
+def test_an_event_another_loaded_scenario_declares_is_not_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two scenarios can share a package; each declares its own events, not the other's."""
+
+    class Neighbours(EventBase):
+        """Defined in this scenario's package, declared by a different scenario."""
+
+        event_type: Literal["neighbours_event"] = "neighbours_event"
+
+    define_in_the_events_module(event_cls=Neighbours, monkeypatch=monkeypatch)
+
+    def neighbour_event_types(cls: type[SimulationScenario]) -> tuple[type[EventBase], ...]:
+        _ = cls
+        return (Neighbours,)
+
+    monkeypatch.setattr(
+        get_scenario_class(name="veyru"), "event_types", classmethod(neighbour_event_types)
     )
 
-    def package_files_copy(cls: type[SimulationScenario]) -> Path:
-        """Report the copy, so every check reads the broken events.py from there."""
-        _ = cls
-        return package_copy
-
-    scenario_cls = get_scenario_class(name=SCENARIO)
-    monkeypatch.setattr(scenario_cls, "scenario_package_files", classmethod(package_files_copy))
-
-    assert "event_base" in failed(BASE_IMPORT, SCENARIO).detail
-
-
-def test_the_check_reads_the_package_the_scenario_reports() -> None:
-    """The shipped file is intact, which the check above must leave that way."""
-    events_file = scenario_package_dir() / "events.py"
-    assert "from glossogen.models.event import" not in events_file.read_text(encoding="utf-8")
-    assert passes(BASE_IMPORT, SCENARIO)
+    assert passes(DECLARED, SCENARIO)
 
 
 def test_a_judge_with_a_blank_model_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:

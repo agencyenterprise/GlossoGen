@@ -1,11 +1,8 @@
 """<<scenario_name>>'s own event types.
 
-Discovery imports this module while the platform's event union is still being
-built, so it imports `glossogen.models.event_base` and nothing else from
-`glossogen.models`. Importing `event` instead deadlocks that cycle.
-
-Events written here reach the JSONL, the run-detail API and any metric that
-reads them.
+The scenario declares each of them in `event_types()`: the event logger refuses
+an event that is not declared, and a reader of the run skips it. Events written
+here reach the JSONL, the run-detail API and any metric that reads them.
 """
 
 from typing import Literal

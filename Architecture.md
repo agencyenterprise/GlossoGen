@@ -47,7 +47,9 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
-Two limits. `models/`, and through it `run_storage/`, import `scenario_contract.submodule_discovery`, which imports `scenario_contract.entry_points`, `scenario_contract.api_version`, `plugin_entry_points` and the `scenarios` package's `__init__`, because the event schema discovers scenario event types through them. And the groups are not acyclic: `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_contract` and `scenarios` import each other in a cycle, which later steps break up. `models/`, `model_catalog/` and `run_storage/` join it through that discovery import, and `llm/` through its imports of `models/` and `model_catalog/`.
+`models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/event_parsing.py` through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
+
+One limit: the groups are not acyclic. `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_contract` and `scenarios` import each other in a cycle, which later steps break up. `llm/` joins it through its imports of `models/` and `model_catalog/`.
 
 ## Simulation Flow
 
@@ -172,11 +174,11 @@ Scoring is not a scenario method: `run_scenario_evaluation(...)` ([scenario_eval
 
 ### Scenario Package Layout
 
-Each scenario is a Python sub-package under `glossogen/scenarios/<name>/` with intentionally-empty `__init__.py` files at the namespace and scenario-package levels. The empty inits matter; see "Scenario Event Discovery" below.
+Each built-in scenario is a Python sub-package under `glossogen/scenarios/<name>/`. The layout below is the built-ins' convention; nothing reads a file by its name. A scenario's event types are whatever its `event_types()` returns, wherever they are defined.
 
 ```
 src/glossogen/scenarios/<scenario_name>/
-├── __init__.py              # empty (avoids eager-load circular import)
+├── __init__.py
 ├── scenario.py              # the SimulationScenario subclass, decorated with @scenario
 ├── ids.py                   # agent IDs, channel IDs, tool names, markers
 ├── knobs.py                 # the Pydantic knobs model extending BaseKnobs
@@ -191,27 +193,31 @@ Each scenario class is registered with `@scenario(name="<scenario_name>")` from 
 
 The registry fills as scenario modules are imported; [scenario_contract/catalog.py](src/glossogen/scenario_contract/catalog.py) decides what is imported. `load_scenario_catalog(sources=...)` imports each source and keeps the classes registered from the modules it imported, after checking each name. The built-in source is a `PackageScanSource` over `glossogen.scenarios`: it walks the package's directory, descending only into subpackages, and imports a file only if its syntax tree shows a class decorated with `@scenario` from `glossogen.scenario_contract.registration`, so scripts and helpers beside a scenario are never executed. Loading makes the catalog the process's current one.
 
-Each process loads its catalog once. `cli/cli_entry.py` does it before dispatching any command, which covers the children the server and the derivation flows spawn with `python -m glossogen run`. `glossogen.server.app` loads the built-in catalog when uvicorn imports it directly (`make dev`), `scripts/export_openapi.py` and `scripts/generate_demo_snapshot.py` load it before importing the server, the helpers in `testing/` load it when a test process has not, and the test suite loads it in its root `conftest.py`. A lookup before that raises `ScenarioCatalogNotLoaded`.
+Each process loads its catalog once. `cli/cli_entry.py` does it before dispatching any command, which covers the children the server and the derivation flows spawn with `python -m glossogen run`. `glossogen.server.app` loads the built-in catalog when uvicorn imports it directly (`make dev`), `scripts/export_openapi.py` and `scripts/generate_demo_snapshot.py` load it before building the app or reading a run, the helpers in `testing/` load it when a test process has not, and the test suite loads it in its root `conftest.py`. A lookup, or a read of a run's events, before that raises `ScenarioCatalogNotLoaded`.
 
 Nothing looks up a name in the catalog directly. Every caller goes through `glossogen/scenario_contract/loader.py`, which asks the current catalog and falls back to scenarios other installed distributions declare under the versioned `glossogen.scenarios.v<N>` entry-point group. See "Scenarios from other distributions" below.
 
-### Scenario Event Discovery
+### Scenario Event Parsing
 
-Scenarios register new event types by adding them to their `events.py` — no edit to `glossogen/models/event.py` is required.
+A scenario declares the event types it logs beyond the platform's by returning them from `event_types()`. The platform's own are `core_event_types()` in [models/event.py](src/glossogen/models/event.py), which imports no scenario code.
 
-At module load time, `glossogen.models.event._discover_scenario_event_types()` imports every scenario's `events` submodule when present, then collects every concrete `EventBase` subclass. The scenario packages come from `scenario_packages()` in `glossogen/scenario_contract/submodule_discovery.py`: the subpackages of `glossogen.scenarios` via `pkgutil.iter_modules`, plus the package of every scenario declared in the `glossogen.scenarios.v1` entry-point group. The discovered classes are combined with the core platform events into `_ALL_EVENT_TYPES`, which is then wrapped in a discriminated-union `TypeAdapter` exposed as `SIMULATION_EVENT_ADAPTER` for the JSONL parser.
+A run logs only the platform's events and its own scenario's, and its first line, `simulation_started`, names that scenario. So a run is parsed with exactly those types. [run_storage/event_parsing.py](src/glossogen/run_storage/event_parsing.py) holds one parser per scenario name, built on first use and cached: `run_event_parser(scenario_name)`. `load_events(log_path)` reads the scenario from the log's first line and raises `ValueError` when that line is not a `simulation_started`. The readers that parse lines on their own (the run-summary scan, the message-export scan, bundle import) pass the scenario name to `parse_event` / `parse_event_bytes`.
 
-The auto-discovery works because:
+`run_storage` does not ask the catalog. When a catalog becomes the process's current one, it installs its `event_types_of` lookup in `event_parsing` with `install_scenario_event_types`, and installing another catalog (or restoring one after `scenario_catalog_installed`) replaces it and drops the cached parsers. A read before any catalog has loaded raises `ScenarioCatalogNotLoaded`, so an ordering bug fails at the first read instead of silently parsing with the platform's events alone.
 
-1. **Scenario `events.py` modules only import from `glossogen.models.event_base`** (where `EventBase` and `TokenUsage` live), never from `glossogen.models.event`. This breaks the would-be cycle.
-2. **Scenario package `__init__.py` files are empty**, so importing `glossogen.scenarios.<name>.events` does NOT cascade into loading `scenario.py` (which imports `glossogen.models.event` and would re-enter the partial module).
-3. **`SimulationEvent` is typed as `EventBase`** statically — the runtime-built discriminated union cannot be expressed as a static type. Concrete subclass attributes still require `isinstance(event, ConcreteEvent)` narrowing at use sites. The discriminator field `event_type: str` is declared on `EventBase` with `model_config = ConfigDict(frozen=True)` so subclasses can override it with `Literal[...]` covariantly.
+An event whose type is neither a platform event nor declared by the run's scenario is skipped and counted per type, with one warning per read, and the rest of the run stays readable. When the run's scenario is not in this process's catalog, every scenario event falls in that case, and the warning names the missing scenario. Because no reader holds two scenarios' events at once, two scenarios may declare the same `event_type`.
+
+The write side keeps logs readable: [runtime/event_logger.py](src/glossogen/runtime/event_logger.py) is built with the classes it may log, `loggable_event_types(scenario_cls)` from [scenario_contract/event_types.py](src/glossogen/scenario_contract/event_types.py), and raises `UndeclaredEventType` for any other class, a subclass of an accepted one included. The derivation flows copy a source run's JSONL lines as bytes and resume it under the same scenario, so the check applies only to what the resumed run logs.
+
+The catalog refuses, at load, a declared event type with no fixed `event_type` literal, or one that repeats a platform event's or another of the scenario's own. `glossogen validate` also reports an event class defined in the scenario's module or package that `event_types()` leaves out, unless another loaded scenario declares it.
+
+`SimulationEvent` is typed as `EventBase` statically, since the union a run is parsed with is built at runtime. Concrete subclass attributes still require `isinstance(event, ConcreteEvent)` narrowing at use sites.
 
 ### Scenario Run-Detail Extensions
 
 Scenarios that want to surface custom data on the run-detail API (per-round case ground truth, judge metadata keyed by tool `call_id`, scenario-specific SSE events) return a `ScenarioRunDetailExtension` from `SimulationScenario.run_detail_extension()`, with a `ScenarioRunExtrasBase` payload class whose `scenario_name` literal is the scenario's name. Both classes live in [scenario_contract/run_detail_extension.py](src/glossogen/scenario_contract/run_detail_extension.py), outside `glossogen.server`, because the scenario contract names them. The module defining a scenario's extension can sit anywhere; nothing looks for it by file name.
 
-[server/runs/scenario_extension.py](src/glossogen/server/runs/scenario_extension.py) asks each loadable scenario class for its extension. The platform's [server/runs/models.py](src/glossogen/server/runs/models.py) builds `RunDetailResponse.scenario_extras` as a discriminated union over every declared `ScenarioRunExtrasBase` subclass (discriminated by `scenario_name`), and the SSE event union is similarly extended by every extension's `sse_event_classes`. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result. `glossogen validate` checks the payload's `scenario_name` matches the scenario.
+[server/runs/scenario_extension.py](src/glossogen/server/runs/scenario_extension.py) asks a scenario class for its extension. [server/runs/models.py](src/glossogen/server/runs/models.py) names no scenario: `RunDetailResponse.scenario_extras` is typed as `SerializeAsAny[ScenarioRunExtrasBase]`, so it serializes as whichever subclass it holds. The API schema is completed when the app is built: `create_app` passes the extensions of every scenario loaded at that point to `publish_scenario_schemas` ([server/runs/scenario_openapi.py](src/glossogen/server/runs/scenario_openapi.py)), which publishes `scenario_extras` as a discriminated union over their `ScenarioRunExtrasBase` subclasses (discriminated by `scenario_name`) and the live event stream as the union of the platform's SSE events and every extension's `sse_event_classes`. `scripts/export_openapi.py` builds the app over the built-in catalog only, so `api.gen.ts` does not depend on which scenarios a developer has configured. After the generic event walk, [server/runs/detail_reader.py](src/glossogen/server/runs/detail_reader.py) calls `extension.build_extras(events, agents_by_id, messages)` for the run's scenario and attaches the result. `glossogen validate` checks the payload's `scenario_name` matches the scenario.
 
 Veyru is the canonical example; see [scenarios/veyru/run_detail_extension.py](src/glossogen/scenarios/veyru/run_detail_extension.py) for `VeyruRunExtras`, the FIFO `(agent_id, call_id)` matcher that builds `stabilize_metadata_by_call_id`, the observer-swap / intern-join / intern-takeover anchors, and the per-round `VeyruCaseSummary` projection.
 
@@ -282,10 +288,8 @@ importing `metric_protocol` and `scenario_contract.run_detail_extension`, which 
 the base. Scenarios subclass `SimulationScenario`; code that only runs or scores a
 simulation types against `ScenarioBase`.
 
-The event parser does not read `event_types()` yet. It still finds event types by
-file name, in each scenario's `events.py`, because it is built while
-`glossogen.models.event` is still importing, before any scenario class can load. A
-test holds every built-in's `event_types()` equal to what its `events.py` defines.
+A run's events are parsed with its scenario's `event_types()`; see "Scenario Event
+Parsing".
 
 One unusable external metric (fails to import, not a `Metric`, name disagrees) is
 logged and skipped so the rest still run and a report is still written.
@@ -310,7 +314,7 @@ Agents do not know they are in a simulation. The MCP server is named `comms` and
 
 Every simulation event is serialized as one JSON object per line in a JSONL file (one file per run).
 
-Event types (discriminated union on `event_type`):
+A run is read back with the platform's event types plus those its scenario declares in `event_types()`, discriminated on `event_type` (see "Scenario Event Parsing"). The platform's include:
 
 - `simulation_started` — run ID, scenario name, scenario description, channel IDs, scenario config
 - `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names, model
@@ -323,7 +327,7 @@ Event types (discriminated union on `event_type`):
 - `closing_prompt_failed` — the same exchange when no answer came back: error type and message, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages
 
-`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_storage/run_archive.py`](src/glossogen/run_storage/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
+`EventLogger` ([`runtime/event_logger.py`](src/glossogen/runtime/event_logger.py)) logs only the platform's events and the running scenario's declared ones, and only appends; it never rewrites an earlier line, so every event keeps a stable byte offset for the life of the run. Replace-agent, cross-run replace-agent and fork-at-round use that: `find_event_offset` ([`run_storage/run_archive.py`](src/glossogen/run_storage/run_archive.py)) locates the target event in the source JSONL, and `copy_run_at_event` copies the run directory and truncates the copy's JSONL there. Run directories created before this design carry a legacy `.git/` subdirectory, which `load_events` removes on first read (`strip_legacy_git_dir`).
 
 ## Run Storage
 

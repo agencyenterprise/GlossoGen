@@ -41,7 +41,7 @@ from glossogen.run_storage.evaluation_score_reader import (
     EvaluationReportScores,
     read_evaluation_scores,
 )
-from glossogen.run_storage.event_parsing import parse_event
+from glossogen.run_storage.event_parsing import parse_event, scenario_name_of_run
 from glossogen.run_storage.jsonl_lines import JsonObjectLines
 from glossogen.run_storage.replace_manifest import (
     REPLACE_MANIFEST_FILENAME,
@@ -197,14 +197,16 @@ _SCANNED_EVENT_TYPES = frozenset(
 )
 
 
-def _parse_scanned_line(raw: dict[str, Any], file_path: Path, line_number: int) -> SimulationEvent:
+def _parse_scanned_line(
+    raw: dict[str, Any], scenario_name: str, file_path: Path, line_number: int
+) -> SimulationEvent:
     """Validate one event the summary scan reads, naming the line when it does not validate.
 
     A line that fails validation fails the scan, like a line that is not JSON:
     a summary built around it would misstate the run's models, cost or round.
     """
     try:
-        return parse_event(raw=raw)
+        return parse_event(raw=raw, scenario_name=scenario_name)
     except ValidationError as exc:
         raise ValueError(
             f"{file_path} line {line_number} is not a valid {raw['event_type']} event"
@@ -231,6 +233,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     a worker thread, enabling true parallelism across concurrent requests.
     """
     first_record: dict[str, Any] | None = None
+    scenario_name = ""
     tail: deque[dict[str, Any]] = deque(maxlen=20)
     agents_by_id: dict[str, _AgentModelInfo] = {}
     played_models = _PlayedModels()
@@ -248,6 +251,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
         for raw in records:
             if first_record is None:
                 first_record = raw
+                scenario_name = scenario_name_of_run(first_record=raw, origin=str(file_path))
 
             tail.append(raw)
             round_number = raw.get("round_number")
@@ -261,7 +265,10 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
                 continue
 
             event = _parse_scanned_line(
-                raw=raw, file_path=file_path, line_number=records.line_number
+                raw=raw,
+                scenario_name=scenario_name,
+                file_path=file_path,
+                line_number=records.line_number,
             )
             if isinstance(event, AgentRegistered):
                 agents_by_id[event.agent_id] = _AgentModelInfo(
@@ -311,7 +318,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     if first_record is None:
         raise ValueError(f"File is empty: {file_path}")
 
-    first_event = parse_event(raw=first_record)
+    first_event = parse_event(raw=first_record, scenario_name=scenario_name)
     if not isinstance(first_event, SimulationStarted):
         raise ValueError(f"First event is not SimulationStarted in {file_path}")
 
@@ -321,7 +328,7 @@ def _scan_jsonl_sync(file_path: Path) -> _SinglePassResult:
     for candidate in reversed(tail):
         if candidate.get("event_type") != "simulation_ended":
             continue
-        event = parse_event(raw=candidate)
+        event = parse_event(raw=candidate, scenario_name=scenario_name)
         if isinstance(event, SimulationEnded):
             last_ended = event
             break
