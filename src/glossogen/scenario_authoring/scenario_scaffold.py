@@ -1,43 +1,54 @@
-"""Write a runnable scenario project, for someone starting from nothing.
+"""Write a runnable scenario folder, for someone starting from nothing.
 
 A scenario is a decorated class, a knobs model, a preset, prompt templates and a
-handful of methods that have to agree with each other, plus a `pyproject.toml`
-that tells glossogen where to load it from. Reading that out of a guide and
-typing it is where an author's first hour goes.
+handful of methods that have to agree with each other. Reading that out of a
+guide and typing it is where an author's first hour goes.
 
-So the generated project is one that already works: `validate` passes,
-`pytest` passes, and `glossogen run` completes. Editing something and watching it
-break is a faster way to learn a contract than assembling it from nothing.
+So the generated folder is one that already works: `validate` passes, its test
+passes, and `glossogen run` completes. Editing something and watching it break is
+a faster way to learn a contract than assembling it from nothing.
+
+Only the scenario's own folder is written. Where it sits in the author's project,
+and how that project is configured, is theirs; the default scan of the project
+directory finds the folder without configuration, and
+:func:`sources_reach` says whether the sources of the directory the command
+ran in import it.
 
 Templates are rendered with `<<name>>` delimiters rather than Jinja's own, so the
 prompt templates they emit keep their `{{ }}` for the platform to render later.
 """
 
-from importlib import metadata
+import logging
+import sys
 from pathlib import Path
 from typing import NamedTuple
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from glossogen.scenario_contract.catalog import (
+    ScenarioCatalogError,
+    ScenarioSource,
+    built_in_scenario_sources,
+)
 from glossogen.scenario_contract.loader import available_scenario_names
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 
+logger = logging.getLogger(__name__)
+
 TEMPLATES_DIR = Path(__file__).parent / "scaffold_templates"
 
-# The folder the scenario module goes in, which `[tool.glossogen] scenarios`
-# in the generated pyproject.toml names.
-SCENARIOS_FOLDER = "scenarios"
 
+class ScaffoldedScenario(NamedTuple):
+    """Where the scenario folder landed, and what was written into it."""
 
-class ScaffoldedPackage(NamedTuple):
-    """Where the package landed, and what was written into it."""
-
-    package_dir: Path
+    scenario_dir: Path
+    module_path: Path
+    test_path: Path
     files: tuple[Path, ...]
 
 
 class ScaffoldError(Exception):
-    """Raised when the package cannot be written, with the reason for a user."""
+    """Raised when the folder cannot be written, with the reason for a user."""
 
 
 def scenario_class_prefix(scenario_name: str) -> str:
@@ -45,28 +56,13 @@ def scenario_class_prefix(scenario_name: str) -> str:
     return "".join(part.capitalize() for part in scenario_name.split("_"))
 
 
-def distribution_name(scenario_name: str) -> str:
-    """Return the distribution name, which spells underscores as hyphens."""
-    return scenario_name.replace("_", "-")
-
-
-def default_glossogen_ref() -> str:
-    """Return the release tag matching the installed glossogen.
-
-    The generated `pyproject.toml` pins this rather than a branch, because the
-    scenario contract can change between releases and a scenario should be
-    validated against the platform it was written for.
-    """
-    return f"v{metadata.version('glossogen')}"
-
-
 def check_scenario_name(scenario_name: str) -> None:
     """Raise ``ScaffoldError`` unless the name can be used everywhere it is used."""
     if not is_valid_scenario_name(name=scenario_name):
         raise ScaffoldError(
             f"{scenario_name!r} is not usable as a scenario name. It becomes a Python "
-            "module and a run directory, so it has to start with a lowercase letter "
-            "and hold only lowercase letters, digits and underscores."
+            "module, a folder and a run directory, so it has to start with a "
+            "lowercase letter and hold only lowercase letters, digits and underscores."
         )
     if scenario_name in available_scenario_names():
         raise ScaffoldError(
@@ -76,53 +72,89 @@ def check_scenario_name(scenario_name: str) -> None:
         )
 
 
-def write_scenario_package(
-    scenario_name: str, target_dir: Path, glossogen_ref: str
-) -> ScaffoldedPackage:
-    """Write the project for ``scenario_name`` under ``target_dir``.
+def write_scenario_folder(scenario_name: str, target_dir: Path) -> ScaffoldedScenario:
+    """Write the folder for ``scenario_name`` as ``target_dir/<scenario_name>/``.
 
     Raises ``ScaffoldError`` when the name is unusable, when a loaded scenario
     holds it, or when the destination already exists. Nothing is written until
-    every check has passed, so a refusal leaves no partial project.
+    every check has passed, so a refusal leaves no partial folder.
     """
     check_scenario_name(scenario_name)
 
-    package_dir = target_dir / distribution_name(scenario_name)
-    if package_dir.exists():
-        raise ScaffoldError(f"{package_dir} already exists. Move it aside or pick another name.")
+    scenario_dir = target_dir / scenario_name
+    if scenario_dir.exists():
+        raise ScaffoldError(f"{scenario_dir} already exists. Move it aside or pick another name.")
 
     variables = {
         "scenario_name": scenario_name,
         "class_prefix": scenario_class_prefix(scenario_name),
-        "distribution_name": distribution_name(scenario_name),
-        "glossogen_ref": glossogen_ref,
     }
 
     written: list[Path] = []
     for template_name, relative_path in _destinations(scenario_name=scenario_name).items():
-        destination = package_dir / relative_path
+        destination = scenario_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             _render(template_name=template_name, variables=variables), encoding="utf-8"
         )
         written.append(destination)
 
-    return ScaffoldedPackage(package_dir=package_dir, files=tuple(sorted(written)))
+    return ScaffoldedScenario(
+        scenario_dir=scenario_dir,
+        module_path=scenario_dir / f"{scenario_name}.py",
+        test_path=scenario_dir / f"test_{scenario_name}.py",
+        files=tuple(sorted(written)),
+    )
+
+
+class SourceReach(NamedTuple):
+    """Whether the configured sources import a module, and why not if a source failed.
+
+    ``failure`` is the error of the first configured source that failed to
+    import, or None when every source imported.
+    """
+
+    reached: bool
+    failure: str | None
+
+
+def sources_reach(module_path: Path, sources: tuple[ScenarioSource, ...]) -> SourceReach:
+    """Import every configured source in ``sources`` and say whether one imports ``module_path``.
+
+    Asks the loader rather than predicting it, so every source kind and every
+    rule a walk or an import applies counts the same way it will for the next
+    command. Importing a source again re-reads its directory, so a module written
+    after the catalog loaded is found. The built-in sources are skipped.
+    """
+    resolved = module_path.resolve()
+    for source in configured_sources(sources=sources):
+        try:
+            imported = source.import_scenario_modules()
+        except ScenarioCatalogError as failure:
+            logger.exception("Scenario source %s failed to import", source.describe())
+            return SourceReach(reached=False, failure=str(failure))
+        for module_name in imported.module_names:
+            loaded_from = getattr(sys.modules.get(module_name), "__file__", None)
+            if loaded_from is not None and Path(loaded_from).resolve() == resolved:
+                return SourceReach(reached=True, failure=None)
+    return SourceReach(reached=False, failure=None)
+
+
+def configured_sources(sources: tuple[ScenarioSource, ...]) -> tuple[ScenarioSource, ...]:
+    """Return ``sources`` without the built-in ones."""
+    built_ins = built_in_scenario_sources()
+    return tuple(source for source in sources if source not in built_ins)
 
 
 def _destinations(scenario_name: str) -> dict[str, Path]:
-    """Map each template to where its output belongs in the new project."""
-    folder = Path(SCENARIOS_FOLDER)
+    """Map each template to where its output belongs in the scenario folder."""
     return {
-        "pyproject.toml.jinja": Path("pyproject.toml"),
-        "README.md.jinja": Path("README.md"),
-        "env.example.jinja": Path(".env.example"),
-        "gitignore.jinja": Path(".gitignore"),
-        "scenario_module.py.jinja": folder / f"{scenario_name}.py",
-        "knobs_default.json.jinja": folder / "knobs_default.json",
-        "prompts/briefer_system.jinja.jinja": folder / "prompts" / "briefer_system.jinja",
-        "prompts/relay_system.jinja.jinja": folder / "prompts" / "relay_system.jinja",
-        "test_scenario.py.jinja": Path("tests") / f"test_{scenario_name}.py",
+        "package_init.py.jinja": Path("__init__.py"),
+        "scenario_module.py.jinja": Path(f"{scenario_name}.py"),
+        "knobs_default.json.jinja": Path("knobs_default.json"),
+        "prompts/briefer_system.jinja.jinja": Path("prompts") / "briefer_system.jinja",
+        "prompts/relay_system.jinja.jinja": Path("prompts") / "relay_system.jinja",
+        "test_scenario.py.jinja": Path(f"test_{scenario_name}.py"),
     }
 
 

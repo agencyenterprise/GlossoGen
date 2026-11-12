@@ -11,16 +11,16 @@ the exit code are the parts being checked, and neither exists below it.
 """
 
 import re
+import shutil
 from pathlib import Path
 
 import pytest
 
 from glossogen.cli.cli_entry import main
-from glossogen.scenario_authoring.scenario_scaffold import write_scenario_package
+from tests.fakes.packaged_scenario_project import write_packaged_project
 
 SCENARIO = "reactor_purge"
-REF = "v9.9.9"
-SCENARIO_FILE = f"scenarios/{SCENARIO}.py"
+SCENARIO_FILE = f"scenarios/{SCENARIO}/{SCENARIO}.py"
 
 
 @pytest.fixture(autouse=True)
@@ -31,9 +31,7 @@ def isolated(isolated_scenario_imports: None) -> None:
 
 def scaffold(target: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Write a project that passes, enter it, and return its directory."""
-    project = write_scenario_package(
-        scenario_name=SCENARIO, target_dir=target, glossogen_ref=REF
-    ).package_dir
+    project = write_packaged_project(target=target, scenario_name=SCENARIO)
     monkeypatch.chdir(project)
     return project
 
@@ -169,23 +167,67 @@ def test_a_name_that_is_also_a_directory_resolves_to_the_loaded_scenario(
 def test_a_sibling_scenarios_events_are_not_reported_as_this_ones(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Single-file scenarios share the `scenarios/` folder, and may import from each other.
+    """Scenarios in one project may import from each other's folders.
 
     The sources load only the second scenario, which imports a constant from the
     first. The first is then imported without being in the catalog, and its event
     still belongs to it rather than to the scenario being checked.
     """
     project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
-    first = (project / SCENARIO_FILE).read_text()
-    second = first.replace(SCENARIO, "second_drill").replace("ReactorPurge", "SecondDrill")
-    second += f"\nfrom scenarios.{SCENARIO} import BRIEFER_ID as FIRST_BRIEFER_ID\n"
-    (project / "scenarios" / "second_drill.py").write_text(second)
+    second_dir = copy_scenario_folder(project=project, new_name="second_drill")
+    second_module = second_dir / "second_drill.py"
+    second_module.write_text(
+        second_module.read_text()
+        + f"\nfrom scenarios.{SCENARIO}.{SCENARIO} import BRIEFER_ID as FIRST_BRIEFER_ID\n"
+    )
     edit_pyproject(
-        project, r'scenarios = \["scenarios"\]', 'scenarios = ["scenarios/second_drill.py"]'
+        project, r'scenarios = \["scenarios"\]', 'scenarios = ["scenarios/second_drill"]'
     )
 
-    validate("scenarios/second_drill.py", monkeypatch)
+    validate("scenarios/second_drill", monkeypatch)
 
     out = capsys.readouterr().out
-    assert "second_drill (scenarios/second_drill.py)" in out
+    assert "second_drill (scenarios/second_drill)" in out
     assert "checks passed" in out
+
+
+def test_two_scenarios_in_one_folder_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They would read each other's presets and prompts, so loading them fails.
+
+    The message names both scenarios, their modules and the folder, and says how
+    to fix it.
+    """
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    folder = project / "scenarios" / SCENARIO
+    first = (folder / f"{SCENARIO}.py").read_text()
+    (folder / "second_drill.py").write_text(
+        first.replace(SCENARIO, "second_drill").replace("ReactorPurge", "SecondDrill")
+    )
+    edit_pyproject(project, r'scenarios = \["scenarios"\]', "scenarios = []")
+
+    with pytest.raises(SystemExit) as raised:
+        validate(f"scenarios/{SCENARIO}", monkeypatch)
+
+    message = str(raised.value.code)
+    assert "'reactor_purge'" in message
+    assert "'second_drill'" in message
+    assert f"scenarios.{SCENARIO}.{SCENARIO}" in message
+    assert f"scenarios.{SCENARIO}.second_drill" in message
+    assert str(folder.resolve()) in message
+    assert "its own folder" in message
+
+
+def copy_scenario_folder(project: Path, new_name: str) -> Path:
+    """Copy the scaffolded scenario's folder as a second scenario called ``new_name``."""
+    source = project / "scenarios" / SCENARIO
+    target = project / "scenarios" / new_name
+    shutil.copytree(src=source, dst=target)
+    module = target / f"{SCENARIO}.py"
+    module.rename(target / f"{new_name}.py")
+    renamed = target / f"{new_name}.py"
+    renamed.write_text(
+        renamed.read_text().replace(SCENARIO, new_name).replace("ReactorPurge", "SecondDrill")
+    )
+    return target

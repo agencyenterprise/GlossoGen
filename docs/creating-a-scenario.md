@@ -2,7 +2,7 @@
 
 A scenario is one self-contained N-agent coordination task. This page is the
 reference for every file in a scenario package and every extension surface, in
-the order you meet them when editing a generated package into your own scenario.
+the order you meet them when editing a generated scenario into your own.
 
 A scenario owns:
 
@@ -25,35 +25,57 @@ class; a frontend plug-in is registered in the frontend.
 
 ## Start from the generator
 
-Generate a project rather than assembling one:
+Generate a scenario rather than assembling one. From your project's root, with
+glossogen installed in its environment:
 
 ```bash
-glossogen new-scenario reactor_purge --target-dir .
-cd reactor-purge
-pip install -e ".[testing]"
-glossogen validate scenarios/reactor_purge.py
-pytest
+glossogen new-scenario reactor_purge
+glossogen validate ./reactor_purge
+pytest ./reactor_purge/test_reactor_purge.py
+```
+
+`new-scenario` writes one folder, `<target-dir>/<name>/`, and nothing else in
+the project. `--target-dir` defaults to the working directory. The folder:
+
+```
+reactor_purge/
+├── __init__.py              # makes the folder a package, so pytest and glossogen import it under one name
+├── reactor_purge.py         # @scenario(name="reactor_purge"): ids, knobs, event, teams, world
+├── knobs_default.json       # the canonical preset
+├── prompts/                 # every word an agent or judge reads
+│   ├── briefer_system.jinja
+│   └── relay_system.jinja
+└── test_reactor_purge.py    # the scripted round loop; see Testing a scenario
 ```
 
 What you get already runs: two agents relay a code word over a metered link,
-`validate` passes, the tests pass, and `glossogen run` completes. Editing one
+`validate` passes, the test passes, and `glossogen run` completes. Editing one
 thing at a time and watching what breaks is a faster way through this contract
-than writing it from scratch, and the generated README lists what to change in
-which order. (Working inside a glossogen checkout, glossogen itself is already
-in the environment; run the commands with that checkout's environment, from the
-generated project's directory.)
+than writing it from scratch.
 
-The project:
+The command refuses a destination folder that already exists, and a name a
+loaded scenario holds. Run it again with another name to add a second scenario:
+each one gets a folder of its own, because a scenario reads its prompts and
+presets from the folder holding its module (see
+[In this repo, or in your own package](#in-this-repo-or-in-your-own-package)).
 
-```
-reactor-purge/
-├── pyproject.toml               # [tool.glossogen] scenarios = ["scenarios"], package-data
-├── tests/                       # the scripted round loop; see Testing a scenario
-└── scenarios/
-    ├── reactor_purge.py         # @scenario(name="reactor_purge"): ids, knobs, event, teams, world
-    ├── knobs_default.json       # the canonical preset
-    └── prompts/                 # every word an agent or judge reads
-```
+No configuration is needed. With no scenario source configured, glossogen scans
+the project directory, so a folder at the root or a level down
+(`experiments/reactor_purge/`) is found. After writing, the command imports the
+sources the working directory configures, the way the next command will, and
+checks that they load the new module. When they do not, such as a
+`[tool.glossogen] scenarios` list that leaves it out or a folder under `tests/`,
+it says so and names the fix where those sources come from: `--scenarios`,
+`GLOSSOGEN_SCENARIOS`, or `[tool.glossogen] scenarios`, with a line for pytest
+where it needs one. It never writes the configuration itself.
+
+After writing, it prints the next steps: install glossogen in the project's
+environment, put `ANTHROPIC_API_KEY` in a `.env` at the project root, then the
+`validate`, `glossogen run` and `pytest` lines for the new folder. The generated
+test needs no pytest configuration: its async tests are marked
+`@pytest.mark.asyncio`, which the `testing` extra's `pytest-asyncio` runs. Run
+pytest from the project root; the test looks the scenario up by name, the way
+`glossogen run` does.
 
 The generator puts the whole scenario in one module. The scenarios in this repo
 split the same parts across files, and the sections below are named after those
@@ -656,23 +678,42 @@ scenarios = ["scenarios"]            # a folder, a .py file, or a module name
 A source is a folder, a `.py` file or a module name. A folder is searched for
 files that use `@scenario`, and only those are imported, so scripts and helpers
 beside them never run. Files are imported by module name relative to the project
-directory, so `scenarios/reactor_purge.py` is `scenarios.reactor_purge` and
-relative imports inside your package work. A module name that is a package, such
+directory, so `experiments/reactor_purge/reactor_purge.py` is
+`experiments.reactor_purge.reactor_purge` and relative imports inside your
+package work. A module name that is a package, such
 as an installed scenario pack, has its directory searched the same way.
 
 With none of the three set, glossogen scans the project directory, the one
 holding that `pyproject.toml`, skipping environments (`.venv`, `venv`, `env`,
 `site-packages`, `node_modules`), `tests`, `build`, `dist`, hidden and
 `_`-prefixed folders, and the runs directory. `scenarios = []` turns the scan
-off. Naming the folder keeps what glossogen imports explicit, which is why the
-generator does.
+off. Naming the folders keeps what glossogen imports explicit.
 
 What differs from an in-repo scenario:
 
 - **A name another loaded scenario holds is an error**, naming both modules,
   when the second one is imported. Pick another name.
-- **Presets and prompts sit beside your module.** `package-data` in the
-  generated `pyproject.toml` ships them only if you build a wheel.
+- **Presets and prompts sit beside your module.** A scenario reads them from the
+  directory `scenario_package_files()` returns, which by default is the folder
+  holding its module. Two loaded scenarios for which it returns the same
+  directory would list each other's presets and share any prompt template with
+  the same file name, so loading them fails with an error naming both scenarios,
+  their modules and the directory. With the default, that means two scenario
+  modules in one folder: give each scenario a folder of its own, such as
+  `<name>/<name>.py` with its own `prompts/` and `knobs_*.json`, which is what
+  `new-scenario` writes.
+- **Prompts and presets ship in a wheel only if you declare them.** If you build
+  a wheel of your scenarios, setuptools packages only `.py` files unless told
+  otherwise, and an installed scenario then fails at its first template render.
+  Declare them for every package, so each scenario folder ships its own:
+
+  ```toml
+  [tool.setuptools.package-data]
+  "*" = ["**/*.jinja", "**/*.json"]
+  ```
+
+  `glossogen validate <path>` checks this when the project's `pyproject.toml` has
+  a `[build-system]`.
 - **No frontend plug-in.** The platform UI renders everything it derives from
   your knobs schema and event log.
 - **Configuration is read from your project**: the `.env` sits beside your
@@ -680,7 +721,12 @@ What differs from an in-repo scenario:
 
 Launching is the same either way: `glossogen run`, or the MCP `start_run` tool.
 A command that needs a scenario the process did not load says so, lists the
-sources it loaded and where each was configured, and says how to add yours.
+sources it loaded and where each was configured, and says how to add yours. The
+server's evaluate endpoint answers a run of such a scenario with the same
+message.
+
+Each process builds its scenario list once, when it starts. A scenario you add
+while `glossogen serve` is running appears there only after you restart it.
 
 ### Viewing your runs in the web UI
 

@@ -187,6 +187,143 @@ def test_the_catalog_refuses_an_invalid_name(
         load_scenario_catalog(sources=(PackageScanSource(package="invalid_pkg", origin="test"),))
 
 
+@pytest.mark.usefixtures("empty_registry")
+def test_the_catalog_refuses_two_scenarios_sharing_a_files_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two modules in one folder would read one set of prompts and presets.
+
+    Refused at load, naming both scenarios, their modules and the folder.
+    """
+    write_package(
+        root=tmp_path,
+        package="shared_pkg",
+        files={
+            "first.py": decorated_scenario_module(name="first"),
+            "second.py": decorated_scenario_module(name="second"),
+        },
+    )
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    with pytest.raises(ScenarioCatalogError) as raised:
+        load_scenario_catalog(sources=(PackageScanSource(package="shared_pkg", origin="test"),))
+
+    message = str(raised.value)
+    assert "'first' (module shared_pkg.first)" in message
+    assert "'second' (module shared_pkg.second)" in message
+    assert str((tmp_path / "shared_pkg").resolve()) in message
+    assert "its own folder" in message
+
+
+def two_overriding_scenarios_module(first_dir: str, second_dir: str) -> str:
+    """Return a module whose two scenarios read their files from the directories named.
+
+    Each directory is a path expression relative to the module's own folder.
+    """
+    return textwrap.dedent(f"""
+        from pathlib import Path
+
+        from glossogen.scenario_contract.registration import scenario
+        from glossogen.scenarios.veyru.scenario import VeyruScenario
+
+        HERE = Path(__file__).parent
+
+
+        @scenario(name="first")
+        class First(VeyruScenario):
+            @classmethod
+            def scenario_package_files(cls) -> Path:
+                return {first_dir}
+
+
+        @scenario(name="second")
+        class Second(VeyruScenario):
+            @classmethod
+            def scenario_package_files(cls) -> Path:
+                return {second_dir}
+        """)
+
+
+@pytest.mark.usefixtures("empty_registry")
+def test_one_module_whose_scenarios_override_to_distinct_directories_loads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check compares the directories `scenario_package_files()` returns, not modules."""
+    write_package(
+        root=tmp_path,
+        package="override_pkg",
+        files={
+            "first/knobs_default.json": "{}",
+            "second/knobs_default.json": "{}",
+            "scen.py": two_overriding_scenarios_module(
+                first_dir='HERE / "first"', second_dir='HERE / "second"'
+            ),
+        },
+    )
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    loaded = load_scenario_catalog(
+        sources=(PackageScanSource(package="override_pkg", origin="test"),)
+    )
+
+    assert loaded.names() == ["first", "second"]
+
+
+@pytest.mark.parametrize(
+    ("alias", "package_suffix"),
+    [('HERE / "second" / ".." / "first"', "dotdot"), ('HERE / "link"', "symlink")],
+    ids=["dot-dot", "symlink"],
+)
+@pytest.mark.usefixtures("empty_registry")
+def test_two_spellings_of_one_directory_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, alias: str, package_suffix: str
+) -> None:
+    """A `..` segment or a symlink reaches the same directory, so it is still shared.
+
+    Each case imports a package of its own name: a second import of one name
+    returns the cached module and registers nothing.
+    """
+    package = f"alias_{package_suffix}_pkg"
+    write_package(
+        root=tmp_path,
+        package=package,
+        files={
+            "first/knobs_default.json": "{}",
+            "second/knobs_default.json": "{}",
+            "scen.py": two_overriding_scenarios_module(
+                first_dir='HERE / "first"', second_dir=alias
+            ),
+        },
+    )
+    (tmp_path / package / "link").symlink_to(tmp_path / package / "first")
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    with pytest.raises(ScenarioCatalogError, match="its own folder"):
+        load_scenario_catalog(sources=(PackageScanSource(package=package, origin="test"),))
+
+
+@pytest.mark.usefixtures("empty_registry")
+def test_scenarios_in_folders_of_their_own_load_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The layout the refusal asks for: one subpackage per scenario."""
+    write_package(
+        root=tmp_path,
+        package="split_pkg",
+        files={
+            "first/__init__.py": "",
+            "first/first.py": decorated_scenario_module(name="first"),
+            "second/__init__.py": "",
+            "second/second.py": decorated_scenario_module(name="second"),
+        },
+    )
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+
+    loaded = load_scenario_catalog(sources=(PackageScanSource(package="split_pkg", origin="test"),))
+
+    assert loaded.names() == ["first", "second"]
+
+
 @pytest.mark.parametrize(
     "source",
     [

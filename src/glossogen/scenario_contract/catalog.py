@@ -23,6 +23,7 @@ import logging
 import os
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple, Protocol, Self
@@ -246,9 +247,10 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
     """Import every source, build the catalog, and make it this process's current one.
 
     Raises :class:`ScenarioCatalogError` for a registered class whose name is not
-    a valid scenario name, or whose ``name()`` disagrees with the name it was
-    registered under. A name registered by two classes has already raised while
-    the second one was imported.
+    a valid scenario name, whose ``name()`` disagrees with the name it was
+    registered under, or that reads its prompts and presets from the same
+    directory as another loaded scenario. A name registered by two classes has
+    already raised while the second one was imported.
     """
     scenarios: dict[str, type[SimulationScenario]] = {}
     loaded_sources: list[LoadedSource] = []
@@ -271,6 +273,7 @@ def load_scenario_catalog(sources: tuple[ScenarioSource, ...]) -> ScenarioCatalo
         )
     for name, scenario_cls in scenarios.items():
         _check_registered_class(name=name, scenario_cls=scenario_cls)
+    _check_files_directories_are_unshared(scenarios=scenarios)
     catalog = ScenarioCatalog(scenarios=scenarios, loaded_sources=tuple(loaded_sources))
     _install(catalog=catalog)
     logger.debug(
@@ -339,6 +342,46 @@ def _check_registered_class(name: str, scenario_cls: type[SimulationScenario]) -
             "up by the name it was registered under; remove the name() override."
         )
     _check_declared_event_types(where=where, event_types=scenario_cls.event_types())
+
+
+def _check_files_directories_are_unshared(
+    scenarios: Mapping[str, type[SimulationScenario]],
+) -> None:
+    """Refuse two scenarios that read their prompts and presets from one directory.
+
+    A scenario reads both from ``scenario_package_files()``, the directory
+    holding its module unless it overrides that. Two scenarios there list each
+    other's presets as their own, and prompt templates with the same file name
+    resolve to one file.
+    """
+    owners: dict[str, tuple[str, type[SimulationScenario]]] = {}
+    for name, scenario_cls in scenarios.items():
+        directory = _directory_identity(files=scenario_cls.scenario_package_files())
+        first = owners.get(directory)
+        if first is None:
+            owners[directory] = (name, scenario_cls)
+            continue
+        first_name, first_cls = first
+        raise ScenarioCatalogError(
+            f"Scenarios {first_name!r} (module {first_cls.__module__}) and {name!r} "
+            f"(module {scenario_cls.__module__}) both read their prompts and knobs "
+            f"presets from {directory}. A scenario reads them from the folder holding "
+            "its module, so these two would list each other's presets and share any "
+            "prompt template with the same file name. Give each scenario its own "
+            f"folder, such as <folder>/{first_name}/{first_name}.py and "
+            f"<folder>/{name}/{name}.py, each with its own prompts/ and knobs_*.json."
+        )
+
+
+def _directory_identity(files: Traversable) -> str:
+    """Return the string two spellings of one directory share.
+
+    A filesystem path is resolved, so ``..`` segments and symlinks name the
+    directory they reach. Any other ``Traversable`` is compared as its string.
+    """
+    if isinstance(files, Path):
+        return str(files.resolve())
+    return str(files)
 
 
 def _check_declared_event_types(where: str, event_types: tuple[type[EventBase], ...]) -> None:

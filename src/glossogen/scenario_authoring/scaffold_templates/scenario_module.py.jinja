@@ -2,11 +2,14 @@
 
 The whole scenario in one module: its ids, knobs, event, team structure, world,
 and the scenario class glossogen loads. `@scenario(name="<<scenario_name>>")`
-registers the class when glossogen imports this file, which it does because
-`[tool.glossogen] scenarios` in `pyproject.toml` names this folder. Split it into
-several modules whenever it grows; glossogen only needs the decorated class.
+registers the class when glossogen imports this file, which it does when it
+scans the project directory, or when a scenario source names this folder. Split
+it into several modules whenever it grows; glossogen only needs the decorated
+class.
 
-Prompts and presets live beside this file: `prompts/` and `knobs_*.json`.
+Prompts and presets live beside this file: `prompts/` and `knobs_*.json`. The
+scenario reads them from the folder holding this module, so this folder belongs
+to this scenario alone. A second scenario goes in a folder of its own.
 
 Deterministic on purpose: a round succeeds when the relay sends the round's code
 word, which the world observes directly, so no LLM judges it. Scenarios that need

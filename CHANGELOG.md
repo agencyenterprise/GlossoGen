@@ -51,6 +51,28 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- **`glossogen new-scenario <name>` writes only the scenario's folder**,
+  `<target-dir>/<name>/`: the module, `knobs_default.json`, `prompts/`, an
+  `__init__.py` and `test_<name>.py`. It no longer writes a `pyproject.toml`,
+  README, `.gitignore` or `.env.example`, and changes nothing else in the
+  project. `--target-dir` is optional and defaults to the working directory;
+  `--glossogen-ref` is gone. Running it again with another name adds a folder
+  beside the first. The scan of the project directory finds the folder with no
+  configuration, and the command prints the next steps. It imports the
+  configured scenario sources again and, when none loads the new folder, says
+  how to add it there. The generated test
+  marks its async tests `@pytest.mark.asyncio` and looks the scenario up by name
+  with the new `glossogen.testing.assert_scenario_is_loaded`, so it needs no
+  pytest configuration. The `package-data` a wheel needs is described in
+  `docs/creating-a-scenario.md`.
+- Loading a scenario catalog fails when two scenarios read their prompts and
+  presets from the same directory (`scenario_package_files()`), naming both
+  scenarios, their modules and the directory; `validate <path>` reports the same.
+  Two scenarios in one folder would list each other's presets and share prompt
+  templates with the same file name. Give each scenario a folder of its own.
+- `POST /runs/{scenario}/{run}/evaluate` on a run whose scenario the server has
+  not loaded answers 422 with the CLI's "not loaded" message, which lists the
+  sources the server loaded, in place of "Unknown scenario".
 - **Breaking for scenarios and metrics outside glossogen: entry points,
   `SCENARIO_API_VERSION` and discovery by `events.py` are gone.** glossogen no
   longer reads the `glossogen.scenarios.v1` or `glossogen.metrics` entry-point

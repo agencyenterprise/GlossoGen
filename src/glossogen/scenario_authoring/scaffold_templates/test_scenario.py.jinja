@@ -2,10 +2,13 @@
 
 `glossogen validate <<scenario_name>>` covers the static contract, so it is
 not repeated here. What these add is the round loop, which the checker never
-starts, and a check that the project's scenario sources load the class.
+starts, and a check that the project's scenario sources load the scenario.
 
 No LLM, no network, and no waiting on a clock: the agents are scripted, so the
 harness knows when they have finished rather than guessing.
+
+The scenario is looked up by name rather than imported, so these tests find it
+the way `glossogen run` does. Run pytest from the project root.
 """
 
 from pathlib import Path
@@ -16,20 +19,20 @@ from glossogen.models.event import RoundResultRecorded
 from glossogen.testing import (
     assert_no_agent_crashed,
     assert_round_loop_completed,
-    assert_scenario_is_registered,
+    assert_scenario_is_loaded,
     run_rounds,
 )
-from scenarios.<<scenario_name>> import <<class_prefix>>Scenario
 
 SCENARIO = "<<scenario_name>>"
 PRESET = "knobs_default"
 
 
-def test_the_scenario_sources_load_this_class() -> None:
-    """`[tool.glossogen] scenarios` in `pyproject.toml` has to reach this file."""
-    assert_scenario_is_registered(scenario_cls=<<class_prefix>>Scenario)
+def test_the_scenario_sources_load_this_scenario() -> None:
+    """The scan of the project directory, or the configured sources, reach this folder."""
+    assert_scenario_is_loaded(scenario_name=SCENARIO)
 
 
+@pytest.mark.asyncio
 async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every round reaches a recorded verdict, and no agent dies on the way."""
     result = await run_rounds(
@@ -45,6 +48,7 @@ async def test_the_round_loop_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert_no_agent_crashed(result=result)
 
 
+@pytest.mark.asyncio
 async def test_relaying_the_code_word_wins_the_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
