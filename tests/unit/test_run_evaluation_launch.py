@@ -2,7 +2,7 @@
 
 The endpoint refuses a request before launching anything when evaluations are
 off, the run is still live, another evaluation of it is running, the judge
-provider is unknown, the run's scenario is not installed, or no metric is named.
+provider is unknown, the run's scenario is not loaded, or no metric is named.
 Whether a metric belongs to the run's scenario is covered in
 ``test_scenario_metric_listings.py``.
 
@@ -222,7 +222,7 @@ async def test_a_provider_that_cannot_judge_is_refused(
     assert launches == []
 
 
-async def test_a_run_of_a_scenario_that_is_not_installed_is_refused(
+async def test_a_run_of_a_scenario_that_is_not_loaded_is_refused_naming_the_sources(
     tmp_path: Path, launches: list[RecordedLaunch]
 ) -> None:
     runs_dir = tmp_path / "runs"
@@ -240,7 +240,11 @@ async def test_a_run_of_a_scenario_that_is_not_installed_is_refused(
         )
 
     assert response.status_code == 422
-    assert "not_installed" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "Scenario 'not_installed' is not loaded in this process" in detail
+    assert "glossogen.scenarios (built-in)" in detail
+    assert "[tool.glossogen] scenarios" in detail
+    assert "restart it" in detail
     assert launches == []
 
 

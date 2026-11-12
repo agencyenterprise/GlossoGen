@@ -189,3 +189,28 @@ def test_a_sibling_scenarios_events_are_not_reported_as_this_ones(
     out = capsys.readouterr().out
     assert "second_drill (scenarios/second_drill.py)" in out
     assert "checks passed" in out
+
+
+def test_two_scenarios_in_one_folder_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """They would read each other's presets and prompts, so loading them fails.
+
+    The message names both scenarios, their modules and the folder, and says how
+    to fix it.
+    """
+    project = scaffold(target=tmp_path, monkeypatch=monkeypatch)
+    first = (project / SCENARIO_FILE).read_text()
+    (project / "scenarios" / "second_drill.py").write_text(
+        first.replace(SCENARIO, "second_drill").replace("ReactorPurge", "SecondDrill")
+    )
+    edit_pyproject(project, r'scenarios = \["scenarios"\]', "scenarios = []")
+
+    with pytest.raises(SystemExit) as raised:
+        validate("scenarios", monkeypatch)
+
+    message = str(raised.value.code)
+    assert f"'{SCENARIO}' (module scenarios.{SCENARIO})" in message
+    assert "'second_drill' (module scenarios.second_drill)" in message
+    assert str((project / "scenarios").resolve()) in message
+    assert "its own folder" in message

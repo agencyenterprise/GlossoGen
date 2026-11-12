@@ -41,7 +41,8 @@ from glossogen.run_storage.run_file_paths import (
 )
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.run_storage.stream_manifest import delete_manifest, read_manifest
-from glossogen.scenario_contract.loader import find_scenario_class
+from glossogen.scenario_contract.catalog import ScenarioNotLoaded
+from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.scenario_sources import child_process_environment
 from glossogen.server.response_models import LaunchStatus
 from glossogen.server.runs.branch_sources import list_branch_sources_for_group
@@ -474,12 +475,17 @@ async def start_evaluation(
             ),
         )
 
-    scenario_cls = find_scenario_class(name=resolved.scenario_name)
-    if scenario_cls is None:
+    try:
+        scenario_cls = get_scenario_class(name=resolved.scenario_name)
+    except ScenarioNotLoaded as not_loaded:
+        logger.exception("Refused to evaluate a run of an unloaded scenario")
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown scenario: {resolved.scenario_name}",
-        )
+            detail=(
+                f"{not_loaded} The server builds its scenario list when it starts, so "
+                "restart it after adding the source."
+            ),
+        ) from not_loaded
 
     if not body.metrics:
         raise HTTPException(status_code=422, detail="Name at least one metric to evaluate")

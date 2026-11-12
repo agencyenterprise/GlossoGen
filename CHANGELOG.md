@@ -51,6 +51,14 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- Loading a scenario catalog fails when two scenarios read their prompts and
+  presets from the same directory (`scenario_package_files()`), naming both
+  scenarios, their modules and the directory; `validate <path>` reports the same.
+  Two scenarios in one folder would list each other's presets and share prompt
+  templates with the same file name. Give each scenario a folder of its own.
+- `POST /runs/{scenario}/{run}/evaluate` on a run whose scenario the server has
+  not loaded answers 422 with the CLI's "not loaded" message, which lists the
+  sources the server loaded, in place of "Unknown scenario".
 - **Breaking for scenarios and metrics outside glossogen: entry points,
   `SCENARIO_API_VERSION` and discovery by `events.py` are gone.** glossogen no
   longer reads the `glossogen.scenarios.v1` or `glossogen.metrics` entry-point
