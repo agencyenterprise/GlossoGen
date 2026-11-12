@@ -73,7 +73,7 @@ class SpotTheDifferenceKnobs(BaseKnobs):
 
     judge_model: str
     judge_provider: Provider
-    judge_model_settings: JudgeModelSettings = JudgeModelSettings(temperature=0.0)
+    judge_model_settings: JudgeModelSettings = JudgeModelSettings()
     round_time_budget_seconds: int
     seed: int
     grid_size: int
