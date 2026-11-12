@@ -12,7 +12,7 @@ than what the agent ran with.
 
 A log is parsed with the platform's events and the events its own scenario
 declares, the scenario its first line names. Any other event is read into an
-``UnrecognizedEvent`` holding the line as logged, and counted in one warning: a
+``UnrecognizedEvent`` holding the line's decoded JSON object, and counted in one warning: a
 log can name a scenario this process has not loaded, or an event its scenario no
 longer declares, and neither should cost the reader the rest of the run or the
 events themselves. Such a line with no ``event_id`` or no ``timestamp``, which

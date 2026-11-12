@@ -130,8 +130,8 @@ async def test_the_generated_event_reaches_the_log(
 ) -> None:
     """The generated event is declared in `event_types()` and parses back out of the JSONL.
 
-    The event logger refuses an undeclared event, and a reader skips one, so
-    this is where a scaffold that forgot to declare it would show.
+    The event logger refuses an undeclared event, and a reader reads one as an
+    `UnrecognizedEvent`, so this is where a scaffold that forgot to declare it would show.
     """
     scenario_cls = generated_scenario_class(tmp_path, monkeypatch)
     scenario = build(scenario_cls, fast_round_overrides(round_count=1))

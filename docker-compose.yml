@@ -68,7 +68,7 @@ services:
       API_URL: http://localhost:8000
       # Multi-tenant auth needs an auth adapter compiled into the frontend image
       # and an identity provider installed in the backend, so it is not something
-      # this compose file can switch on. See docs/web-ui.md#authentication.
+      # this compose file can switch on. See docs/deployment.md#authentication.
       PORT: "3000"
     ports:
       - "3000:3000"

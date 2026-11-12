@@ -1,6 +1,8 @@
 # Changelog
 
 Notable changes per release. Versions follow the `vX.Y.Z` tags on `main`.
+Everything since `v0.5.0` is listed under Unreleased: releases are cut from labelled
+pull requests, and nothing in the release workflow moves entries out of that section.
 
 Releases `v0.1.4` through `v0.2.7` are not itemized here: the file went unwritten
 while they were cut. Their contents are in
@@ -34,7 +36,7 @@ the commit log.
 - Each run is parsed with the platform's events plus the events its own
   scenario returns from `event_types()`. The event logger raises
   `UndeclaredEventType` for an event class the running scenario does not return,
-  and a reader skips such lines with a warning. Two scenarios may use the same
+  and a reader keeps such a line as an `UnrecognizedEvent` (see below). Two scenarios may use the same
   `event_type`. `parse_event` and `parse_event_bytes`
   (`glossogen.run_storage.event_parsing`) take the run's `scenario_name`;
   reading a run before the catalog has loaded raises `ScenarioCatalogNotLoaded`,
@@ -42,9 +44,11 @@ the commit log.
   `EventLogger` takes `allowed_event_types`
   (`glossogen.scenario_contract.event_types.loggable_event_types`).
 - `glossogen validate <path>` takes a `.py` file or a folder and checks every
-  scenario it registers. `glossogen new-scenario` writes a project with the
-  scenario in `scenarios/<name>.py` and `[tool.glossogen] scenarios =
-  ["scenarios"]`.
+  scenario it registers.
+- A docs page, [Reading runs from your own code](docs/reading-runs-from-code.md),
+  covers loading a scenario catalog in a script and what a read returns for an
+  `UnrecognizedEvent`. [Creating a scenario](docs/creating-a-scenario.md) lists
+  everything the default scan skips.
 - `move_a_box` knobs `virtual_list_cost_fixed` and `virtual_list_cost_s`: on the
   virtual clock, each `act` list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
@@ -98,8 +102,8 @@ the commit log.
 
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`
-  (`glossogen.models.event`), which holds the line's `event_type` and the whole
-  line as `payload` and serializes back to an equal object; `parse_event` does the
+  (`glossogen.models.event`), which holds the line's `event_type` and its decoded JSON
+  object as `payload` and serializes back to an equal object; `parse_event` does the
   same. The one warning per read now says how many were read that way. Code that
   iterates a run's events sees them where it saw nothing before. Run detail
   returns them as `unrecognized_events`, and the run page shows each in the "all
@@ -180,7 +184,8 @@ the commit log.
 
   A metric annotating `compute` with `ScenarioBase` imports it from
   `glossogen.scenario_contract.scenario_base`. A metric still importing an old
-  path fails to import, and evaluation logs it and skips it.
+  path fails to import, which stops the command that loads its scenario with
+  `Could not load scenarios: ... failed to import`.
 - `glossogen.cli` no longer re-exports `main`, so importing a `glossogen.cli.<module>`
   does not load every subcommand. The console script's entry point is now
   `glossogen.cli.cli_entry:main`, and `from glossogen.cli import main` becomes

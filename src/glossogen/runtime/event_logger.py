@@ -4,8 +4,8 @@ Publishes each logged event to the ``EventBus`` it is constructed with, for
 real-time delivery to SSE subscribers. Logs only the event classes it is built
 with, the platform's and the running scenario's declared ones, so every line it
 writes is one a reader of the run can parse. An ``UnrecognizedEvent``, which a
-reader builds from a line it could not parse, is refused too: a derived run copies
-its source's lines as bytes and never logs one through here.
+reader builds from a line it could not parse, is refused too: a derived run keeps
+its source's lines through ``rewrite_run_jsonl`` and never logs one through here.
 """
 
 import asyncio
@@ -79,7 +79,7 @@ class EventLogger:
             raise UndeclaredEventType(
                 f"Refusing to log an UnrecognizedEvent (event_type {event.event_type!r}): "
                 "it is a line read back from a run's log, not an event of this run. A "
-                "derived run copies its source's lines as bytes instead."
+                "derived run keeps its source's lines through rewrite_run_jsonl instead."
             )
         event_cls = type(event)
         if event_cls not in self._allowed_event_types:
@@ -87,8 +87,8 @@ class EventLogger:
                 f"Refusing to log {event_cls.__module__}.{event_cls.__qualname__} "
                 f"(event_type {fixed_event_type(event_cls=event_cls)!r}): it is neither "
                 "a platform event nor one the running scenario returns from "
-                "event_types(), so a reader of this run would skip it. Add it to the "
-                "scenario's event_types()."
+                "event_types(), so a reader of this run would read it as an "
+                "UnrecognizedEvent. Add it to the scenario's event_types()."
             )
         if self._file is None:
             raise RuntimeError("EventLogger is not open. Call open() first.")

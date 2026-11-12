@@ -7,7 +7,7 @@
  * run-detail page, chat pane) looks up the plug-in by `scenario_name`
  * and routes scenario-specific concerns through it. Scenarios without a
  * registered plug-in get the default no-op surface, which is also what a
- * scenario installed from another distribution gets: these plug-ins are
+ * scenario loaded from outside this repo gets: these plug-ins are
  * compiled into the bundle, so only scenarios in this repo can ship one.
  *
  * `extras` is typed as `unknown` at the plug-in boundary so the registry
