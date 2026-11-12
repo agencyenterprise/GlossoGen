@@ -2239,7 +2239,7 @@ derives the getters (<code>knobs_json_schema</code>, <code>get_round_count</code
 <tbody>
 <tr>
 <td><code>name()</code>, <code>scenario_description()</code></td>
-<td>The registry key; a one-line description read from <code>prompts/description.jinja</code></td>
+<td>The name given to <code>@scenario</code>; a one-line description read from <code>prompts/description.jinja</code></td>
 </tr>
 <tr>
 <td><code>knobs_model()</code>, <code>get_knobs()</code>, <code>create_from_config(config)</code></td>
@@ -2710,15 +2710,29 @@ failing. Without a plug-in, the run viewer still splits a
 <code>read_notifications</code> result from its call and wires the two together, and
 renders a payload whose <code>type</code> the platform does not define field by field.</p>
 <h2 id="in-this-repo-or-in-your-own-package">In this repo, or in your own package<a class="headerlink" href="#in-this-repo-or-in-your-own-package" title="Permanent link">&para;</a></h2>
-<p><strong>In this repo</strong>: the package lives at <code>src/glossogen/scenarios/&lt;name&gt;/</code> and
-registration is one line in
-<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenario_contract/registry.py">scenario_contract/registry.py</a>. That is the only
-file outside your package you touch.</p>
+<p><strong>In this repo</strong>: the package lives at <code>src/glossogen/scenarios/&lt;name&gt;/</code>, and
+registration is the decorator on your scenario class, with the package directory
+name as the scenario's name. Return your event classes from <code>event_types()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.models.event_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventBase</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenario_contract.protocol</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimulationScenario</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenario_contract.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">scenario</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">glossogen.scenarios.reactor_purge.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoolantVented</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="nd">@scenario</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;reactor_purge&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">ReactorPurgeScenario</span><span class="p">(</span><span class="n">SimulationScenario</span><span class="p">):</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">event_types</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">EventBase</span><span class="p">],</span> <span class="o">...</span><span class="p">]:</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>        <span class="k">return</span> <span class="p">(</span><span class="n">CoolantVented</span><span class="p">,)</span>
+</code></pre></div>
+<p>The catalog finds the class by scanning <code>glossogen/scenarios/</code>, so no file outside
+your package changes. <code>event_types()</code> must list every event class your
+<code>events.py</code> defines; a test checks this for every scenario in the repo.</p>
 <p><strong>In your own package</strong>: registration is the entry point the generator already
 declared. The key is the name callers pass to <code>glossogen run</code> and the API, the
 value the module and class:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.scenarios.v1&quot;</span><span class="k">]</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">reactor_purge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_scenarios.reactor_purge.scenario:ReactorPurgeScenario&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;glossogen.scenarios.v1&quot;</span><span class="k">]</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">reactor_purge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_scenarios.reactor_purge.scenario:ReactorPurgeScenario&quot;</span>
 </code></pre></div>
 <p>What differs from an in-repo scenario:</p>
 <ul>
@@ -2745,7 +2759,7 @@ value the module and class:</p>
 environment decides which scenarios resolve: a server started from a glossogen
 checkout knows only the scenarios that checkout ships, so your run would list
 under a name it cannot build.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>glossogen<span class="w"> </span>serve<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ui-port<span class="w"> </span><span class="m">3000</span>
 </code></pre></div>
 <p>The flags, the <code>--ui-image</code> pin and the checkout alternative are covered in
 <a href="../web-ui/">Web UI</a>.</p>
@@ -2758,11 +2772,11 @@ scripted round loop (<code>run_rounds</code>) that exercises what <code>validate
 world's state machine, the postmortem phase, and the round verdict, with no LLM
 and no waiting.</p>
 <p>Then one short real run, end to end:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w"> </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--config<span class="w"> </span>knobs_default<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nv">round_count</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span>&gt;<span class="w"> </span>./runs/your_scenario_smoke.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">&amp;</span>
 </code></pre></div>
 <p>Pass criteria:</p>
 <ol>
@@ -2773,10 +2787,10 @@ and no waiting.</p>
    <code>make dev</code> + <code>make dev-frontend</code>.</li>
 </ol>
 <p>Then evaluate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>your_scenario<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/your_scenario/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,mean_chars_per_round,mean_chars_per_message<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
 </code></pre></div>
 <p>The report should hold one Measurement per metric with sensible <code>score</code> and
 <code>per_round</code> values.</p>

@@ -2001,6 +2001,14 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>@scenario(name=...)</code> in <code>glossogen.scenario_contract.registration</code> registers a
+  scenario class and sets the name <code>name()</code> returns. Every built-in scenario uses
+  it, and <code>glossogen.scenario_contract.registry</code> (<code>SCENARIO_REGISTRY</code>) is gone:
+  the scenario catalog (<code>glossogen.scenario_contract.catalog</code>) finds the built-ins
+  by scanning <code>glossogen/scenarios/</code>, once per process. Code outside the CLI loads
+  it with <code>load_scenario_catalog(...)</code> before looking a scenario up.</li>
+<li><code>SimulationScenario.event_types()</code> returns the event classes a scenario logs.
+  The default is <code>()</code>; every built-in returns what its <code>events.py</code> defines.</li>
 <li><code>move_a_box</code> knobs <code>virtual_list_cost_fixed</code> and <code>virtual_list_cost_s</code>: on the
   virtual clock, each <code>act</code> list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
