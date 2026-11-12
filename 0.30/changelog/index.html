@@ -2052,6 +2052,12 @@ the commit log.</p>
   returns them as <code>unrecognized_events</code>, and the run page shows each in the "all
   activity" timeline where it was logged, with the line as JSON on demand. The event logger refuses an
   <code>UnrecognizedEvent</code>.</li>
+<li><strong><code>glossogen.model_catalog.token_pricing.usage_cost_usd</code> takes token counts</strong>
+  (<code>input_tokens</code>, <code>output_tokens</code>, <code>cache_read_tokens</code>, <code>cache_write_tokens</code>)
+  where it took <code>usage: TokenUsage</code>, so <code>model_catalog/</code> imports nothing from
+  <code>models/</code>. Build the call from a <code>TokenUsage</code> as <code>input_tokens=usage.input_tokens</code>,
+  <code>output_tokens=usage.output_tokens</code>, <code>cache_read_tokens=usage.cache_read_input_tokens</code> and
+  <code>cache_write_tokens=usage.cache_creation_input_tokens</code>. Costs are unchanged.</li>
 <li><strong><code>glossogen new-scenario &lt;name&gt;</code> writes only the scenario's folder</strong>,
   <code>&lt;target-dir&gt;/&lt;name&gt;/</code>: the module, <code>knobs_default.json</code>, <code>prompts/</code>, an
   <code>__init__.py</code> and <code>test_&lt;name&gt;.py</code>. It no longer writes a <code>pyproject.toml</code>,
