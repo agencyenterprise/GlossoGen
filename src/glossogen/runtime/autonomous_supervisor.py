@@ -24,12 +24,11 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.models.scheduled_events import SwapAgent
-from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runtime.agent_runner import CLOSING_PROMPT_TIMEOUT_SECONDS, AgentRunner
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
-from glossogen.runtime.agent_tool_specs import select_tool_definitions
+from glossogen.runtime.agent_tool_specs import ToolDefinitionLister, select_tool_definitions
 from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
@@ -69,7 +68,7 @@ class AutonomousSupervisor:
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
         runner_factory: Callable[[], AgentRunner],
-        list_tool_definitions: Callable[[SimulationRuntime], list[RecordedToolDefinition]],
+        list_tool_definitions: ToolDefinitionLister,
         resume_state: RewindState | None,
         run_id: str,
         provider: str,
@@ -430,7 +429,7 @@ class AutonomousSupervisor:
                     timestamp=simulation_start_time,
                 )
             )
-        tool_definitions = self._list_tool_definitions(runtime)
+        tool_definitions = self._list_tool_definitions(runtime=runtime)
         for config in self._agent_configs:
             # Sorted because BASE_TOOL_NAMES is a frozenset: unpacking it wrote a
             # different order on every run, so two identical runs logged

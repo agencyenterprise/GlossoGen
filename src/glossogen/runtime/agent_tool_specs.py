@@ -6,7 +6,7 @@ takes ``agent_id`` first and refuses a call by raising ``ValueError``.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Protocol
 
 from glossogen.models.communication_tool_names import (
     GET_CHANNEL_MEMBERS_TOOL_NAME,
@@ -76,6 +76,16 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
             )
         )
     return specs
+
+
+class ToolDefinitionLister(Protocol):
+    """Lists the tools an agent can be offered, with the schema its framework sends the model.
+
+    The entry point supplies one, so the supervisor records on ``AgentRegistered``
+    what the runner it built will send.
+    """
+
+    def __call__(self, runtime: SimulationRuntime) -> list[RecordedToolDefinition]: ...
 
 
 def select_tool_definitions(

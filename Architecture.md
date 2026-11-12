@@ -1,6 +1,6 @@
 # GlossoGen Architecture
 
-A platform for running controlled experiments on teams of LLM agents. LLM-based agents interact via MCP tools exposed by a central runtime. Agents are processes launched via the Pydantic AI framework that connect to a shared MCP server. A game clock manages round progression and injection delivery. No centralized turn control.
+A platform for running controlled experiments on teams of LLM agents. LLM-based agents interact through communication tools the runtime offers. Each agent is a Pydantic AI agent running as an asyncio task in the run's process, with the runtime's tools bound to it as function tools. A game clock manages round progression and injection delivery. No centralized turn control.
 
 A web UI exposes simulation runs and evaluation results through a FastAPI backend and Next.js frontend.
 
@@ -10,14 +10,14 @@ A web UI exposes simulation runs and evaluation results through a FastAPI backen
 | Decision            | Choice                                                       |
 | ------------------- | ------------------------------------------------------------ |
 | LLM Backend         | Pydantic AI (supports Anthropic, OpenAI, Ollama, self-hosted OpenAI-compatible endpoints) |
-| Transport           | MCP over Streamable HTTP (agents are external processes)     |
+| Transport           | In-process function tools; the agent id is bound when a tool is built |
 | Scenario Definition | Python classes                                               |
 | Agent Autonomy      | Agents decide when to speak; no central turn controller      |
 | Round Advancement   | Hybrid: all-agents-idle OR round timeout                     |
 | Channels            | Scenario-defined channels with membership lists              |
-| Agent Runtime       | Pydantic AI with MCP toolsets (pluggable runner protocol)    |
+| Agent Runtime       | Pydantic AI function tools (pluggable runner interface)      |
 | Coordination        | Reaction delays + per-channel write locks                    |
-| Agent Framing       | Agents do not know they are in a simulation; MCP server named "comms", tools feel like Slack |
+| Agent Framing       | Agents do not know they are in a simulation; tools feel like Slack |
 | Observability       | Structured JSONL log (one file per run)                      |
 | Run Storage         | Filesystem: `runs/{scenario}/{unix_timestamp}/`              |
 | End Conditions      | Scenario-defined round count + max round duration            |
@@ -58,35 +58,35 @@ No two top-level packages import each other, directly or through other packages,
 
 ## Simulation Flow
 
-1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs, event logger, and agent runner. Passes everything into the `AutonomousSupervisor`.
-2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects, creates the `SimulationRuntime` (FastMCP server), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
-3. **MCP server starts** on a configured port, exposing the `comms` MCP server. Agent runners are launched as concurrent asyncio tasks, each starting an external Claude Code process connected to the MCP server URL.
-4. **Game clock triggers round-1 injection delivery** through `runtime.deliver_round_injections(1)`, which pushes `NewInfoNotification` messages to agent session queues. Agents receive these via the `read_notifications` MCP tool and begin interacting.
-5. **Agents act autonomously** by calling MCP tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
+1. **CLI** parses arguments in two passes (first to identify the scenario, then to parse known flags plus `key=value` overrides). Builds the scenario, agent configs and event logger, and starts the embedded server that streams events over SSE. Passes everything into the `AutonomousSupervisor`, with a factory for the agent runner and the function that lists its tool definitions.
+2. **AutonomousSupervisor.run()** opens the event logger, builds per-agent `AgentSession` objects, creates the `SimulationRuntime` (the shared state the tools act on), and wires a `GameClock`. Logs `SimulationStarted` and one `AgentRegistered` event per agent.
+3. **Agent runners start** as concurrent asyncio tasks, one per agent, each running a Pydantic AI agent with the runtime's tools bound to its agent id.
+4. **Game clock triggers round-1 injection delivery** through `runtime.deliver_round_injections(1)`, which pushes `NewInfoNotification` messages to agent session queues. Agents receive these via the `read_notifications` tool and begin interacting.
+5. **Agents act autonomously** by calling tools: `read_notifications` (blocks until a notification arrives), `read_channel` (fetches recent messages), `send_message` (posts to a channel), `list_channels` (discovers available channels), and `get_channel_members` (sees who is in a channel). There is no central turn controller.
 6. **Round advancement** uses a hybrid condition. The game clock polls at 500ms intervals and advances the round when either (a) all agents are idle (blocked on `read_notifications` with empty queues) *and* at least 5 seconds have passed since the last message, or (b) the round duration exceeds `max_round_duration_seconds` since the last message. When a round advances, the clock bumps `runtime.current_round`, logs `RoundAdvanced`, and calls `runtime.deliver_round_injections(round_number)` to push that round's injections.
-7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits up to 120 seconds for agent tasks to finish, and logs `SimulationEnded` with total message count.
+7. **Termination** occurs when the game clock reaches `max_rounds`. The runtime broadcasts a `DoneNotification` to all agents, waits `RUNNER_DRAIN_SECONDS` for agent tasks to finish (plus `CLOSING_PROMPT_TIMEOUT_SECONDS` when an agent has a closing prompt), and logs `SimulationEnded` with total message count.
 
 ## Simulation Runtime
 
-`SimulationRuntime` is the shared-state container that the game clock, MCP tools, world context, scenarios, and runners all interact with. It owns the channel router, per-agent sessions, agent tool allowlists, the world context, and the active round number (`current_round`, written by the game clock via `set_current_round`, seeded by the supervisor on resume). It also owns injection delivery: `deliver_round_injections`, `deliver_postmortem_injections`, and `has_postmortem_for_round` look up scenario-defined injection content, push it to agent sessions, and emit the corresponding `InjectionDelivered` / `PostmortemStarted` events. Resume bookkeeping (`_last_injected_rounds`) lives on the runtime and is seeded via `seed_last_injected_rounds`.
+`SimulationRuntime` is the shared-state container that the game clock, the agent tools, the world context, scenarios, and runners all interact with. It owns the channel router, per-agent sessions, agent tool allowlists, the world context, and the active round number (`current_round`, written by the game clock via `set_current_round`, seeded by the supervisor on resume). It also owns injection delivery: `deliver_round_injections`, `deliver_postmortem_injections`, and `has_postmortem_for_round` look up scenario-defined injection content, push it to agent sessions, and emit the corresponding `InjectionDelivered` / `PostmortemStarted` events. Resume bookkeeping (`_last_injected_rounds`) lives on the runtime and is seeded via `seed_last_injected_rounds`.
 
 Scenarios receive a `ScenarioRuntimeHandle` (a `Protocol` exposing `event_logger` and `current_round`) via `bind_runtime`, used to emit custom events and read the active round.
 
-## MCP Tools
+## Agent Tools
 
-The `SimulationRuntime` registers five MCP tools on a FastMCP server named `comms`. Agents interact with the simulation exclusively through these tools.
+Every agent is offered five base tools, unless its scenario withholds one through `hidden_base_tools`, plus the scenario's own tools from `get_tools()`. The runtime describes them as `ToolSpec`s and the runner binds them as function tools. Agents interact with the simulation exclusively through these tools.
 
 | Tool                 | Parameters                          | Behavior                                                                                                    |
 | -------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `read_notifications`     | *(none)*                   | Blocks until a notification arrives in the agent's queue, or returns a `no_activity` notification after a 120s timeout.  |
+| `read_notifications`     | `wait_for`, `timeout_s`    | Parks the agent until what `wait_for` names arrives (`any`, `message` or `next_round`). `any` returns `no_activity` after the scenario's default timeout when `timeout_s` is not given.  |
 | `read_channel`       | `channel_id`, `last_n`     | Returns the last N messages from a channel the agent belongs to. Validates membership.                      |
 | `send_message`       | `channel_id`, `text`       | Posts a message under a per-channel write lock, notifies other channel members, fires on-message callbacks.  |
 | `list_channels`      | *(none)*                   | Returns channels the agent belongs to with scenario-defined display names.                                  |
 | `get_channel_members`| `channel_id`               | Returns the members of a channel with display names. Validates membership.                                  |
 
-Agent identity is resolved from the MCP connection URL query parameter (`?agent_id=engineer`), not from tool arguments. Agents cannot impersonate each other.
+Agent identity is bound when the runner builds an agent's tools: each executor receives `agent_id` and the model never supplies it, so agents cannot impersonate each other.
 
-Agents see these as generic communication primitives (the MCP server is named `comms`), not simulation APIs.
+Agents see these as generic communication primitives, not simulation APIs.
 
 ## Agent Runners
 
@@ -154,7 +154,7 @@ The ChannelRouter stores messages and validates membership.
 - Scenarios define channels with membership lists (e.g., "planning-meeting" with all agents, "eng-private" with two agents).
 - The scenario provides per-agent display names for each channel via `get_channel_display_name(channel_id, agent_id)` (e.g., the engineer sees "private conversation with the PM" while the PM sees "private conversation with the engineer" for the same channel). Agents never see technical channel IDs.
 - The scenario provides per-agent display names via `get_agent_display_name(agent_id)`, used when rendering message history in `read_channel`.
-- The `send_message` MCP tool validates agent membership before appending a message to a channel.
+- The `send_message` tool validates agent membership before appending a message to a channel.
 
 ## Scenario Protocol
 
@@ -172,7 +172,7 @@ The `SimulationScenario` ABC in [scenario_contract/protocol.py](src/glossogen/sc
 
 **Runtime extensions:**
 - `get_world()` — scenario world (state, per-message async reactions via `on_message_async`, tool handlers). The `run` event loop is provided by the base `ScenarioWorld`.
-- `get_mcp_tools()` — scenario-specific MCP tools (agent_id injected automatically)
+- `get_tools()` — scenario-specific tools, one `ScenarioTool` each (agent_id injected automatically)
 - `bind_runtime(runtime)` and the `runtime` property are provided by the base; scenarios that emit custom events read `self.runtime` (raises if accessed before binding).
 
 Scoring is not a scenario method: `run_scenario_evaluation(...)` ([scenario_evaluation_runner.py](src/glossogen/evaluation/scenario_evaluation_runner.py)) is platform code that runs the requested metrics against a run's log. The game clock uses the timing getters to manage round progression and termination; injection delivery is triggered by the clock and performed by the runtime via `deliver_round_injections` / `deliver_postmortem_injections`, which read scenario-defined injection content and push it onto agent sessions.
@@ -298,7 +298,7 @@ The system prompt reads:
 
 This keeps agents grounded as genuine assistants (which they are), avoids roleplay artifacts, and makes secret-leak evaluation more meaningful, because confidential information is shared as trusted context between user and assistant.
 
-Agents do not know they are in a simulation. The MCP server is named `comms` and the tools are named after generic communication primitives (`read_notifications`, `read_channel`, `send_message`). From the agent's perspective, it is connected to a messaging system.
+Agents do not know they are in a simulation. The tools are named after generic communication primitives (`read_notifications`, `read_channel`, `send_message`). From the agent's perspective, it is using a messaging system.
 
 ## Event Log
 
@@ -552,7 +552,7 @@ The in-run scheduler swaps one agent's seat for a fresh instance at scheduled ro
 ### Swap Flow
 
 1. **Round boundary fires** in `RoundBoundaryScheduler` (driven by the game clock's `signal_round_advanced`). The scheduler dispatches every event whose `at_round` matches.
-2. **`SwapAgent` dispatch** calls `execute_agent_swap` in `runtime/agent_swap.py` with an `AgentSwapResources` bundle (runtime, runner factory, runner-task table, log path, run dir, MCP url, cost tracker).
+2. **`SwapAgent` dispatch** calls `execute_agent_swap` in `runtime/agent_swap.py` with an `AgentSwapResources` bundle (runtime, runner factory, runner-task table, log path, run dir, cost tracker).
 3. **Drain old runner**: push `DoneNotification(reason="agent_swap")` to the existing `AgentSession`; wait `SWAP_RUNNER_GRACE_SECONDS`; force-cancel on timeout.
 4. **Compose effective channel visibility**: query `runtime.scenario.get_world().get_globally_disabled_channels()` and force `ChannelVisibilityNone` for each (so a previously-disabled channel like Veyru postmortem can never bleed into the new agent's view, even if the swap config didn't explicitly list it).
 5. **Rebuild seed history** by replaying the live JSONL through `build_message_history` with `cutoff_round=at_round`, `tool_calls_only=True`, and the effective channel visibility. The same builder produces the notification round-floor filter automatically (see below).

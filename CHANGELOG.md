@@ -70,7 +70,7 @@ the commit log.
   | `glossogen.runtime.notification_payload` (`Wake`, `NotificationInbox`, `render_default_notification`, ...) | `glossogen.scenario_contract.notification_delivery` |
   | `glossogen.runtime.wait_registry` (`WakeReason`, `ParkedWait`, `DEFAULT_ANY_TIMEOUT_SECONDS`) | `glossogen.scenario_contract.parked_wait` |
   | `glossogen.evaluation.metric_core.metric_protocol` (`Metric`) | `glossogen.scenario_contract.metric_protocol` |
-  | `glossogen.evaluation.metric_core.measurement` (`Measurement`) | `glossogen.scenario_contract.measurement` |
+  | `glossogen.evaluation.metric_core.measurement` | `glossogen.scenario_contract.measurement` |
   | `glossogen.evaluation.metric_core.keyed_observation` | `glossogen.scenario_contract.keyed_observation` |
   | `glossogen.evaluation.metric_core.metric_run_options` | `glossogen.scenario_contract.metric_run_options` |
   | `glossogen.evaluation.metric_core.protocol_boundary` | `glossogen.scenario_contract.protocol_boundary` |
@@ -81,7 +81,7 @@ the commit log.
   | `glossogen.runners.agent_runner_base` (`AgentRunner`) | `glossogen.runtime.agent_runner` |
   | `glossogen.runners.agent_run_result` | `glossogen.runtime.agent_run_result` |
   | `glossogen.runners.closing_prompt` (`CLOSING_PROMPT_TIMEOUT_SECONDS`) | `glossogen.runtime.agent_runner` |
-  | `glossogen.runners.agent_tools` (`ToolSpec`, `tool_specs`, `select_tool_definitions`) | `glossogen.runtime.agent_tool_specs` |
+  | `glossogen.runners.agent_tools` (`ToolSpec`, `Executor`, `tool_specs`, `select_tool_definitions`) | `glossogen.runtime.agent_tool_specs` |
 
   The platform's runner prompt templates move with it, from
   `glossogen/runners/prompts/*.jinja` to `glossogen/scenario_contract/runner_prompts/*.jinja`.
@@ -93,8 +93,8 @@ the commit log.
   instead. `ScenarioRuntimeHandle.event_logger` is typed as the new
   `ScenarioEventLog` protocol, which only has `log(event=...)`.
   `AutonomousSupervisor` takes a `list_tool_definitions` argument next to
-  `runner_factory`: `glossogen.runners.agent_tools.list_tool_definitions` for
-  the pydantic-ai runner.
+  `runner_factory`, a `glossogen.runtime.agent_tool_specs.ToolDefinitionLister`:
+  `glossogen.runners.agent_tools.list_tool_definitions` for the pydantic-ai runner.
 
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`
