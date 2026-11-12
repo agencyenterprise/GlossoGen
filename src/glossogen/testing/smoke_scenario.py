@@ -26,19 +26,19 @@ from glossogen.evaluation.metrics.communication.round_view import (
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel
-from glossogen.models.event import SimulationEvent
-from glossogen.runtime.communication_tools import (
+from glossogen.models.communication_tool_names import (
     GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_TOOL_NAME,
     READ_CHANNEL_TOOL_NAME,
     SEND_MESSAGE_TOOL_NAME,
 )
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
+from glossogen.models.event import SimulationEvent
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenarios.base_knobs import BaseKnobs
 
 LINK_CHANNEL_ID = "link"
 FIRST_AGENT_ID = "first_agent"

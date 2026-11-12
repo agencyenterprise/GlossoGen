@@ -23,13 +23,13 @@ from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event_base import EventBase
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_tool import ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
+from glossogen.scenario_contract.channel_noise import apply_character_noise
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
-from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.satellite_contact_window.cases import CommandStep, SatelliteCase, get_cases
 from glossogen.scenarios.satellite_contact_window.command_judge import judge_command_sequence
 from glossogen.scenarios.satellite_contact_window.events import (

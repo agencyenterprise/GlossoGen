@@ -22,25 +22,27 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 from pydantic_ai import ModelRetry, Tool
 
+from glossogen.models.communication_tool_names import (
+    BASE_TOOL_NAMES,
+    GET_CHANNEL_MEMBERS_TOOL_NAME,
+    LIST_CHANNELS_TOOL_NAME,
+    READ_CHANNEL_TOOL_NAME,
+    SEND_MESSAGE_TOOL_NAME,
+)
+from glossogen.models.read_notifications_schema import read_notifications_tool_definition
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.read_notifications_tool import (
     RunTermination,
     build_read_notifications_tool,
 )
 from glossogen.runtime.communication_tools import (
-    BASE_TOOL_NAMES,
     GET_CHANNEL_MEMBERS_DESCRIPTION,
-    GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_DESCRIPTION,
-    LIST_CHANNELS_TOOL_NAME,
     READ_CHANNEL_DESCRIPTION,
-    READ_CHANNEL_TOOL_NAME,
-    SEND_MESSAGE_TOOL_NAME,
     build_get_channel_members,
     build_list_channels,
     build_read_channel,
 )
-from glossogen.runtime.read_notifications_schema import read_notifications_tool_definition
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)

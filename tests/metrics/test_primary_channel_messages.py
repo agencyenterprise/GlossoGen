@@ -18,10 +18,10 @@ from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_
 from glossogen.evaluation.metrics import language_repetition_metric
 from glossogen.evaluation.metrics.communication import round_view
 from glossogen.evaluation.metrics.communication.round_view import CommunicationMessageLine
+from glossogen.models.communication_tool_names import SEND_MESSAGE_TOOL_NAME
 from glossogen.models.event import MessageSent, SimulationEvent, ToolResultReceived
 from glossogen.models.mcp_responses import SendReceipt, SendStatus
 from glossogen.models.message import SimulationMessage
-from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 LINK = frozenset({"link"})

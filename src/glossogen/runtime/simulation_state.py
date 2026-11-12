@@ -15,6 +15,7 @@ from uuid import uuid4
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel
+from glossogen.models.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.event import (
     ChannelCreated,
     InjectionDelivered,
@@ -31,7 +32,6 @@ from glossogen.runtime.activity_notification import (
 )
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.channel_router import ChannelRouter
-from glossogen.runtime.elapsed_time import elapsed_seconds_since_start
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.scenario_world import MessageEvent, WorldContext
 from glossogen.runtime.wait_registry import ParkedWait, WaitRegistry

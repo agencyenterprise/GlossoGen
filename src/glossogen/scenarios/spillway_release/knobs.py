@@ -11,7 +11,7 @@ from typing import Self
 
 from pydantic import model_validator
 
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 
 # Archetype weights are positional; this is the fixed order they map to.
 ARCHETYPE_ORDER = ("hold", "time_it", "keep_closed", "evacuate")

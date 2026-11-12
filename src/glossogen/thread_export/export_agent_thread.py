@@ -21,7 +21,7 @@ from glossogen.run_replay.message_history_builder import (
 )
 from glossogen.run_storage.event_log_reader import extract_agent_configs, load_events
 from glossogen.run_storage.run_file_paths import event_log_path
-from glossogen.runners.communication_protocol import (
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     runner_prompts_from_events,
 )

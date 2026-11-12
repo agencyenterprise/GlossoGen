@@ -5,7 +5,7 @@ from typing import Self
 from pydantic import Field, model_validator
 
 from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenarios.move_a_box.ids import (
     BAY_LETTERS,
     BAY_SYMBOLS,

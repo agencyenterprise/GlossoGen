@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
 from glossogen.testing.scripted_agent import SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (

@@ -42,14 +42,16 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 
 1. **Contracts**: `model_catalog/`, `models/`, `run_storage/`. The LLM catalog, the event schema and everything that reads a run directory or selects finished runs from it, including `knob_filter.py`. They import no web framework and none of the groups after them.
 2. **Simulation**: `runtime/`, `runners/`, `engine/`, `llm/`. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
-3. **Scenarios**: `scenario_contract/` and `scenarios/`. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. Three modules import `scenarios.base_knobs` directly (`scenario_contract.scenario_base`, `run_config.config_overrides`, `run_derivation.replace_agent`) until it moves out of `scenarios/`, and `testing/` names concrete scenarios by design.
+3. **Scenarios**: `scenario_contract/` and `scenarios/`. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. The knobs every scenario shares (`scenario_contract.base_knobs`) and the platform's runner prompts (`scenario_contract.platform_runner_prompts`) live in the contract, so nothing outside `scenarios/` imports `glossogen.scenarios.*` except `testing/`, which names concrete scenarios by design.
 4. **After-the-run work**: `evaluation/`, `run_replay/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`).
 5. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 6. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
 `models/` and `run_storage/` import no scenario code. Which event types a run's scenario declares reaches `run_storage/event_parsing.py` through a lookup the scenario catalog installs there when it loads (see "Scenario Event Parsing").
 
-One limit: the groups are not acyclic. `engine`, `evaluation`, `run_replay`, `runners`, `runtime`, `scenario_contract` and `scenarios` import each other in a cycle, which later steps break up.
+`models/` also holds what a run's log records beyond the events themselves: the round-end triggers, the scheduled events, the base tool names, the `read_notifications` schema and elapsed-time conversion. The runtime, the runners and evaluation all read them from there.
+
+One limit: the groups are not acyclic. `evaluation`, `run_replay`, `runners`, `runtime` and `scenario_contract` import each other in a cycle.
 
 ## Simulation Flow
 
@@ -581,7 +583,7 @@ The filter applies to every caller that builds an agent history with a `FromRoun
 ### Key Modules
 
 - `models/channel_visibility.py` — `ChannelVisibility` discriminated union (`Full` / `None` / `FromRound`)
-- `runtime/scheduled_events.py` — `SwapAgent`, `SetPostmortem`, `InjectCase`, `ScheduledEvent` discriminated union
+- `models/scheduled_events.py` — `SwapAgent`, `SetPostmortem`, `InjectCase`, `ScheduledEvent` discriminated union
 - `runtime/scheduler.py` — `RoundBoundaryScheduler` and the `SchedulerOps` Protocol
 - `runtime/agent_swap.py` — `AgentSwapResources` named tuple + `execute_agent_swap`
 - `runtime/scenario_world.py` — `get_globally_disabled_channels()` and `on_agent_swapped_mid_run()` ABC hooks

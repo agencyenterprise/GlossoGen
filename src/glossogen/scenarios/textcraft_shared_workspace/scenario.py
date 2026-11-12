@@ -29,6 +29,7 @@ from glossogen.runtime.virtual_clock import (
     VirtualClock,
     VirtualClockConfig,
 )
+from glossogen.scenario_contract.channel_noise import apply_character_noise
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.scenario_base import (
@@ -36,7 +37,6 @@ from glossogen.scenario_contract.scenario_base import (
     RoundResult,
     SendMessageExecutor,
 )
-from glossogen.scenarios.channel_noise import apply_character_noise
 from glossogen.scenarios.textcraft_shared_workspace.events import (
     WorkspaceActionExecuted,
     WorkspaceCraftCompleted,

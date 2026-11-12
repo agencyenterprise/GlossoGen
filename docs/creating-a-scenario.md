@@ -269,7 +269,7 @@ derives the getters (`knobs_json_schema`, `get_round_count`,
 | `get_injection(round_number, agent_id)` | The round-start Jinja injection, or `None` for an agent with nothing to hear. Case and previous outcome come from your world |
 | `get_postmortem_injection(...)` | Same shape, for the debrief phase |
 | `on_round_advanced(round_number)` | Resolve the previous round, load the next case, and log your `<Scenario>CaseStarted` event via `self.runtime.event_logger` |
-| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/runtime/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
+| `on_round_ended(round_number, trigger)` | Settle round-end state. `trigger` is a [`RoundEndTrigger`](../src/glossogen/models/round_end_trigger.py) value when the clock ended the round, or your own early-end string; compare against the enum's members |
 | `validate_outgoing_message(...)`, `transform_outgoing_message(...)` | Enforce and mutate messages: budget refusal, noise injection |
 | `get_early_round_end_trigger()` | Optional: a trigger string when the round should end before the clock. It must not spell a `RoundEndTrigger` value; the clock raises on one |
 | `restore_state_from_events(events)` | Optional: seed per-round outcomes after a fork or resume, so the first post-resume injection renders accurate "previous result" context |

@@ -17,7 +17,7 @@ from glossogen.llm.pydantic_ai_model_factory import (
 )
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 
 
 def test_google_gla_uses_pydantic_ais_google_prefix(

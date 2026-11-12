@@ -16,12 +16,12 @@ from typing import Any, NamedTuple
 import pytest
 
 from glossogen.models.event import SimulationEvent
+from glossogen.models.round_end_trigger import RoundEndTrigger
 from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.notification_payload import NotificationInbox, Wake
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_registry import WakeReason

@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
@@ -22,6 +23,7 @@ from glossogen.models.event import (
     SimulationEnded,
     SimulationStarted,
 )
+from glossogen.models.scheduled_events import SwapAgent
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runners.agent_runner_base import AgentRunner
 from glossogen.runners.agent_tools import list_tool_definitions, select_tool_definitions
@@ -30,11 +32,9 @@ from glossogen.runtime.activity_notification import NewMessagesNotification
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
 from glossogen.runtime.channel_router import compute_per_channel_join_index
-from glossogen.runtime.communication_tools import BASE_TOOL_NAMES
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
 from glossogen.runtime.scenario_world import WorldContext
-from glossogen.runtime.scheduled_events import SwapAgent
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_contract.protocol import SimulationScenario

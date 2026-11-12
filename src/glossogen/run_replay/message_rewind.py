@@ -28,6 +28,7 @@ from pydantic_ai.messages import ModelMessage
 
 from glossogen.models.channel import Channel
 from glossogen.models.channel_visibility import ChannelVisibility
+from glossogen.models.elapsed_time import find_simulation_start_time
 from glossogen.models.event import (
     AgentRegistered,
     AgentSwappedMidRun,
@@ -42,13 +43,12 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.message import SimulationMessage
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.run_replay.message_history_builder import build_message_history
-from glossogen.runners.communication_protocol import (
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     registered_runner_prompts,
 )
-from glossogen.runtime.elapsed_time import find_simulation_start_time
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 

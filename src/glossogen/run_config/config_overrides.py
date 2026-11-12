@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
-from glossogen.scenarios.base_knobs import AgentModelOverride
+from glossogen.scenario_contract.base_knobs import AgentModelOverride
 
 logger = logging.getLogger(__name__)
 

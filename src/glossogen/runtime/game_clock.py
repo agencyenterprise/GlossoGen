@@ -17,9 +17,9 @@ from glossogen.models.event import (
     RoundResultRecorded,
     RunStatus,
 )
+from glossogen.models.round_end_trigger import PLATFORM_TRIGGER_VALUES, RoundEndTrigger
 from glossogen.models.wait_for import WaitFor
 from glossogen.runtime.agent_session import AgentSession
-from glossogen.runtime.round_end_trigger import PLATFORM_TRIGGER_VALUES, RoundEndTrigger
 from glossogen.runtime.scenario_world import WorldContext
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenario_contract.protocol import SimulationScenario

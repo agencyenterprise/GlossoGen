@@ -16,7 +16,7 @@ from glossogen.evaluation.metrics.round_ended.main_phase_ending_count import (
 from glossogen.llm.provider import LLMProvider
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import SimulationEvent
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
 from glossogen.scenario_contract.scenario_base import ScenarioBase
 
 

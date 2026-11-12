@@ -51,6 +51,20 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- **Moved modules: imports in scenario packages change.** The old paths are
+  gone, with no aliases left behind. For scenario authors:
+
+  | Old import | New import |
+  |---|---|
+  | `glossogen.scenarios.base_knobs` (`BaseKnobs`, `AgentModelOverride`) | `glossogen.scenario_contract.base_knobs` |
+  | `glossogen.scenarios.channel_noise` (`apply_character_noise`, `NoiseReplacementMode`) | `glossogen.scenario_contract.channel_noise` |
+  | `glossogen.runtime.round_end_trigger` (`RoundEndTrigger`) | `glossogen.models.round_end_trigger` |
+  | `glossogen.runtime.scheduled_events` (`ScheduledEvent`, `SwapAgent`, ...) | `glossogen.models.scheduled_events` |
+  | `glossogen.runtime.read_notifications_schema` | `glossogen.models.read_notifications_schema` |
+  | `glossogen.runtime.elapsed_time` | `glossogen.models.elapsed_time` |
+  | `glossogen.runtime.communication_tools` (`SEND_MESSAGE_TOOL_NAME`, `READ_CHANNEL_TOOL_NAME`, `LIST_CHANNELS_TOOL_NAME`, `GET_CHANNEL_MEMBERS_TOOL_NAME`, `BASE_TOOL_NAMES`) | `glossogen.models.communication_tool_names` |
+  | `glossogen.runners.communication_protocol` | `glossogen.scenario_contract.platform_runner_prompts` |
+
 - **A run's events of a type no loaded scenario declares are kept, not skipped.**
   `load_events` returns each as an `UnrecognizedEvent`
   (`glossogen.models.event`), which holds the line's `event_type` and the whole

@@ -27,7 +27,7 @@ from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.message import SimulationMessage
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.run_replay.message_history_builder import build_message_history
-from glossogen.runners.communication_protocol import platform_runner_prompts
+from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
 
 _AGENT = "seat"
 _START = datetime(2026, 8, 1, tzinfo=UTC)

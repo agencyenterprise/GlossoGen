@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from pydantic_ai.models.function import FunctionModel
 
 from glossogen.llm.token_counter import TokenCounter
+from glossogen.models.communication_tool_names import SEND_MESSAGE_TOOL_NAME
 from glossogen.models.event import (
     MessageSent,
     SimulationEvent,
@@ -35,7 +36,6 @@ from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.activity_notification import NewInfoNotification
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
-from glossogen.runtime.communication_tools import SEND_MESSAGE_TOOL_NAME
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import PhaseTimeoutCheck

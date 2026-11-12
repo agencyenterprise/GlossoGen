@@ -19,16 +19,16 @@ from pydantic_ai import RunContext, Tool
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
 from glossogen.models.event import AgentResumed, RunStatus, WaitRegistered
-from glossogen.runtime.notification_payload import (
-    NotificationInbox,
-    Wake,
-    render_parallel_rejection,
-)
-from glossogen.runtime.read_notifications_schema import (
+from glossogen.models.read_notifications_schema import (
     READ_NOTIFICATIONS_TOOL_NAME,
     ReadNotificationsArguments,
     read_notifications_arguments_model,
     read_notifications_description,
+)
+from glossogen.runtime.notification_payload import (
+    NotificationInbox,
+    Wake,
+    render_parallel_rejection,
 )
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.wait_registry import WakeReason, wait_deadline

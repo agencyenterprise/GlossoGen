@@ -39,16 +39,16 @@ from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
 from glossogen.models.model_consumer import ModelConsumer
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.notification_payload import Wake, render_default_notification
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_DESCRIPTION
 from glossogen.runtime.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS, ScenarioTool
 from glossogen.runtime.scenario_world import ScenarioWorld
 from glossogen.runtime.wait_registry import DEFAULT_ANY_TIMEOUT_SECONDS, ParkedWait
-from glossogen.scenarios.base_knobs import BaseKnobs
+from glossogen.scenario_contract.base_knobs import BaseKnobs
 
 logger = logging.getLogger(__name__)
 

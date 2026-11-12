@@ -23,7 +23,7 @@ from glossogen.run_config.config_overrides import (
     split_agent_overrides,
     validate_agent_override_ids,
 )
-from glossogen.scenarios.base_knobs import AgentModelOverride
+from glossogen.scenario_contract.base_knobs import AgentModelOverride
 
 PROVIDERS = {Provider.ANTHROPIC, Provider.OPENAI, Provider.SELF_HOSTED}
 

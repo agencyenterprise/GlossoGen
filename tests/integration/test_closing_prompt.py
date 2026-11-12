@@ -37,8 +37,8 @@ from glossogen.models.event import (
     SimulationEvent,
 )
 from glossogen.models.runner_prompts import RunnerPrompts
-from glossogen.runners.communication_protocol import CONTINUE_PROMPT, INITIAL_PROMPT
-from glossogen.runtime.scheduled_events import ScheduledEvent, SwapAgent
+from glossogen.models.scheduled_events import ScheduledEvent, SwapAgent
+from glossogen.scenario_contract.platform_runner_prompts import CONTINUE_PROMPT, INITIAL_PROMPT
 from glossogen.testing import simulation_harness
 from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation

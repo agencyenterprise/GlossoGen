@@ -16,16 +16,16 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
+from glossogen.models.communication_tool_names import READ_CHANNEL_TOOL_NAME
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runtime.activity_notification import NewInfoNotification, NoActivityNotification
-from glossogen.runtime.communication_tools import READ_CHANNEL_TOOL_NAME
 from glossogen.runtime.notification_payload import (
     DELIVERED_NOTIFICATION_ADAPTER,
     DeliveredNoActivity,
     delivered_notification,
 )
-from glossogen.runtime.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 
 
 def call(tool_name: str, call_id: str, channel_id: str | None) -> ModelResponse:

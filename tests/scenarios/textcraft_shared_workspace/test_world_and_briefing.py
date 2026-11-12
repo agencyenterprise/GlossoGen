@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from glossogen.runners.communication_protocol import build_full_system_prompt
+from glossogen.scenario_contract.platform_runner_prompts import build_full_system_prompt
 from glossogen.scenarios.textcraft_shared_workspace.recipe_dealing import deal_recipes
 from glossogen.scenarios.textcraft_shared_workspace.scenario import (
     TextcraftSharedWorkspaceScenario,

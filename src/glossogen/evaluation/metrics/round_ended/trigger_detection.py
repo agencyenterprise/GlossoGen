@@ -12,7 +12,7 @@ from glossogen.models.event import (
     RoundEnded,
     SimulationEvent,
 )
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
 
 _POSTMORTEM_TIMEOUT_TRIGGER = RoundEndTrigger.POSTMORTEM_TIMEOUT
 

@@ -13,7 +13,7 @@ from glossogen.evaluation.metrics.round_ended.trigger_detection import (
     find_round_end_triggers,
 )
 from glossogen.models.event import SimulationEvent
-from glossogen.runtime.round_end_trigger import RoundEndTrigger
+from glossogen.models.round_end_trigger import RoundEndTrigger
 
 logger = logging.getLogger(__name__)
 

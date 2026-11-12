@@ -50,7 +50,7 @@ from glossogen.models.channel_visibility import (
 from glossogen.models.event import SimulationEvent
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.run_storage.replace_manifest import ReplaceManifest, read_replace_manifest
-from glossogen.runners.communication_protocol import (
+from glossogen.scenario_contract.platform_runner_prompts import (
     build_full_system_prompt,
     runner_prompts_from_events,
 )
