@@ -135,20 +135,33 @@ class BayIdentity(str, Enum):
     letter, and put each operator's bays on squares of its own floor, squares no
     other floor's bays stand on, so only the mark says which bay is which. The
     value is also the word the prompts use for that mark.
+
+    ``LANDMARK`` puts the same landmarks and bays on both operators' floors,
+    and draws the second operator's floor mirrored left to right. A floor shows
+    only its operator's bays, each beside a landmark, and no square is numbered.
+    A bay has no name, so only where it stands among the landmarks says which
+    bay it is.
     """
 
     SQUARE = "square"
     SYMBOL = "symbol"
     LETTER = "letter"
+    LANDMARK = "landmark"
 
     def is_marked(self) -> bool:
         """Whether each floor holds its own bays, named by the mark they carry."""
-        return self is not BayIdentity.SQUARE
+        return self in (BayIdentity.SYMBOL, BayIdentity.LETTER)
+
+    def is_landmark(self) -> bool:
+        """Whether the floors share one layout of landmarks and bays, with no square numbered."""
+        return self is BayIdentity.LANDMARK
 
     def crate_mark(self) -> str:
         """How the floor drawing marks the crate's start square under this identity."""
         if self is BayIdentity.LETTER:
             return LETTER_FLOOR_CRATE_MARK
+        if self is BayIdentity.LANDMARK:
+            return LANDMARK_CRATE_MARK
         return CRATE_MARK
 
 
@@ -189,6 +202,21 @@ The letter is both the bay's name and its mark on the floor drawing."""
 
 SQUARE_BAY_MARK = "B"
 """How the floor drawing marks a bay under ``BayIdentity.SQUARE``."""
+
+LANDMARK_BAY_MARK = "bay"
+"""How the floor drawing marks a bay under ``BayIdentity.LANDMARK``."""
+
+LANDMARK_CRATE_MARK = "crate"
+"""How a landmark floor drawing marks the operator's own crate."""
+
+LANDMARK_KINDS: tuple[str, ...] = ("tree", "pond", "rock", "well", "barn", "bush")
+"""What a landmark can be. A floor draws each landmark by its kind, and kinds repeat.
+
+No kind is a word the prompts already use for something else: there is no cart,
+which is a way of carrying, and no pallet."""
+
+LANDMARK_CELL_WIDTH = 6
+"""Characters each square takes in a landmark floor drawing, so the columns line up."""
 
 
 class HaulMethod(str, Enum):

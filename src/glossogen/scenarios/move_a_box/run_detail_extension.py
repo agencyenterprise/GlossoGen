@@ -191,9 +191,9 @@ def _cell(pair: tuple[int, int]) -> MoveABoxCell:
 
 
 def _floor_bay(bay: MoveABoxBay, bay_identity: str) -> MoveABoxFloorBay:
-    """One bay of a floor as the panel draws it."""
+    """One bay of a floor as the panel draws it, by number where every bay carries one mark."""
     label = bay.mark
-    if bay_identity == BayIdentity.SQUARE.value:
+    if bay_identity in (BayIdentity.SQUARE.value, BayIdentity.LANDMARK.value):
         label = str(bay.number)
     return MoveABoxFloorBay(
         number=bay.number, name=bay.name, label=label, cell=_cell(pair=bay.cell)
