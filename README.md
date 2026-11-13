@@ -17,7 +17,7 @@
 | src/glossogen/cli/\_\_init\_\_.py                                                                      |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/cli/analyze\_command.py                                                                  |       59 |        4 |        8 |        1 |     93% |138-139, 157-158 |
 | src/glossogen/cli/cli\_entry.py                                                                        |       98 |        5 |        6 |        0 |     95% |189-191, 220-221 |
-| src/glossogen/cli/derivation\_commands.py                                                              |      168 |       77 |       34 |        0 |     50% |364-376, 385-392, 403-460, 471-508, 599-604, 617-627, 641-719 |
+| src/glossogen/cli/derivation\_commands.py                                                              |      168 |       77 |       34 |        0 |     50% |372-384, 393-400, 411-468, 479-516, 607-612, 625-635, 649-727 |
 | src/glossogen/cli/evaluate\_command.py                                                                 |       48 |       11 |        2 |        0 |     74% |   124-156 |
 | src/glossogen/cli/export\_commands.py                                                                  |      106 |       29 |       24 |        3 |     68% |221, 240, 242, 293-295, 305-322, 337-359 |
 | src/glossogen/cli/frontend\_container.py                                                               |       95 |       37 |       24 |        3 |     58% |86, 104-108, 110, 123, 128-137, 144-148, 221-228, 237-254, 262-268, 273-279 |
@@ -285,7 +285,7 @@
 | src/glossogen/scenario\_authoring/scenario\_target.py                                                  |       24 |        0 |        8 |        0 |    100% |           |
 | src/glossogen/scenario\_contract/\_\_init\_\_.py                                                       |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/scenario\_contract/activity\_notification.py                                             |       18 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/scenario\_contract/base\_knobs.py                                                        |       50 |        1 |       12 |        1 |     97% |       129 |
+| src/glossogen/scenario\_contract/base\_knobs.py                                                        |       50 |        1 |       12 |        1 |     97% |       131 |
 | src/glossogen/scenario\_contract/catalog.py                                                            |      222 |       10 |       82 |        7 |     94% |201-\>200, 343-344, 359, 437, 472-474, 502, 568, 574 |
 | src/glossogen/scenario\_contract/channel\_noise.py                                                     |       20 |        3 |        6 |        1 |     85% | 61, 67-68 |
 | src/glossogen/scenario\_contract/communication\_round\_view.py                                         |        3 |        0 |        0 |        0 |    100% |           |
