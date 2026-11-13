@@ -86,7 +86,7 @@ written.
 | `round_success` | the scenario's `judge_round_result` recorded no verdicts |
 | `round_success_after_resume` | the run is not a replace-agent, fork-at-round, cross-run or in-run-swap run, or recorded no verdicts, or none after a swap (that swap only) |
 | `protocol_probe` | the scenario provides no probe config |
-| `protocol_learned_after_swap` | the scenario reports no boundary, or one side of it has no messages |
+| `protocol_learned_after_swap` | the scenario reports no boundary or builds no communication rounds, or one side of the boundary has no rounds |
 | `protocol_explanation` | no agent has a history to reconstruct |
 | The probe similarity metrics | see [Protocol](#protocol) |
 
@@ -231,7 +231,7 @@ cutoffs weighs more.
 |---|---|---|
 | `protocol_probe_replica_self_similarity` | replicas of one (agent, question, cutoff), upper-triangle mean | no group has at least 2 replicas |
 | `protocol_probe_agent_pair_similarity` | agents on one (question, cutoff), mean across replicas | no (question, cutoff) has answers from two agents, as in a single-team run |
-| `protocol_probe_cutoff_trajectory` | adjacent cutoffs of one (agent, question) | the JSONL has one cutoff |
+| `protocol_probe_cutoff_trajectory` | adjacent cutoffs of one (agent, question) | no (agent, question) was probed at two cutoffs |
 
 Saturation at 1.0 is what a converged protocol looks like.
 

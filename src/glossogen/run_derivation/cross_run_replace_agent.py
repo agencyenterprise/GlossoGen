@@ -71,9 +71,9 @@ class CrossRunReplaceAgentRequest(NamedTuple):
     event when Sim B did not advance further).
 
     ``model`` / ``provider`` are the concrete model/provider the
-    imported agent runs under. Callers (CLI / API router) resolve "use
-    Sim B's defaults" before constructing this request so the core
-    flow always has explicit values.
+    imported agent runs under. The CLI resolves "use Sim B's defaults"
+    before constructing this request so the core flow always has explicit
+    values.
 
     ``rounds_after`` is how many new rounds the fork plays: round_count
     is set to ``after_round + rounds_after``. When ``None``, it defaults

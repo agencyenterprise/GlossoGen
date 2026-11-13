@@ -104,11 +104,14 @@ def add_replace_agent_parser(subparsers: SubcommandParsers, scenario_names: list
         action="append",
         default=None,
         help=(
-            "Channel ID for which the replaced agent retains visibility of prior "
-            "messages on resume. Repeatable. When the flag is omitted entirely, "
-            "the per-channel defaults from the source run's "
-            "`replace_agent_default_channel_visibility` knob are used (channels "
-            "that map to false get wiped; the rest stay visible)."
+            "Channel ID whose prior messages stay visible to the replaced agent "
+            "on resume (from round R on, with --history-from-round R). Repeatable. When the "
+            "flag is omitted, the list is every channel the agent belongs to "
+            "except those the source run's "
+            "`replace_agent_default_channel_visibility` knob maps to false. A "
+            "channel left out of the list also keeps its history visible; only "
+            "the scenario's blocked channels (its postmortem by default) are "
+            "hidden."
         ),
     )
     replace_parser.add_argument(
@@ -138,8 +141,10 @@ def add_replace_agent_parser(subparsers: SubcommandParsers, scenario_names: list
             "(read_notifications, the scenario's own tools) from an earlier round "
             "is dropped, which is what windows a seat that belongs to no channel. "
             "For the previous P rounds before the boundary, pass "
-            "after_round - P + 1; after_round + 1 keeps no prior history. When "
-            "omitted, the predecessor's whole tool-call history is kept."
+            "after_round - P + 1; after_round + 1 keeps no prior history on the "
+            "listed and blocked channels. A channel left out of the visible list "
+            "keeps its whole history. When omitted, the predecessor's whole "
+            "tool-call history is kept."
         ),
     )
     replace_parser.add_argument(
@@ -247,10 +252,13 @@ def add_cross_run_replace_agent_parser(
         action="append",
         default=None,
         help=(
-            "Channel ID for which the imported agent retains visibility of "
-            "prior source-A messages on resume. Repeatable. When omitted, "
-            "the per-channel defaults from source A's "
-            "`replace_agent_default_channel_visibility` knob are used."
+            "Channel ID whose prior source-A messages stay visible to the "
+            "imported agent on resume. Repeatable. When omitted, the list is "
+            "every channel the agent belongs to except those source A's "
+            "`replace_agent_default_channel_visibility` knob maps to false. A "
+            "channel left out of the list also keeps its history visible; only "
+            "the scenario's blocked channels and source B's channels that "
+            "source A lacks are hidden."
         ),
     )
     cross_run_parser.add_argument(

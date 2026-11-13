@@ -54,12 +54,14 @@ class BaseKnobs(BaseModel):
     when a scenario enables postmortem. Scenarios that do not use postmortem
     can ignore it entirely.
 
-    ``replace_agent_default_channel_visibility`` maps channel IDs to a
-    boolean that determines whether the replace-agent flow makes that
-    channel's prior history visible to the replaced agent by default.
-    Channel IDs not in the map default to ``True`` (visible). The
-    simulation itself does not read this field at runtime; only the
-    replace-agent CLI/HTTP/FE flows consult it to populate defaults.
+    ``replace_agent_default_channel_visibility`` maps channel IDs to whether
+    the replace-agent and cross-run replace-agent commands put that channel in
+    the replaced agent's visible-history list when no
+    ``--visible-history-channel`` is given. Channel IDs not in the map default
+    to ``True``. A channel left out of that list keeps its prior history
+    visible all the same; only the scenario's
+    ``get_replace_agent_blocked_tool_call_channels`` are hidden. The
+    simulation itself does not read this field at runtime.
 
     ``scheduled_events`` declares mid-run interventions (agent swaps and
     postmortem toggles) keyed off round boundaries. The runtime's
