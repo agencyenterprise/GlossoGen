@@ -10,11 +10,13 @@ calls dropped, while the replacement keeps everything it produced itself.
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 
 from glossogen.models.channel_visibility import ChannelVisibility, ChannelVisibilityNone
 from glossogen.models.event import (
     LLMResponseReceived,
+    RoundAdvanced,
     SimulationEvent,
     SimulationStarted,
     StopReason,
@@ -151,3 +153,85 @@ def test_no_window_filters_the_whole_history() -> None:
 
     assert texts == set()
     assert call_ids == set()
+
+
+def _recovered_history_with_a_boundary_orphan() -> list[str]:
+    """The seat's recovered history, in order, when a predecessor call lost its parent.
+
+    The clone is cut at the boundary ``RoundAdvanced``. A predecessor cycle that
+    straddled it, as a round timeout mid-cycle leaves it, keeps the round-2 call
+    and result but loses the ``LLMResponseReceived`` flushed after the cut. The
+    replacement then plays round 3 and the fork crashes as round 4 opens.
+    """
+    events = _stamped(
+        events=[
+            SimulationStarted(
+                round_number=0,
+                run_id="smoke/1",
+                scenario_name="smoke",
+                scenario_description="",
+                channel_ids=["link"],
+                scenario_config={"round_count": 4},
+                provider="anthropic",
+            ),
+            ToolCallInvoked(
+                round_number=2,
+                agent_id=_AGENT,
+                call_id="predecessor-r2",
+                tool_name="record_finding",
+                arguments={"finding": "r2"},
+            ),
+            ToolResultReceived(
+                round_number=2,
+                agent_id=_AGENT,
+                tool_name="record_finding",
+                call_id="predecessor-r2",
+                arguments={"finding": "r2"},
+                result="ok",
+            ),
+            RoundAdvanced(round_number=3, trigger="round_timeout"),
+            *_turn(round_number=3, text="my own words", call_id="own-r3"),
+            RoundAdvanced(round_number=4, trigger="all_agents_idle"),
+        ]
+    )
+    history = build_message_history(
+        events=events,
+        agent_id=_AGENT,
+        system_prompt="do things",
+        runner_prompts=platform_runner_prompts(role_name="worker"),
+        target_timestamp=events[-1].timestamp,
+        cutoff_round=None,
+        tool_calls_only=True,
+        channel_visibility={},
+        history_floor_round=None,
+        filter_below_round=3,
+        split_parallel_tool_calls=False,
+    )
+    order: list[str] = []
+    for message in history:
+        if not isinstance(message, ModelResponse):
+            continue
+        for part in message.parts:
+            if isinstance(part, TextPart):
+                order.append(part.content)
+            if isinstance(part, ToolCallPart):
+                order.append(part.tool_call_id)
+    return order
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "build_message_history appends every parentless call as one synthetic "
+        "cycle after all parented cycles (message_history_builder.py, "
+        "_build_orphan_cycle). On crash recovery the predecessor's round-2 "
+        "orphan lands after the replacement's round-3 turn, so the seat's "
+        "latest turn reads as its predecessor's."
+    ),
+)
+def test_a_predecessor_call_that_lost_its_parent_stays_before_the_replacements_turns() -> None:
+    """Recovered history keeps the predecessor's round-2 call ahead of round 3."""
+    order = _recovered_history_with_a_boundary_orphan()
+
+    assert set(order) == {"predecessor-r2", "my own words", "own-r3"}
+    assert order.index("predecessor-r2") < order.index("my own words")
