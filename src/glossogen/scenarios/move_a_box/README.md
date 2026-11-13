@@ -292,18 +292,21 @@ operators, one crate each, one target a round, no pallets and a
 `view_shift` also turns square floors into windows on one yard. The yard is
 that many squares wider and taller than a floor, and every round each
 operator's floor is placed anywhere up to that many squares down and right of
-the yard's corner. The two corners never land on the same square, so the two
-floors always show different parts of the yard, sharing at least 4 rows and 4
-columns. The bays and pallets belong to the yard: where the floors overlap
-they show the same ones. Each floor draws every bay its window covers as `B`,
-with numbered rows as on any square floor, and each operator's assigned bays
-are inside its own window.
+the yard's corner. If both corners land on the same square, they are drawn
+again, so the two floors show different parts of the yard. The two floors share
+at least 4 rows and 4 columns. The bays and pallets belong to the yard: where
+the floors overlap they show the same ones. Each floor draws every bay its
+window covers as `B`, with numbered rows as on any square floor, and each
+operator's assigned bays are inside its own window.
 
 A square is named on the floor that shows it, so one bay stands on different
 squares of the two floors, and the briefing lists assigned bays by the
-reader's own squares. Nothing an operator reads mentions the shift. A missed
-round's result says only that the other crate was left somewhere else, as on
-landmark floors. `knobs_shifted` is `knobs_default` with `view_shift` 4 and
+reader's own squares. Nothing an operator reads mentions the shift. With
+`partner_bay_disclosed` off, a missed round's result says only that the other
+crate was left somewhere else, as on landmark floors. With it on, the result
+names the other crate's bay by its square on the other floor and says so: "The
+other crates were left on the bay at 2,3 of the other operator's floor."
+`knobs_shifted` is `knobs_default` with `view_shift` 4 and
 `partner_bay_disclosed` off.
 
 A shift keeps reading order, so when both windows cover the same bays, "the
@@ -314,6 +317,11 @@ showed all six bays, and none of the 4 where they did not.
 stand where the other operator's floor does not reach, so the shared bay is the
 only assigned bay both floors show, and the two floors list different bays.
 `knobs_shifted_apart` is `knobs_shifted` with it on.
+
+On `knobs_shifted_apart` with `partner_bay_disclosed` on, gpt-6-astra and Claude
+Opus 5.5 each matched 1 of 10 rounds, one run each. Both pairs kept sending row
+and column numbers. Both Opus operators' closing answers say that crates on the
+same square number were not on the same bay, and neither found the reason.
 
 ## Several targets in a round
 

@@ -472,8 +472,6 @@ def test_shifted_square_floors_hold_every_assigned_bay_and_name_it_by_their_own_
 def test_a_shift_is_refused_where_floors_are_not_windows_on_one_yard() -> None:
     with pytest.raises(ValueError, match="view_shift applies only with bay_identity=square"):
         build(preset_name="knobs_symbol_bays", overrides={"view_shift": 2})
-    with pytest.raises(ValueError, match="view_shift above 0 needs partner_bay_disclosed=false"):
-        build(preset_name="knobs_shifted", overrides={"partner_bay_disclosed": True})
     with pytest.raises(ValueError, match="needs operator_count=2, crates_each=1"):
         build(preset_name="knobs_shifted", overrides={"crates_each": 2})
 
@@ -568,3 +566,44 @@ def test_private_bays_apart_needs_a_shift_and_private_bays() -> None:
         build(preset_name="knobs_default", overrides={"private_bays_outside_overlap": True})
     with pytest.raises(ValueError, match="private_bays_outside_overlap needs bays_differ"):
         build(preset_name="knobs_shifted_apart", overrides={"bays_differ": False})
+
+
+def test_a_disclosed_bay_on_shifted_floors_is_named_on_the_other_operators_floor() -> None:
+    """The square comes from the other floor, so the result says whose floor it is."""
+    scenario = build(
+        preset_name="knobs_shifted_apart",
+        overrides={**TWO_ROUNDS, "partner_bay_disclosed": True},
+    )
+    depot = first_depot(scenario=scenario)
+    target = depot.first_target
+    own = target.bays[OPERATOR_A][0]
+    other_private = next(
+        bay
+        for bay in target.bays[OPERATOR_B]
+        if bay.number in target.allowed_bays[OPERATOR_B]
+        and bay.number not in target.allowed_bays[OPERATOR_A]
+    )
+    scenario.restore_state_from_events(
+        events=[
+            MoveABoxRoundResolved(
+                round_number=1,
+                final_cells={
+                    CRATE_A: (own.cell.row, own.cell.col),
+                    CRATE_B: (other_private.cell.row, other_private.cell.col),
+                },
+                final_bays={CRATE_A: own.number, CRATE_B: other_private.number},
+                temperatures={CRATE_A: 23, CRATE_B: 23},
+                steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
+                points={OPERATOR_A: 10, OPERATOR_B: 10},
+                matched_slots=(),
+                matched=False,
+                success=False,
+                trigger="all_finished",
+            )
+        ]
+    )
+    text = scenario.get_injection(round_number=2, agent_id=OPERATOR_A)
+    square = other_private.cell.label()
+    assert f"The other crates were left on the bay at {square} of the other operator's floor." in (
+        text
+    )

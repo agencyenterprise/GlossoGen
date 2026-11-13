@@ -921,6 +921,7 @@ class MoveABoxScenario(SimulationScenario):
                     for crate_id in self._world.crates_of(agent_id=agent_id)
                 ],
                 "partner_bay_disclosed": self._knobs.partner_bay_disclosed,
+                "view_shift": self._knobs.view_shift,
                 "match_bonus": MATCH_BONUS,
             },
         )
