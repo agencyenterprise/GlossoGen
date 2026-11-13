@@ -15,6 +15,7 @@ from glossogen.scenarios.move_a_box.depot import (
     MIN_START_SEPARATION,
     Cell,
     RoundDepot,
+    YardSetup,
     crate_tags,
     distances_from,
     draw_next_target,
@@ -37,6 +38,10 @@ BAY_COUNT = 6
 BAYS_ALLOWED_EACH = 3
 STEPS = 400
 AGENT_IDS = operator_ids(operator_count=2)
+NO_LANDMARKS = YardSetup(
+    landmark_count=0, mirrored=False, view_shift=0, private_bays_outside_overlap=False
+)
+"""The landmark setup of every identity but landmark."""
 """These checks are about the two-operator geometry, so they name that roster."""
 
 
@@ -58,6 +63,7 @@ def depots(
         bays_differ=bays_differ,
         crate_start=crate_start,
         pallet_density=pallet_density,
+        yard_setup=NO_LANDMARKS,
     )
 
 
@@ -291,6 +297,7 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
             bays_differ=True,
             crate_start=CrateStart.CORNER,
             pallet_density=0.0,
+            yard_setup=NO_LANDMARKS,
         )
 
 
@@ -364,6 +371,7 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
         bays_differ=True,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
+        yard_setup=NO_LANDMARKS,
     )
     for depot in layouts:
         assert sorted(depot.first_target.allowed_bays) == sorted(four)
@@ -402,6 +410,7 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
         bays_differ=True,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
+        yard_setup=NO_LANDMARKS,
     )
     for depot in layouts:
         lists: list[set[int]] = [
@@ -522,12 +531,14 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
     [symbol_depot] = marked_depots(
         bay_identity=BayIdentity.SYMBOL, round_count=1, pallet_density=0.0
     )
-    assert symbol_depot.first_target.bay_name(number=1) == BAY_SYMBOLS[0].name
+    assert (
+        symbol_depot.first_target.bay_name(number=1, agent_id=AGENT_IDS[0]) == BAY_SYMBOLS[0].name
+    )
     assert symbol_depot.first_target.bay_mark(number=1) == BAY_SYMBOLS[0].glyph
     [letter_depot] = marked_depots(
         bay_identity=BayIdentity.LETTER, round_count=1, pallet_density=0.0
     )
-    assert letter_depot.first_target.bay_name(number=4) == "D"
+    assert letter_depot.first_target.bay_name(number=4, agent_id=AGENT_IDS[0]) == "D"
     assert letter_depot.first_target.bay_mark(number=4) == "D"
     [square_depot] = depots(
         bays_differ=True,
@@ -537,7 +548,10 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
         pallet_density=0.0,
     )
     first = square_depot.first_target.bays[AGENT_IDS[0]][0]
-    assert square_depot.first_target.bay_name(number=first.number) == first.cell.label()
+    assert (
+        square_depot.first_target.bay_name(number=first.number, agent_id=AGENT_IDS[0])
+        == first.cell.label()
+    )
 
 
 @pytest.mark.parametrize("preset_name", ["knobs_symbol_bays", "knobs_letter_bays"])
@@ -565,6 +579,7 @@ def test_a_switch_from_letters_to_symbols_keeps_every_square_and_changes_only_th
             bays_differ=True,
             crate_start=CrateStart.SEPARATE_RANDOM,
             pallet_density=0.1,
+            yard_setup=NO_LANDMARKS,
         )
         for identities in (letters, switched)
     )

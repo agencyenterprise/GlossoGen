@@ -40,18 +40,21 @@ from glossogen.scenarios.move_a_box.clock_charge import charged_output_tokens
 from glossogen.scenarios.move_a_box.depot import (
     Bay,
     Cell,
+    RoundDepot,
     TargetLayout,
     crate_tags,
     draw_next_target,
     floor_rows,
     generate_depots,
     humidity_series,
+    landmark_floor_rows,
 )
 from glossogen.scenarios.move_a_box.evaluation.bay_match_metric import BayMatchMetric
 from glossogen.scenarios.move_a_box.evaluation.thermal_excess_metric import ThermalExcessMetric
 from glossogen.scenarios.move_a_box.events import (
     MoveABoxActionTaken,
     MoveABoxBay,
+    MoveABoxFloorView,
     MoveABoxNoteWritten,
     MoveABoxOperatorFinished,
     MoveABoxRequestReleased,
@@ -72,6 +75,7 @@ from glossogen.scenarios.move_a_box.ids import (
     HAUL_TOOL,
     HIDDEN_BASE_TOOLS,
     INJECTION_TEMPLATE,
+    LANDMARK_CRATE_MARK,
     MATCH_BONUS,
     NOTEPAD_TOOL,
     PACK_ICE_TOOL,
@@ -378,6 +382,7 @@ class MoveABoxScenario(SimulationScenario):
             bays_differ=knobs.bays_differ,
             crate_start=knobs.crate_start,
             pallet_density=knobs.pallet_density,
+            yard_setup=knobs.yard_setup(),
         )
         self._crates = crate_tags(seed=knobs.seed, crate_ids=self._world.crate_ids)
         self._humidity: tuple[int, ...] = ()
@@ -430,6 +435,9 @@ class MoveABoxScenario(SimulationScenario):
                 "bay_count": self._knobs.bay_count,
                 "bays_differ": self._knobs.bays_differ,
                 "bay_identity": self._knobs.bay_identity,
+                "landmark_mirrored": self._knobs.landmark_mirrored,
+                "view_shift": self._knobs.view_shift,
+                "private_bays_outside_overlap": self._knobs.private_bays_outside_overlap,
                 "identity_switches": self._identity_switches(),
                 "targets_per_round": self._knobs.targets_per_round,
                 "crate_start": self._knobs.crate_start.value,
@@ -485,6 +493,7 @@ class MoveABoxScenario(SimulationScenario):
                 "crates_each": self._knobs.crates_each,
                 "targets_per_round": self._knobs.targets_per_round,
                 "bay_identity": self._knobs.bay_identity,
+                "view_shift": self._knobs.view_shift,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
                 "channel_disclosed": self._knobs.channel_disclosed,
@@ -824,7 +833,7 @@ class MoveABoxScenario(SimulationScenario):
             number = final_bays[crate_id]
             bay: str | None = None
             if number is not None:
-                bay = layout.bay_name(number=number)
+                bay = layout.bay_name(number=number, agent_id=owner_of(crate_id))
             return CrateOutcome(marking=self._crates[crate_id].crate_id, bay=bay)
 
         return PreviousResult(
@@ -845,6 +854,42 @@ class MoveABoxScenario(SimulationScenario):
             own_points=own_points,
         )
 
+    def _floor_drawing(
+        self, agent_id: str, round_number: int, target: TargetLayout, crate: Cell
+    ) -> list[str]:
+        """``agent_id``'s floor with its crate on ``crate``, drawn for ``target``'s bay identity."""
+        depot = self._depots[round_number - 1]
+        if target.bay_identity.is_landmark():
+            return landmark_floor_rows(
+                landmarks=depot.landmarks[agent_id],
+                bays=target.bays[agent_id],
+                crates={crate: LANDMARK_CRATE_MARK},
+                grid_size=self._knobs.grid_size,
+            )
+        return floor_rows(
+            target=target,
+            pallets=depot.pallets[agent_id],
+            crate=crate,
+            agent_id=agent_id,
+            grid_size=self._knobs.grid_size,
+        )
+
+    def _floor_now(self, agent_id: str) -> list[str]:
+        """``agent_id``'s landmark floor with its crate where it stands now; no rows off landmarks.
+
+        A landmark floor numbers no square, so a result that moved the crate
+        draws the floor again to say where it went.
+        """
+        target = self._world.target
+        if not target.bay_identity.is_landmark():
+            return []
+        return self._floor_drawing(
+            agent_id=agent_id,
+            round_number=self._world.depot.round_number,
+            target=target,
+            crate=self._world.cell_of(crate_id=self._world.crates_of(agent_id=agent_id)[0]),
+        )
+
     def _briefing(
         self,
         agent_id: str,
@@ -856,7 +901,6 @@ class MoveABoxScenario(SimulationScenario):
         identity_switch: IdentitySwitch | None,
     ) -> str:
         """A briefing for one target: the result before it, the floor, the bays and the crate."""
-        depot = self._depots[round_number - 1]
         return self._renderer.render(
             template_name=INJECTION_TEMPLATE,
             template_variables={
@@ -865,12 +909,8 @@ class MoveABoxScenario(SimulationScenario):
                 "targets_per_round": self._knobs.targets_per_round,
                 "previous": previous,
                 "points_so_far": self._world.points_so_far(agent_id=agent_id),
-                "floor_rows": floor_rows(
-                    target=target,
-                    pallets=depot.pallets[agent_id],
-                    crate=crate,
-                    agent_id=agent_id,
-                    grid_size=self._knobs.grid_size,
+                "floor_rows": self._floor_drawing(
+                    agent_id=agent_id, round_number=round_number, target=target, crate=crate
                 ),
                 "allowed_bays": _bay_listings(target=target, agent_id=agent_id),
                 "bay_identity": target.bay_identity,
@@ -930,6 +970,12 @@ class MoveABoxScenario(SimulationScenario):
                 crate_ids={crate_id: tag.crate_id for crate_id, tag in self._crates.items()},
                 crate_masses={crate_id: tag.mass_kg for crate_id, tag in self._crates.items()},
                 virtual_time_s=self._virtual_now(),
+                floor_views=_logged_views(
+                    depot=depot,
+                    over_a_yard=(
+                        self._knobs.bay_identity.is_landmark() or self._knobs.view_shift > 0
+                    ),
+                ),
             )
         )
 
@@ -1320,7 +1366,10 @@ class MoveABoxScenario(SimulationScenario):
             for applied in outcome.applied:
                 await self._log_step(round_number=round_number, applied=applied, reasoning=checked)
             result = self._act_result(
-                round_number=round_number, outcome=outcome, requested=len(resolved)
+                agent_id=agent_id,
+                round_number=round_number,
+                outcome=outcome,
+                requested=len(resolved),
             )
             closing: str | None = None
             if self._world.is_done(agent_id=agent_id):
@@ -1354,9 +1403,10 @@ class MoveABoxScenario(SimulationScenario):
             view = self._readout(
                 agent_id=agent_id,
                 result=self._action_result(
+                    agent_id=agent_id,
                     round_number=round_number,
                     entry=applied.entry,
-                    bay=self._bay_name(number=applied.bay),
+                    bay=self._bay_name(number=applied.bay, agent_id=agent_id),
                 ),
             )
             await self._open_next_target_if_done(round_number=round_number)
@@ -1379,7 +1429,9 @@ class MoveABoxScenario(SimulationScenario):
                 return _ended_before_landing(round_number=round_number, landed=0, requested=1)
             applied = self._take_step(step=step)
             await self._log_step(round_number=round_number, applied=applied, reasoning=reasoning)
-            result = self._action_result(round_number=round_number, entry=applied.entry, bay=None)
+            result = self._action_result(
+                agent_id=agent_id, round_number=round_number, entry=applied.entry, bay=None
+            )
             await self._open_next_target_if_done(round_number=round_number)
         return await self._after_action(
             agent_id=agent_id,
@@ -1492,6 +1544,7 @@ class MoveABoxScenario(SimulationScenario):
                 closing = self._readout(
                     agent_id=agent_id,
                     result=self._act_result(
+                        agent_id=agent_id,
                         round_number=round_number,
                         outcome=AppliedList(applied=applied, stopped=stopped),
                         requested=len(steps),
@@ -1513,7 +1566,10 @@ class MoveABoxScenario(SimulationScenario):
             return self._readout(
                 agent_id=agent_id,
                 result=self._act_result(
-                    round_number=round_number, outcome=outcome, requested=requested
+                    agent_id=agent_id,
+                    round_number=round_number,
+                    outcome=outcome,
+                    requested=requested,
                 ),
             )
 
@@ -1600,17 +1656,20 @@ class MoveABoxScenario(SimulationScenario):
             entry=entry, steps_used=self._world.steps_used(agent_id=entry.agent_id), bay=bay
         )
 
-    def _bay_name(self, number: int | None) -> str | None:
-        """The name of bay ``number`` on the target in play, or None for no bay."""
+    def _bay_name(self, number: int | None, agent_id: str) -> str | None:
+        """What ``agent_id`` calls bay ``number`` on the target in play, or None for no bay."""
         if number is None:
             return None
-        return self._world.target.bay_name(number=number)
+        return self._world.target.bay_name(number=number, agent_id=agent_id)
 
-    def _action_result(self, round_number: int, entry: LoggedAction, bay: str | None) -> str:
+    def _action_result(
+        self, agent_id: str, round_number: int, entry: LoggedAction, bay: str | None
+    ) -> str:
         """What one single-action tool did, as its result opens."""
         return self._renderer.render(
             template_name=ACTION_RESULT_TEMPLATE,
             template_variables={
+                "floor_now": self._floor_now(agent_id=agent_id),
                 "action": entry.action,
                 "direction": entry.direction,
                 "round_number": round_number,
@@ -1622,11 +1681,14 @@ class MoveABoxScenario(SimulationScenario):
             },
         )
 
-    def _act_result(self, round_number: int, outcome: AppliedList, requested: int) -> str:
+    def _act_result(
+        self, agent_id: str, round_number: int, outcome: AppliedList, requested: int
+    ) -> str:
         """What an ``act`` list did, action by action, as the call's result opens."""
         return self._renderer.render(
             template_name=ACT_RESULT_TEMPLATE,
             template_variables={
+                "floor_now": self._floor_now(agent_id=agent_id),
                 "steps": [self._step_report(applied=applied) for applied in outcome.applied],
                 "stopped": outcome.stopped,
                 "requested": requested,
@@ -1645,7 +1707,7 @@ class MoveABoxScenario(SimulationScenario):
             action=entry.action,
             direction=entry.direction,
             temperature=entry.temperature,
-            bay=self._bay_name(number=applied.bay),
+            bay=self._bay_name(number=applied.bay, agent_id=entry.agent_id),
         )
 
     def _crate_for(self, agent_id: str, crate: str) -> str:
@@ -1808,7 +1870,7 @@ class MoveABoxScenario(SimulationScenario):
         bay: str | None = None
         number = self._world.bay_of(agent_id=owner_of(crate_id), cell=cell)
         if own and number is not None:
-            bay = self._world.target.bay_name(number=number)
+            bay = self._world.target.bay_name(number=number, agent_id=owner_of(crate_id))
         return CrateRow(
             crate_id=tag.crate_id,
             mass_kg=tag.mass_kg,
@@ -2001,7 +2063,7 @@ def _bay_listings(target: TargetLayout, agent_id: str) -> list[BayListing]:
     """The bays ``target`` assigns ``agent_id``, in reading order, as briefings list them."""
     return [
         BayListing(
-            name=target.bay_name(number=bay.number),
+            name=target.bay_name(number=bay.number, agent_id=agent_id),
             mark=target.bay_mark(number=bay.number),
             square=bay.cell.label(),
         )
@@ -2010,13 +2072,25 @@ def _bay_listings(target: TargetLayout, agent_id: str) -> list[BayListing]:
     ]
 
 
+def _logged_views(depot: RoundDepot, over_a_yard: bool) -> dict[str, MoveABoxFloorView]:
+    """Where each floor of ``depot`` sat in the yard; empty unless the floors are its windows."""
+    if not over_a_yard:
+        return {}
+    return {
+        agent_id: MoveABoxFloorView(
+            row_offset=view.row_offset, col_offset=view.col_offset, mirrored=view.mirrored
+        )
+        for agent_id, view in depot.views.items()
+    }
+
+
 def _logged_bays(target: TargetLayout) -> dict[str, list[MoveABoxBay]]:
     """Every floor's bays of ``target``, as the round and target events record them."""
     return {
         agent_id: [
             MoveABoxBay(
                 number=bay.number,
-                name=target.bay_name(number=bay.number),
+                name=target.bay_name(number=bay.number, agent_id=agent_id),
                 mark=target.bay_mark(number=bay.number),
                 cell=(bay.cell.row, bay.cell.col),
             )
