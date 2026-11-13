@@ -82,6 +82,10 @@ Passing `postmortem_disabled_at_start: true` here drops the postmortem channel
 for the rest of the resumed run: no postmortem injections, no postmortem phase,
 sends rejected.
 
+A replace-agent run can be forked again only by replacing the same agent. Its
+log holds the predecessor's unfiltered turns, and the filters that hid them live
+in its `replace_manifest.json`, which a fork does not inherit.
+
 ## Import an agent from another run
 
 Fills the seat with an agent from a *different* completed run, carrying its full
@@ -178,8 +182,9 @@ pass it via `--knobs` or validation rejects the merged config.
 
 **If a fork crashes.** `--resume` on the fork's directory continues it from
 where it stopped, like any interrupted run. Only a fork that never played
-resumes at its boundary. A crashed cross-run fork is the exception: its
-imported history cannot be rebuilt past the boundary, so re-create it.
+resumes at its boundary. A cross-run fork that crashed after playing past its
+boundary is the exception: its imported history cannot be rebuilt past the
+boundary, so re-create it.
 
 ## In-run swaps
 
@@ -222,8 +227,10 @@ per-channel discriminated union:
 
 - `{"kind": "full"}` — the whole prior history. The default for any channel not
   listed
-- `{"kind": "none"}` — the channel is hidden entirely: no reads, no sends, nothing
-  retained
+- `{"kind": "none"}` — the prior history is hidden. `read_channel` returns only
+  messages sent after the swap, and the predecessor's sends and reads on the
+  channel are dropped from the rebuilt history. The new agent stays a member
+  and can still send
 - `{"kind": "from_round", "round_floor": R}` — windowed to round `R` onward.
   The predecessor's `send_message` calls are kept from round `R`, and all its
   `read_channel` calls are dropped, since their results would carry older
@@ -231,24 +238,37 @@ per-channel discriminated union:
 
 ### With flags, on the replace flows
 
-On the two flows that replace an agent the same choice is made with flags.
-`--visible-history-channel` (repeatable) names the channels that keep their
-history. Every other channel the agent belongs to has its join index bumped, so
-`read_channel` there returns only post-resume messages. Omit the flag and the
-source's `replace_agent_default_channel_visibility` knob decides, defaulting to
-visible for any channel it does not list.
+On the two flows that replace an agent the choice is coarser.
+`--visible-history-channel` (repeatable) names the channels whose history stays
+visible. Omit the flag and the list is every channel the agent belongs to, less
+those the source's `replace_agent_default_channel_visibility` knob maps to
+`false`.
+
+Leaving a channel out of that list does not hide it. Its join index is left as
+the resumed run set it, so `read_channel` there still returns the whole prior
+history, and the predecessor's tool calls on it stay in the rebuilt history.
+The only channels hidden on these flows are the ones the scenario blocks
+(`get_replace_agent_blocked_tool_call_channels`, its postmortem channels by
+default), which are treated as `none`, and on `cross-run-replace-agent` the
+imported agent's Sim B channels that Sim A does not have. The shipped presets
+map only postmortem channels to `false`, and those are blocked anyway.
 
 On `replace-agent`, `--history-from-round R` then windows the replaced agent's
-history to round `R` onward: the visible channels, and every other tool call
-its predecessor made (`read_notifications`, the scenario's own tools). For the
-previous P rounds before the boundary, pass `after_round - P + 1`. Passing
-`after_round + 1` keeps no prior history at all, which in a scenario without
-channels is the only way to give the seat nothing of its predecessor's. `cross-run-replace-agent` has no such flag, because the
-imported agent brings its own history rather than inheriting a predecessor's, and
-`fork-at-round` replaces no agent, so neither flag applies.
+history to round `R` onward: the channels in the list, and every other tool call
+its predecessor made (`read_notifications`, the scenario's own tools). A channel
+left out of the list is not windowed.
 
-A channel the scenario has globally disabled is forced to `none` regardless of
-what the config asks for.
+For the previous P rounds before the boundary, pass `after_round - P + 1`.
+Passing `after_round + 1` keeps no prior history on the listed and blocked
+channels, which with the shipped presets' default list is every channel.
+In a scenario without channels that is the only way to give the seat nothing of
+its predecessor's. `cross-run-replace-agent` has no such flag: the imported
+agent brings its own history. `fork-at-round` replaces no agent, so neither flag
+applies.
+
+On an in-run swap, a channel the scenario has globally disabled (the postmortem,
+after a `set_postmortem` event closes it) is forced to `none` regardless of what
+`channel_visibility` asks for.
 
 ## Scoring a swap
 
