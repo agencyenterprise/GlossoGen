@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 
 from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenario_contract.scenario_tool import SCENARIO_TOOL_TIMEOUT_SECONDS
+from glossogen.scenarios.move_a_box.depot import YardSetup
 from glossogen.scenarios.move_a_box.ids import (
     BAY_LETTERS,
     BAY_SYMBOLS,
@@ -18,6 +19,12 @@ from glossogen.scenarios.move_a_box.ids import (
 
 MIN_BAY_COUNT = 3
 """Fewest bays a floor can hold: one shared and one private to each of two operators."""
+
+MAX_LANDMARKS = 40
+"""Most landmarks one landmark yard can hold."""
+
+MIN_VIEW_OVERLAP = 4
+"""Fewest rows and columns two landmark floors share however far the shift moves them."""
 
 
 class MoveABoxKnobs(BaseKnobs):
@@ -47,6 +54,30 @@ class MoveABoxKnobs(BaseKnobs):
     squares no other floor's bays use, so only the mark says which bay is
     which. Bay ``n`` carries the ``n``-th symbol or letter, and an operator only
     ever sees the marks on its own floor.
+
+    Under ``landmark`` every floor is a window on one yard holding
+    ``landmark_count`` landmarks (trees, ponds, rocks and the like) and
+    ``bay_count`` bays, each bay beside a landmark. A floor shows only the bays
+    its operator was assigned, the drawing numbers no square, and the landmarks
+    block the crate the way pallets do. ``landmark_mirrored`` draws the second
+    operator's floor mirrored left to right. Nothing an operator reads mentions
+    the mirror, and a round result never says where the other crate went. It
+    needs two operators, one crate each, one target a round, no pallets and
+    ``partner_bay_disclosed`` off.
+
+    ``view_shift`` applies to ``square`` and ``landmark`` floors. It makes the
+    yard that many squares wider and taller than a floor and draws, every round
+    and for each operator, where its floor sits in it, so the two floors overlap
+    by a different amount each round. On square floors the pallets belong to
+    the yard, so both floors show the same ones where they overlap, and each
+    floor draws every bay its window covers. A square is named on the floor that
+    shows it, so one bay stands on different squares of the two floors. Nothing
+    an operator reads mentions the shift. At 0 every floor shows the whole yard.
+    Under a shift, ``partner_bay_disclosed`` names the other crate's bay by its
+    square on the other operator's floor, and says so.
+    ``private_bays_outside_overlap`` puts each operator's private bays where the
+    other operator's floor does not reach, so the shared bay is the only
+    assigned bay both floors show; it needs a shift and ``bays_differ``.
 
     ``bay_identity_from_round`` switches the identity partway through a run:
     ``{6: symbol}`` plays from round 6 on under ``symbol``, and the rounds
@@ -152,6 +183,10 @@ class MoveABoxKnobs(BaseKnobs):
     bay_identity: BayIdentity
     bay_identity_from_round: dict[int, BayIdentity]
     pallet_density: float = Field(ge=0.0, le=0.4)
+    landmark_count: int = Field(ge=0, le=MAX_LANDMARKS)
+    landmark_mirrored: bool
+    view_shift: int = Field(ge=0)
+    private_bays_outside_overlap: bool
     crate_start: CrateStart
     partner_readout: bool
     partner_disclosed: bool
@@ -199,11 +234,14 @@ class MoveABoxKnobs(BaseKnobs):
                     f"bay_identity_from_round switches at round {start}: a switch takes effect "
                     f"at a round between 2 and round_count={self.round_count}"
                 )
-            if switched.is_marked() != self.bay_identity.is_marked():
+            if not (switched.is_marked() and self.bay_identity.is_marked()):
                 raise ValueError(
                     "bay_identity_from_round switches only between symbol and letter: square "
                     "bays put every bay on every floor, which no briefing can announce midway"
                 )
+        self._validate_landmarks()
+        self._validate_view_shift()
+        self._validate_private_bays()
         if self.targets_per_round > 1 and self.crates_each > 1:
             raise ValueError(
                 "targets_per_round above 1 needs crates_each=1: a target starts where each "
@@ -256,6 +294,97 @@ class MoveABoxKnobs(BaseKnobs):
         if self.virtual_list_cost_s and not self.virtual_list_cost_fixed:
             raise ValueError("virtual_list_cost_s applies only with virtual_list_cost_fixed=true")
         return self
+
+    def _validate_landmarks(self) -> None:
+        """Refuse landmark knobs off landmark floors, and what landmark floors cannot play."""
+        if not self.bay_identity.is_landmark():
+            if self.landmark_count or self.landmark_mirrored:
+                raise ValueError(
+                    "landmark_count and landmark_mirrored apply only with bay_identity=landmark"
+                )
+            return
+        if self.landmark_count < 1:
+            raise ValueError(
+                "bay_identity=landmark needs landmark_count of at least 1: every bay stands "
+                "beside a landmark"
+            )
+        if self.operator_count != 2:
+            raise ValueError(
+                "bay_identity=landmark needs operator_count=2: the second floor is the first "
+                "one mirrored, and a third operator has no mirror of its own"
+            )
+        if self.crates_each != 1 or self.targets_per_round != 1:
+            raise ValueError(
+                "bay_identity=landmark needs crates_each=1 and targets_per_round=1: a landmark "
+                "floor describes one crate's start and one set of bays"
+            )
+        if self.pallet_density:
+            raise ValueError(
+                "bay_identity=landmark needs pallet_density=0: the landmarks are what block "
+                "the crate, and both floors hold the same ones"
+            )
+        if self.partner_bay_disclosed:
+            raise ValueError(
+                "bay_identity=landmark needs partner_bay_disclosed=false: a landmark bay has no "
+                "name a result could give, and the other crate's square is a square of a "
+                "different floor"
+            )
+        if self.bay_count + self.landmark_count + 1 > self.grid_size * self.grid_size:
+            raise ValueError(
+                f"grid_size={self.grid_size} has too few squares for {self.bay_count} bays, "
+                f"{self.landmark_count} landmarks and the crate"
+            )
+
+    def _validate_view_shift(self) -> None:
+        """Refuse a shift where floors are no yard's windows, and what a shift cannot play."""
+        if not self.view_shift:
+            return
+        if self.bay_identity.is_marked():
+            raise ValueError(
+                "view_shift applies only with bay_identity=square or landmark: marked bays put "
+                "each floor's bays on squares of its own, so there is no one yard to shift over"
+            )
+        if self.view_shift > self.grid_size - MIN_VIEW_OVERLAP:
+            raise ValueError(
+                f"view_shift can be at most {self.grid_size - MIN_VIEW_OVERLAP} on a "
+                f"{self.grid_size}x{self.grid_size} floor, so two floors always share "
+                f"{MIN_VIEW_OVERLAP} rows and columns"
+            )
+        if self.operator_count != 2 or self.crates_each != 1 or self.targets_per_round != 1:
+            raise ValueError(
+                "view_shift above 0 needs operator_count=2, crates_each=1 and "
+                "targets_per_round=1: each floor's window is drawn for one crate and one set of "
+                "bays a round"
+            )
+        if self.crate_start is not CrateStart.SEPARATE_RANDOM:
+            raise ValueError(
+                "view_shift above 0 needs crate_start=separate_random: a corner or a "
+                "shared start square names a square of one floor that another floor may not show"
+            )
+
+    def _validate_private_bays(self) -> None:
+        """Refuse private bays kept apart where there is no shift or nothing private."""
+        if not self.private_bays_outside_overlap:
+            return
+        if not self.view_shift:
+            raise ValueError(
+                "private_bays_outside_overlap needs view_shift above 0: unshifted floors show "
+                "the same part of the yard, so no bay stands outside their overlap"
+            )
+        if not self.bays_differ:
+            raise ValueError(
+                "private_bays_outside_overlap needs bays_differ: with one list for everyone "
+                "there are no private bays to keep apart"
+            )
+
+    def yard_setup(self) -> YardSetup:
+        """How this run lays its floors over one yard."""
+        return YardSetup(
+            landmark_count=self.landmark_count,
+            mirrored=self.landmark_mirrored,
+            view_shift=self.view_shift,
+            private_bays_outside_overlap=self.private_bays_outside_overlap,
+        )
 
     def bay_identity_of(self, round_number: int) -> BayIdentity:
         """The identity round ``round_number`` plays under: the last switch at or before it."""

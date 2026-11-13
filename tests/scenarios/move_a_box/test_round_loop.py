@@ -213,7 +213,7 @@ async def test_marked_bays_match_on_one_mark_at_two_different_squares(
     assert outcome.matched
     assert outcome.final_bays == {CRATE_A: shared, CRATE_B: shared}
     assert outcome.final_cells[CRATE_A] != outcome.final_cells[CRATE_B]
-    name = depot.first_target.bay_name(number=shared)
+    name = depot.first_target.bay_name(number=shared, agent_id=OPERATOR_A)
     [finished] = results_for(result=result, agent_id=OPERATOR_A, tool_name="finish")
     assert f"on the {name} bay" in finished
 

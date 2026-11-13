@@ -191,6 +191,138 @@ unswitched run plays, relabelled: the rounds before a switch are word for word
 those of `knobs_letter_bays`. A switch to or from square bays is refused, since
 square bays lay out every floor differently.
 
+## Landmark bays
+
+With `bay_identity=landmark`, every floor is a window on one yard of landmarks
+and bays. `landmark_count` landmarks stand in the yard, each a tree, pond, rock,
+well, barn or bush, and a kind can appear more than once. Every bay stands
+beside a landmark, and every bay a floor shows has a landmark beside it on that
+floor. A landmark blocks the crate the way a pallet does, and landmark floors
+hold no pallets.
+
+A floor shows only the bays its operator was assigned. The drawing gives one
+word per square and numbers no row and no column. Two knobs set how the floors
+relate:
+
+- `landmark_mirrored` draws the second operator's floor mirrored left to right.
+- `view_shift` makes the yard that many squares wider and taller than
+  a floor; it also applies to square floors, as described below. Every round, each operator's floor is placed anywhere up to that many
+  squares down and right of the yard's corner, so the two floors overlap by a
+  different amount each round. They always share at least 4 rows and 4
+  columns, and the bay on both lists stands in that overlap beside a landmark
+  both floors show. At 0 every floor shows the whole yard.
+
+Round 1 of `knobs_landmarks` (mirrored, no shift), the first operator's floor
+and then the second's:
+
+```
+  .     .     .     .     .     .     .     .
+  .     barn  .     .     .     .     .     .
+  .     .     .     .     .     .     .     .
+  .     crate .     .     .     .     .     .
+  .     .     .     .     tree  bay   .     .
+  .     bay   tree  .     .     .     .     .
+  well  .     .     .     .     bay   bush  .
+  .     .     .     .     .     .     .     bush
+```
+
+```
+  .     .     .     .     .     .     .     .
+  .     .     .     .     .     .     barn  .
+  .     .     .     .     .     .     .     .
+  .     .     .     bay   .     .     .     .
+  .     .     bay   tree  .     .     .     .
+  .     .     .     .     .     tree  .     .
+  .     bush  .     .     .     crate .     well
+  bush  bay   .     .     .     .     .     .
+```
+
+The bay on both lists is the one right of the upper tree on the first floor and
+left of it on the second. Each operator's other two bays are on its floor only.
+
+Round 1 of `knobs_landmarks_shifted` (mirrored, shift 4, 10 landmarks). The
+first floor sits 1 row down and 3 columns right in the yard, the second 1 row
+down and mirrored:
+
+```
+  pond  .     .     .     .     .     .     .
+  .     .     .     .     .     .     .     .
+  .     crate .     .     .     .     .     .
+  bay   .     rock  .     .     .     .     .
+  well  bay   .     .     .     .     .     .
+  .     .     .     .     .     .     .     .
+  .     .     .     .     pond  tree  .     pond
+  .     .     .     .     bay   .     .     .
+```
+
+```
+  .     .     .     .     pond  tree  .     .
+  .     .     .     .     .     .     .     bay
+  .     .     crate .     .     .     .     tree
+  .     .     rock  .     bay   .     bush  .
+  .     .     .     .     well  .     .     .
+  bay   .     .     .     .     .     .     .
+  pond  .     .     .     .     .     .     pond
+  .     .     .     .     .     .     .     .
+```
+
+The shared bay is the one above the well on both floors.
+
+Nothing an operator reads names a square or says how the floors relate. An
+action's result draws the floor again with the crate where it stands, the
+readout says only whether the crate is on one of the operator's bays, and a
+refusal names the landmark in the way. A missed round's result says only that
+the other crate was left somewhere else: `partner_bay_disclosed` has to be off,
+because a landmark bay has no name to give and the other crate's square belongs
+to a different floor.
+
+Measured on gpt-6.1-sol at high thinking with `channel_disclosed`, mirrored and
+unshifted. Told about the mirror, the pair matched 5 of 5 rounds with a
+row-and-column temperature code and flipped the column. Not told, they matched 7
+of 10. The mirror came out when a missed round's result marked the other crate
+on the reader's floor, a feedback the scenario no longer gives. All four closing
+answers of the two runs describe a row-and-column code.
+
+Scoring compares bay numbers, as for marked bays. Landmark floors need two
+operators, one crate each, one target a round, no pallets and a
+`separate_random` start under a shift.
+
+## Shifted square floors
+
+`view_shift` also turns square floors into windows on one yard. The yard is
+that many squares wider and taller than a floor, and every round each
+operator's floor is placed anywhere up to that many squares down and right of
+the yard's corner. If both corners land on the same square, they are drawn
+again, so the two floors show different parts of the yard. The two floors share
+at least 4 rows and 4 columns. The bays and pallets belong to the yard: where
+the floors overlap they show the same ones. Each floor draws every bay its
+window covers as `B`, with numbered rows as on any square floor, and each
+operator's assigned bays are inside its own window.
+
+A square is named on the floor that shows it, so one bay stands on different
+squares of the two floors, and the briefing lists assigned bays by the
+reader's own squares. Nothing an operator reads mentions the shift. With
+`partner_bay_disclosed` off, a missed round's result says only that the other
+crate was left somewhere else, as on landmark floors. With it on, the result
+names the other crate's bay by its square on the other floor and says so: "The
+other crates were left on the bay at 2,3 of the other operator's floor."
+`knobs_shifted` is `knobs_default` with `view_shift` 4 and
+`partner_bay_disclosed` off.
+
+A shift keeps reading order, so when both windows cover the same bays, "the
+n-th bay in reading order" is the same bay on both floors. gpt-6.1-sol found
+that code on `knobs_shifted`: it matched 5 of the 6 rounds where both windows
+showed all six bays, and none of the 4 where they did not.
+`private_bays_outside_overlap` takes that away. Each operator's private bays
+stand where the other operator's floor does not reach, so the shared bay is the
+only assigned bay both floors show, and the two floors list different bays.
+`knobs_shifted_apart` is `knobs_shifted` with it on.
+
+On `knobs_shifted_apart` with `partner_bay_disclosed` on, gpt-6-astra and Claude
+Opus 5.5 each matched 1 of 10 rounds, one run each. Both pairs kept sending row
+and column numbers. Both Opus operators' closing answers say that crates on the
+same square number were not on the same bay, and neither found the reason.
+
 ## Several targets in a round
 
 With `targets_per_round` above 1, a round holds that many targets, worked one
@@ -496,7 +628,11 @@ out before it reaches a bay.
 | `operator_count` | how many operators run, each on a floor of its own |
 | `crates_each` | how many crates each operator works at once, matched across operators by slot |
 | `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
-| `bay_identity` | `square`, every floor holds every bay on the same squares and a bay is named by its square; `symbol` or `letter`, each floor holds only its operator's bays on squares of its own and a bay is named by its symbol or letter |
+| `bay_identity` | `square`, every floor holds every bay on the same squares and a bay is named by its square; `symbol` or `letter`, each floor holds only its operator's bays on squares of its own and a bay is named by its symbol or letter; `landmark`, every floor is a window on one yard of landmarks and bays, showing only its operator's bays, with no square numbered |
+| `landmark_count` | landmarks in a `landmark` yard; 0 under every other identity |
+| `landmark_mirrored` | draws the second operator's `landmark` floor mirrored left to right |
+| `view_shift` | how many squares larger than a floor a `square` or `landmark` yard is, and how far each floor's window moves in it, drawn per operator and per round; 0 shows every floor the whole yard |
+| `private_bays_outside_overlap` | under a shift, puts each operator's private bays where the other operator's floor does not reach |
 | `bay_identity_from_round` | rounds at which the marks switch between symbol and letter, as `{"6": "symbol"}`; `{}` keeps `bay_identity` for the whole run |
 | `targets_per_round` | how many targets a round holds, each scored on its own; above 1 needs `crates_each` at 1 |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |
@@ -532,22 +668,27 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
 | `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
 | `knobs_two_targets` | `knobs_default` with two targets a round |
+| `knobs_landmarks` | `knobs_default` with `bay_identity=landmark`, 6 landmarks, the second floor mirrored, no shift, no pallets and `partner_bay_disclosed` off |
+| `knobs_landmarks_shifted` | `knobs_landmarks` with 10 landmarks and `view_shift` 4 |
+| `knobs_shifted` | `knobs_default` with `view_shift` 4 and `partner_bay_disclosed` off: square floors as shifted windows on one yard |
+| `knobs_shifted_apart` | `knobs_shifted` with `private_bays_outside_overlap`: each operator's private bays off the other's floor |
 | `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, and a list of actions landing at once (`step_duration_s` 0) |
 
 Every preset sets `parallel_tool_calls` to false, `batched_actions` and
 `describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,
 `round_count` 10 and `seed` 42. Every preset but `knobs_virtual_clock` sets
 `lockstep` on and `virtual_clock` off. Every preset but `knobs_four_operators` also sets
-`grid_size` to 8, `pallet_density` to `0.1` and `crate_start` to
-`separate_random`. `knobs_four_operators` departs on the floor and the roster, as
-its row says. Only `knobs_symbol_bays`, `knobs_letter_bays` and
-`knobs_letters_then_symbols` name bays by a mark.
+`grid_size` to 8 and `crate_start` to `separate_random`, and every preset but
+`knobs_four_operators` and the two landmark presets sets `pallet_density` to `0.1`.
+`knobs_four_operators` departs on the floor and the roster, as its row says.
+Only `knobs_symbol_bays`, `knobs_letter_bays` and `knobs_letters_then_symbols`
+name bays by a mark, and only `knobs_landmarks` and `knobs_landmarks_shifted` draw landmarks.
 
 ## Events
 
 | Event | Holds |
 |---|---|
-| `move_a_box_round_started` | The floor size, the round's `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets, the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`), the crate markings, and under `virtual_clock` the virtual second the round started at |
+| `move_a_box_round_started` | The floor size, the round's `bay_identity`, and per operator the bays on its floor (number, name, drawn mark, square), the start square, the pallets (under `landmark`, the landmarks' squares), the assigned bays. Plus the condition flags (`bays_differ`, `crate_start`, `partner_readout`, `partner_disclosed`, `partner_bay_disclosed`), the crate markings, under `virtual_clock` the virtual second the round started at, and under `landmark` or `view_shift` each floor's place in the yard (`floor_views`: row and column offset, mirrored) |
 | `move_a_box_action_taken` | Operator, `action` (the haul method, `stand_by` or `pack_ice`), `direction`, from and to squares, `sequence`, `temperature` after the action, steps used, the call's `reasoning`, and under `virtual_clock` the virtual second it landed at |
 | `move_a_box_note_written` | Operator and the note's text. Never shown to another operator |
 | `move_a_box_operator_finished` | Operator, final square, the bay it scores for or None, reading, steps used, `reasoning`, and under `virtual_clock` the virtual second it landed at |
@@ -703,7 +844,7 @@ Read any match rate against what the two controls return on the same floors.
 | `ids.py` | Agent ids, tool and trigger names, scoring constants, `Direction`, `HaulMethod`, `CrateStart`, `BayIdentity`, `BAY_SYMBOLS`, `BAY_LETTERS`, the floor-drawing marks, the temperature deltas |
 | `planned_action.py` | `CrateAction`, the steps `act` takes, and what the scenario records of each one it applies |
 | `knobs.py`, `knobs_*.json` | Knobs, validators, the presets |
-| `depot.py` | Cells, bays, the assignment draw, pallets, start squares, the inert readings. No runtime state |
+| `depot.py` | Cells, bays, the assignment draw, pallets, landmark yards and each floor's window on them, start squares, the floor drawings, the inert readings. No runtime state |
 | `world.py` | Crate positions, readings, steps used, the round's action log with each operator's read position, the round's targets, outcomes |
 | `events.py` | The events above |
 | `wake_package.py` | The wake package `read_notifications` returns |
