@@ -157,7 +157,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       body: (
         <>
           This is a run of the <strong>Veyru</strong> scenario: two AI agents coordinating over{" "}
-          {maxRound} rounds. <strong>Run info</strong> holds its counts and cost;{" "}
+          {maxRound} rounds. <strong>Run info</strong> holds its counts, cost and models;{" "}
           <strong>Knobs</strong> holds the settings the run used. The <code>?</code> opens the
           scenario description.
         </>
@@ -316,6 +316,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
                 messageCount={run.total_messages}
                 eventCount={null}
                 agentCount={run.agents.length}
+                agents={run.agents}
                 totalCostUsd={run.total_cost_usd}
                 tokenUsage={run.agent_token_usage}
                 durationSeconds={run.duration_seconds}
