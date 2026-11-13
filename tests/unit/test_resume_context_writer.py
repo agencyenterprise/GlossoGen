@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import orjson
-import pytest
 from pydantic_ai.messages import ModelMessage
 
 from glossogen.models.event import (
@@ -175,18 +174,19 @@ def test_each_agent_gets_a_file_holding_its_history_in_order(tmp_path: Path) -> 
     assert other == {"agent_id": _OTHER_AGENT, "num_messages": 0, "messages": []}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "resume_context_writer._serialize_part has no branch for CompactionPart, so "
-        "a compaction falls back to {'kind': 'CompactionPart'} and the file drops the "
-        "summary the resumed agent is handed in place of its earlier turns."
-    ),
-)
 def test_a_compaction_is_written_with_its_summary(tmp_path: Path) -> None:
     history = _history(events=[_started(), _compaction(), *_cycle()])
 
     write_resume_context_files(run_dir=tmp_path, agent_message_histories={_AGENT: history})
 
     parts = _written_parts(run_dir=tmp_path, agent_id=_AGENT)
-    assert any(part.get("content") == _SUMMARY for part in parts)
+    compactions = [part for part in parts if part["kind"] == "compaction"]
+    assert compactions == [
+        {
+            "kind": "compaction",
+            "content": _SUMMARY,
+            "id": None,
+            "provider_name": "anthropic",
+            "provider_details": None,
+        }
+    ]

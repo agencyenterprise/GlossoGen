@@ -48,6 +48,14 @@ def _serialize_part(part: object) -> dict[str, Any]:
             "provider_details": getattr(part, "provider_details", None),
             "signature_recorded": getattr(part, "signature", None) is not None,
         }
+    if cls == "CompactionPart":
+        return {
+            "kind": "compaction",
+            "content": getattr(part, "content", None),
+            "id": getattr(part, "id", None),
+            "provider_name": getattr(part, "provider_name", None),
+            "provider_details": getattr(part, "provider_details", None),
+        }
     if cls == "ToolCallPart":
         return {
             "kind": "tool_call",
