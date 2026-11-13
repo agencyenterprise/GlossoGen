@@ -410,16 +410,9 @@ async def load_or_refresh_credentials() -> Credentials:
     return credentials
 
 
-def delete_credentials(*, path: Path) -> None:
-    """Remove the credentials file (used by ``glossogen logout``-style flows)."""
-    if path.exists():
-        path.unlink()
-
-
 __all__ = [
     "CREDENTIALS_PATH",
     "Credentials",
-    "delete_credentials",
     "load_credentials",
     "load_or_refresh_credentials",
     "refresh_credentials",
