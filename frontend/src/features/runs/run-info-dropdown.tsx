@@ -2,9 +2,16 @@
 
 import { Info } from "lucide-react";
 import type { components } from "@/types/api.gen";
-import { formatCost, formatDayHeader, formatDuration, formatTokens } from "./format";
+import {
+  formatCost,
+  formatDayHeader,
+  formatDuration,
+  formatModelSettings,
+  formatTokens,
+} from "./format";
 import { HeaderDropdown } from "./header-dropdown";
 
+type AgentDetail = components["schemas"]["AgentDetail"];
 type AgentTokenUsage = components["schemas"]["AgentTokenUsageResponse"];
 
 type Stat = {
@@ -68,15 +75,53 @@ function buildStats({
   return stats;
 }
 
+/** The roster's one-line model summary: the single ``provider:model`` every
+ *  agent played, or how many distinct ones they played. */
+function summarizeModels(agents: AgentDetail[]): string {
+  const keys = [...new Set(agents.map(agent => `${agent.provider}:${agent.model}`))];
+  if (keys.length === 1) {
+    return keys[0] ?? "unknown";
+  }
+  return `${keys.length} models`;
+}
+
+/** Each agent's ``provider:model`` and the settings it was sent, under a
+ *  one-line summary of the models. */
+function ModelRoster({ agents }: { agents: AgentDetail[] }) {
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <div className="flex justify-between gap-6">
+        <span className="text-muted-foreground">Models</span>
+        <span className="font-medium text-foreground">{summarizeModels(agents)}</span>
+      </div>
+      <div className="mt-1 space-y-0.5">
+        {agents.map(agent => (
+          <div key={agent.agent_id} className="flex justify-between gap-6">
+            <span className="text-muted-foreground">{agent.role_name}</span>
+            <span className="text-right font-mono text-foreground">
+              {agent.provider}:{agent.model}
+              <span className="block text-[11px] text-muted-foreground">
+                {formatModelSettings(agent.model_settings)}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The run header's "Run info" dropdown: start date, round / message / event /
- * agent counts, cost, duration and token counts.
+ * agent counts, cost, duration, token counts, and the per-agent model roster.
  *
  * ``eventCount`` is ``null`` for surfaces that carry no timeline entry count
  * (the public demo viewer, the runs list), which drops the Events row.
  * ``tokenUsage`` is ``null`` where the surface carries none (the runs list),
- * which drops the token rows. ``align`` is passed through to
- * :func:`HeaderDropdown`: "right" in a run header, "left" in a runs-list row.
+ * which drops the token rows. ``agents`` is ``null`` in the runs list, whose
+ * models dropdown sits beside this one, which drops the model roster.
+ * ``align`` is passed through to :func:`HeaderDropdown`: "right" in a run
+ * header, "left" in a runs-list row.
  */
 export function RunInfoDropdown({
   timestamp,
@@ -84,6 +129,7 @@ export function RunInfoDropdown({
   messageCount,
   eventCount,
   agentCount,
+  agents,
   totalCostUsd,
   durationSeconds,
   tokenUsage,
@@ -94,6 +140,7 @@ export function RunInfoDropdown({
   messageCount: number;
   eventCount: number | null;
   agentCount: number;
+  agents: AgentDetail[] | null;
   totalCostUsd: number;
   durationSeconds: number;
   tokenUsage: AgentTokenUsage | null;
@@ -119,14 +166,17 @@ export function RunInfoDropdown({
       panelClassName="w-max min-w-56 p-3"
     >
       {() => (
-        <dl className="space-y-1">
-          {stats.map(stat => (
-            <div key={stat.label} className="flex justify-between gap-6">
-              <dt className="text-muted-foreground">{stat.label}</dt>
-              <dd className="font-medium text-foreground">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          <dl className="space-y-1">
+            {stats.map(stat => (
+              <div key={stat.label} className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{stat.label}</dt>
+                <dd className="font-medium text-foreground">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {agents !== null && agents.length > 0 ? <ModelRoster agents={agents} /> : null}
+        </>
       )}
     </HeaderDropdown>
   );

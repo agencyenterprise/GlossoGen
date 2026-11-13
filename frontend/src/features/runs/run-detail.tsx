@@ -279,6 +279,7 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
             messageCount={channelMessages}
             eventCount={timelineEntries}
             agentCount={allAgents.length}
+            agents={allAgents}
             totalCostUsd={totalCostUsd}
             tokenUsage={restData.agent_token_usage}
             durationSeconds={durationSeconds}

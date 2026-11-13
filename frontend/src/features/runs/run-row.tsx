@@ -339,6 +339,7 @@ function RunRowComponent({
               messageCount={run.total_messages}
               eventCount={null}
               agentCount={run.agent_models.length}
+              agents={null}
               totalCostUsd={run.total_cost_usd}
               durationSeconds={run.duration_seconds}
               tokenUsage={null}
