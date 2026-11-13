@@ -325,6 +325,32 @@ def _tool_return_content(
     return result.result
 
 
+class _OrphanGroup(NamedTuple):
+    """Parentless calls that belong at one position among the kept cycles."""
+
+    slot: int
+    invoked: list[ToolCallInvoked]
+
+
+def _orphan_groups_by_slot(
+    orphan_invoked: list[ToolCallInvoked],
+    kept_cycles: list[_KeptCycle],
+) -> list[_OrphanGroup]:
+    """Group parentless calls by the kept cycle they come before, in slot order.
+
+    A call's own response is logged after the call, so the call belongs after
+    every kept cycle whose response was logged before it and before the rest.
+    Calls cut off at a fork boundary and calls cut off by a crash therefore land
+    in different places: on recovery of a replace-agent fork, the predecessor's
+    boundary calls stay ahead of the replacement's own turns.
+    """
+    by_slot: dict[int, list[ToolCallInvoked]] = {}
+    for inv in sorted(orphan_invoked, key=lambda one: one.timestamp):
+        slot = sum(1 for cycle in kept_cycles if cycle.response_timestamp < inv.timestamp)
+        by_slot.setdefault(slot, []).append(inv)
+    return [_OrphanGroup(slot=slot, invoked=invoked) for slot, invoked in sorted(by_slot.items())]
+
+
 def _build_orphan_cycle(
     orphan_invoked: list[ToolCallInvoked],
     tool_results_by_call_id: dict[str, ToolResultReceived],
@@ -342,11 +368,13 @@ def _build_orphan_cycle(
     that fired before the anchor are, since each is logged when its call
     starts. Without their parent we'd lose
     the matching ``ToolCallPart``s entirely; instead we group them into
-    one synthetic ``ModelResponse`` placed at the end of the agent's
-    history (they are the most recent calls before resume). The
+    one synthetic ``ModelResponse``, which the caller places among the
+    other cycles by time (see ``_orphan_groups_by_slot``). The
     channel-visibility filter still applies, and ``stop_reason`` is set
-    to ``end_turn`` so the cycle is treated as terminal. The resumed
-    agent picks up on a fresh prompt rather than a mid-batch continuation.
+    to ``end_turn`` so the cycle is treated as terminal. When the cycle
+    comes last, the resumed agent picks up on a fresh prompt rather than a
+    mid-batch continuation. Placed earlier, it gets no continuation prompt
+    and the next kept response follows its tool returns directly.
     """
     if not orphan_invoked:
         return None
@@ -753,17 +781,19 @@ def build_message_history(
             )
         )
 
-    orphan_cycle = _build_orphan_cycle(
-        orphan_invoked=orphan_invoked,
-        tool_results_by_call_id=tool_results_by_call_id,
-        channel_visibility=channel_visibility,
-        sent_channel_by_call_id=sent_channel_by_call_id,
-        nonchannel_round_floor=nonchannel_round_floor,
-        filter_below_round=filter_below_round,
-        simulation_start_time=simulation_start_time,
-    )
-    if orphan_cycle is not None:
-        kept_cycles.append(orphan_cycle)
+    orphan_groups = _orphan_groups_by_slot(orphan_invoked=orphan_invoked, kept_cycles=kept_cycles)
+    for group in reversed(orphan_groups):
+        orphan_cycle = _build_orphan_cycle(
+            orphan_invoked=group.invoked,
+            tool_results_by_call_id=tool_results_by_call_id,
+            channel_visibility=channel_visibility,
+            sent_channel_by_call_id=sent_channel_by_call_id,
+            nonchannel_round_floor=nonchannel_round_floor,
+            filter_below_round=filter_below_round,
+            simulation_start_time=simulation_start_time,
+        )
+        if orphan_cycle is not None:
+            kept_cycles.insert(group.slot, orphan_cycle)
 
     if trailing_compactions:
         trailing_parts: list[CompactionPart | ThinkingPart | TextPart | ToolCallPart] = list(
