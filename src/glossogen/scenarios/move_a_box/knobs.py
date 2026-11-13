@@ -73,6 +73,8 @@ class MoveABoxKnobs(BaseKnobs):
     floor draws every bay its window covers. A square is named on the floor that
     shows it, so one bay stands on different squares of the two floors. Nothing
     an operator reads mentions the shift. At 0 every floor shows the whole yard.
+    Under a shift, ``partner_bay_disclosed`` names the other crate's bay by its
+    square on the other operator's floor, and says so.
     ``private_bays_outside_overlap`` puts each operator's private bays where the
     other operator's floor does not reach, so the shared bay is the only
     assigned bay both floors show; it needs a shift and ``bays_differ``.
@@ -358,11 +360,6 @@ class MoveABoxKnobs(BaseKnobs):
             raise ValueError(
                 "view_shift above 0 needs crate_start=separate_random: a corner or a "
                 "shared start square names a square of one floor that another floor may not show"
-            )
-        if self.partner_bay_disclosed:
-            raise ValueError(
-                "view_shift above 0 needs partner_bay_disclosed=false: the other crate's bay "
-                "stands on a different square of the reader's floor, or off it"
             )
 
     def _validate_private_bays(self) -> None:
