@@ -1645,6 +1645,9 @@ and boards; <code>--history-from-round</code> windows it (see
 <p>Passing <code>postmortem_disabled_at_start: true</code> here drops the postmortem channel
 for the rest of the resumed run: no postmortem injections, no postmortem phase,
 sends rejected.</p>
+<p>A replace-agent run can be forked again only by replacing the same agent. Its
+log holds the predecessor's unfiltered turns, and the filters that hid them live
+in its <code>replace_manifest.json</code>, which a fork does not inherit.</p>
 <h2 id="import-an-agent-from-another-run">Import an agent from another run<a class="headerlink" href="#import-an-agent-from-another-run" title="Permanent link">&para;</a></h2>
 <p>Fills the seat with an agent from a <em>different</em> completed run, carrying its full
 history (text, thinking, tool calls) from that run. Same scenario and same
@@ -1724,8 +1727,9 @@ source dispatched that boundary.</p>
 pass it via <code>--knobs</code> or validation rejects the merged config.</p>
 <p><strong>If a fork crashes.</strong> <code>--resume</code> on the fork's directory continues it from
 where it stopped, like any interrupted run. Only a fork that never played
-resumes at its boundary. A crashed cross-run fork is the exception: its
-imported history cannot be rebuilt past the boundary, so re-create it.</p>
+resumes at its boundary. A cross-run fork that crashed after playing past its
+boundary is the exception: its imported history cannot be rebuilt past the
+boundary, so re-create it.</p>
 <h2 id="in-run-swaps">In-run swaps<a class="headerlink" href="#in-run-swaps" title="Permanent link">&para;</a></h2>
 <p><code>scheduled_events</code> swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).</p>
@@ -1759,30 +1763,43 @@ per-channel discriminated union:</p>
 <ul>
 <li><code>{"kind": "full"}</code> — the whole prior history. The default for any channel not
   listed</li>
-<li><code>{"kind": "none"}</code> — the channel is hidden entirely: no reads, no sends, nothing
-  retained</li>
+<li><code>{"kind": "none"}</code> — the prior history is hidden. <code>read_channel</code> returns only
+  messages sent after the swap, and the predecessor's sends and reads on the
+  channel are dropped from the rebuilt history. The new agent stays a member
+  and can still send</li>
 <li><code>{"kind": "from_round", "round_floor": R}</code> — windowed to round <code>R</code> onward.
   The predecessor's <code>send_message</code> calls are kept from round <code>R</code>, and all its
   <code>read_channel</code> calls are dropped, since their results would carry older
   messages</li>
 </ul>
 <h3 id="with-flags-on-the-replace-flows">With flags, on the replace flows<a class="headerlink" href="#with-flags-on-the-replace-flows" title="Permanent link">&para;</a></h3>
-<p>On the two flows that replace an agent the same choice is made with flags.
-<code>--visible-history-channel</code> (repeatable) names the channels that keep their
-history. Every other channel the agent belongs to has its join index bumped, so
-<code>read_channel</code> there returns only post-resume messages. Omit the flag and the
-source's <code>replace_agent_default_channel_visibility</code> knob decides, defaulting to
-visible for any channel it does not list.</p>
+<p>On the two flows that replace an agent the choice is coarser.
+<code>--visible-history-channel</code> (repeatable) names the channels whose history stays
+visible. Omit the flag and the list is every channel the agent belongs to, less
+those the source's <code>replace_agent_default_channel_visibility</code> knob maps to
+<code>false</code>.</p>
+<p>Leaving a channel out of that list does not hide it. Its join index is left as
+the resumed run set it, so <code>read_channel</code> there still returns the whole prior
+history, and the predecessor's tool calls on it stay in the rebuilt history.
+The only channels hidden on these flows are the ones the scenario blocks
+(<code>get_replace_agent_blocked_tool_call_channels</code>, its postmortem channels by
+default), which are treated as <code>none</code>, and on <code>cross-run-replace-agent</code> the
+imported agent's Sim B channels that Sim A does not have. The shipped presets
+map only postmortem channels to <code>false</code>, and those are blocked anyway.</p>
 <p>On <code>replace-agent</code>, <code>--history-from-round R</code> then windows the replaced agent's
-history to round <code>R</code> onward: the visible channels, and every other tool call
-its predecessor made (<code>read_notifications</code>, the scenario's own tools). For the
-previous P rounds before the boundary, pass <code>after_round - P + 1</code>. Passing
-<code>after_round + 1</code> keeps no prior history at all, which in a scenario without
-channels is the only way to give the seat nothing of its predecessor's. <code>cross-run-replace-agent</code> has no such flag, because the
-imported agent brings its own history rather than inheriting a predecessor's, and
-<code>fork-at-round</code> replaces no agent, so neither flag applies.</p>
-<p>A channel the scenario has globally disabled is forced to <code>none</code> regardless of
-what the config asks for.</p>
+history to round <code>R</code> onward: the channels in the list, and every other tool call
+its predecessor made (<code>read_notifications</code>, the scenario's own tools). A channel
+left out of the list is not windowed.</p>
+<p>For the previous P rounds before the boundary, pass <code>after_round - P + 1</code>.
+Passing <code>after_round + 1</code> keeps no prior history on the listed and blocked
+channels, which with the shipped presets' default list is every channel.
+In a scenario without channels that is the only way to give the seat nothing of
+its predecessor's. <code>cross-run-replace-agent</code> has no such flag: the imported
+agent brings its own history. <code>fork-at-round</code> replaces no agent, so neither flag
+applies.</p>
+<p>On an in-run swap, a channel the scenario has globally disabled (the postmortem,
+after a <code>set_postmortem</code> event closes it) is forced to <code>none</code> regardless of what
+<code>channel_visibility</code> asks for.</p>
 <h2 id="scoring-a-swap">Scoring a swap<a class="headerlink" href="#scoring-a-swap" title="Permanent link">&para;</a></h2>
 <p><code>round_success_after_resume</code> re-scores the post-swap window and states the
 difference against a baseline: the source run over the same rounds for the CLI
