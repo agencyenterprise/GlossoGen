@@ -6,7 +6,12 @@
 make install           # installs both server (uv sync) and frontend (npm ci)
 make install-server    # server only
 make install-frontend  # frontend only
+make install-docs      # server plus the docs and notebooks groups, for `make docs-build`; a later make install drops them
 ```
+
+Each git worktree has its own `.venv` and `frontend/node_modules`, and a new one has neither: run `make install` in it first. Without it, `uv run --no-sync` creates an empty `.venv` and fails with `No module named glossogen`.
+
+The source needs Python 3.14. A bare `python3` may be older and fail to parse it, so run anything that imports or parses the code with `VIRTUAL_ENV= uv run --no-sync python`.
 
 ## Linting
 
