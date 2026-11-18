@@ -104,6 +104,14 @@ def teammates_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[Teammate]:
     raise ValueError(f"{agent_id} is on no team")
 
 
+def seat_role_names_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[str]:
+    """The role names on ``agent_id``'s team, in seat order, its own included."""
+    for team in teams:
+        if any(role.agent_id == agent_id for role in team.roles):
+            return [role.role_name for role in team.roles]
+    raise ValueError(f"{agent_id} is on no team")
+
+
 def seats_by_agent_id(teams: tuple[TeamSpec, ...]) -> dict[str, Seat]:
     """Map every declared agent to its seat, in each team's declared role order."""
     return {

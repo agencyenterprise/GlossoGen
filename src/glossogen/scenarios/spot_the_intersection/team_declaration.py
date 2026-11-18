@@ -1,9 +1,11 @@
 """Spot the intersection's structure, stated as engine declarations.
 
 One team, or two isolated teams on the same boards. Each team is ``team_size``
-interchangeable viewers on one link channel, with a debrief when the run holds
-one. A simulated Team B is declared nowhere: only Team A's viewers play, under
-the same names they hold in a two-team run.
+interchangeable viewers on one link channel, with a debrief channel when the run
+holds a discussion phase on one. A ``chosen_partner`` discussion phase runs on
+pair channels instead (see :mod:`partner_channels`), so its team declares no
+debrief. A simulated Team B is declared nowhere: only Team A's viewers play,
+under the same names they hold in a two-team run.
 """
 
 from glossogen.engine.team_declaration import (
@@ -16,6 +18,7 @@ from glossogen.engine.team_declaration import (
 )
 from glossogen.scenarios.spot_the_intersection.ids import TOOLS_VIEWER, VIEWER_SYSTEM_TEMPLATE
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
+from glossogen.scenarios.spot_the_intersection.postmortem_modes import PostmortemMode
 from glossogen.scenarios.spot_the_intersection.seats import (
     link_channel_id_for,
     link_display_name_for,
@@ -53,7 +56,11 @@ def _debrief(team_id: str, active: bool) -> DebriefPolicy:
 
 def intersection_teams(knobs: SpotTheIntersectionKnobs) -> tuple[TeamSpec, ...]:
     """Return the teams a run with these knobs holds."""
-    debrief_active = knobs.postmortem_enabled and not knobs.postmortem_disabled_at_start
+    debrief_active = (
+        knobs.postmortem_enabled
+        and not knobs.postmortem_disabled_at_start
+        and knobs.postmortem_mode != PostmortemMode.CHOSEN_PARTNER
+    )
     teams: list[TeamSpec] = []
     for team_id in team_ids_for(
         two_teams=knobs.two_teams,

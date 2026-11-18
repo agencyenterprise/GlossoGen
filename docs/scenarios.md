@@ -167,9 +167,11 @@ preset needs at least 3. Larger teams need a larger `grid_size`.
 Two teams play the same boards, and among correct teams the one that said least
 wins. `simulated_opponent_ratio` replaces Team B with a simulated team that is
 always right in a share of Team A's characters, fixed or drawn each round from a
-range. Team A reads exactly what it would against a real team. Every round is
-certified from the lines the viewers read before it is played, and recorded
-runs can be audited against what each viewer was sent.
+range. Team A reads exactly what it would against a real team.
+`postmortem_mode` and `postmortem_character_limit` set who posts in the
+discussion phase after each round, and how much. Every round is certified from
+the lines the viewers read before it is played, and recorded runs can be
+audited against what each viewer was sent.
 
 ## Prisoners' dilemma
 

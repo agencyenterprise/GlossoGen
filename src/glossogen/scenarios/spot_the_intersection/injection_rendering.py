@@ -12,6 +12,7 @@ from glossogen.scenarios.spot_the_intersection.ids import (
     VIEWER_INJECTION_TEMPLATE,
 )
 from glossogen.scenarios.spot_the_intersection.messaging import Messaging
+from glossogen.scenarios.spot_the_intersection.postmortem_modes import PostmortemMode
 from glossogen.scenarios.spot_the_intersection.world_state import (
     IntersectionOutcome,
     TeamCharacters,
@@ -51,14 +52,26 @@ def render_postmortem_injection(
     round_number: int,
     previous_outcome: IntersectionOutcome | None,
     team_characters: TeamCharacters,
+    postmortem_mode: PostmortemMode,
+    postmortem_character_limit: int,
+    author_role_name: str | None,
+    is_author: bool,
 ) -> str:
-    """The discussion-phase injection for one viewer."""
+    """The discussion-phase injection for one viewer.
+
+    ``author_role_name`` names the one viewer who may post in this phase, or is
+    ``None`` when every viewer may; ``is_author`` says whether that is this viewer.
+    """
     return renderer.render(
         template_name=POSTMORTEM_INJECTION_TEMPLATE,
         template_variables={
             "round_number": round_number,
             "previous_outcome": previous_outcome,
             "team_characters": team_characters.value,
+            "postmortem_mode": postmortem_mode.value,
+            "postmortem_character_limit": postmortem_character_limit,
+            "author_role_name": author_role_name,
+            "is_author": is_author,
         },
     )
 
