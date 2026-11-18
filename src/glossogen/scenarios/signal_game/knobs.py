@@ -25,10 +25,16 @@ class SignalGameKnobs(BaseKnobs):
     which removes the private information and is the control condition.
     ``move_reasoning`` makes every ``move`` and ``end_round`` call carry one
     sentence on why the player acts that way, logged and never shown to the partner.
+    ``briefing_as_user_message`` gives each round's briefing to the player as a user
+    message that opens a new cycle of its conversation, right after the
+    ``read_notifications`` call that waited for the round, instead of inside that
+    call's result.
 
-    ``shape_count``, ``fill_count``, ``word_count`` and ``max_moves_per_call`` default
-    to the game played before they were knobs (no shapes, fills or words, 10 steps a
-    call), so a config recorded without them forks and resumes as that game.
+    ``shape_count``, ``fill_count``, ``word_count``, ``max_moves_per_call`` and
+    ``briefing_as_user_message`` default to the game played before they were knobs
+    (no shapes, fills or words, 10 steps a call, each briefing inside a
+    ``read_notifications`` result), so a config recorded without them forks and
+    resumes as that game.
     """
 
     grid_size: int = Field(ge=2, le=5)
@@ -40,6 +46,7 @@ class SignalGameKnobs(BaseKnobs):
     max_moves_per_call: int = Field(default=10, ge=1, le=1000)
     partner_colours_visible: bool
     move_reasoning: bool
+    briefing_as_user_message: bool = False
     seed: int
 
     @model_validator(mode="after")

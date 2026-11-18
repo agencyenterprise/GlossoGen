@@ -105,6 +105,15 @@ READ_NOTIFICATIONS_DESCRIPTION = (
     "briefings, the board, and a notice when the wait was cut short; type done ends the game. "
     "Must be the only tool call in its response."
 )
+READ_NOTIFICATIONS_BRIEFING_MESSAGE_DESCRIPTION = (
+    "Each round's briefing arrives as a message right after the read_notifications() call "
+    "that waited for the round: the one at startup, or the one after a round changes. During "
+    "a round, read_notifications() waits until your partner acts, then returns the board with "
+    "its actions. read_notifications(wait_for='next_round') declares you are done with this "
+    "round and waits for the next one. The result is a wake package: the reasons, the board, "
+    "and a notice when the wait was cut short; type done ends the game. Must be the only tool "
+    "call in its response."
+)
 
 
 def move_description(max_moves_per_call: int) -> str:
@@ -214,6 +223,8 @@ class SignalGameScenario(SimulationScenario):
         self._request_round: dict[str, int] = {}
         # The last round whose briefing each player has received.
         self._briefed_round: dict[str, int] = {}
+        # Under briefing_as_user_message: the briefings each player's next cycle opens with.
+        self._pending_briefings: dict[str, list[str]] = {}
         self._started_round = 0
 
     def get_knobs(self) -> SignalGameKnobs:
@@ -298,10 +309,14 @@ class SignalGameScenario(SimulationScenario):
                 template_variables={
                     "max_moves_per_call": self._knobs.max_moves_per_call,
                     "move_reasoning": self._knobs.move_reasoning,
+                    "briefing_as_user_message": self._knobs.briefing_as_user_message,
                 },
             ),
             initial=self._renderer.render(
-                template_name=PROTOCOL_INITIAL_TEMPLATE, template_variables={}
+                template_name=PROTOCOL_INITIAL_TEMPLATE,
+                template_variables={
+                    "briefing_as_user_message": self._knobs.briefing_as_user_message,
+                },
             ),
             continuation=self._renderer.render(
                 template_name=PROTOCOL_CONTINUE_TEMPLATE, template_variables={}
@@ -311,6 +326,8 @@ class SignalGameScenario(SimulationScenario):
 
     def read_notifications_description(self) -> str:
         """Describe the wake package and the waits a player uses."""
+        if self._knobs.briefing_as_user_message:
+            return READ_NOTIFICATIONS_BRIEFING_MESSAGE_DESCRIPTION
         return READ_NOTIFICATIONS_DESCRIPTION
 
     def default_any_wait_timeout_s(self) -> float | None:
@@ -325,7 +342,9 @@ class SignalGameScenario(SimulationScenario):
         """Render a wake: briefings, the board with the partner's new actions, any notice.
 
         Everything is taken before anything awaits, so an action the partner makes
-        while this renders is still unshown and goes with the next result.
+        while this renders is still unshown and goes with the next result. Under
+        ``briefing_as_user_message`` the briefings are held for ``take_cycle_prompt``
+        and the result lists none.
         """
         lifecycle = wake.inbox.take_lifecycle()
         briefings = [
@@ -336,6 +355,10 @@ class SignalGameScenario(SimulationScenario):
         current = self.runtime.current_round
         if briefings:
             self._briefed_round[agent_id] = current
+        shown_briefings = briefings
+        if self._knobs.briefing_as_user_message:
+            self._pending_briefings.setdefault(agent_id, []).extend(briefings)
+            shown_briefings = []
         board: str | None = None
         if self._world.round_open and self._briefed_round.get(agent_id) == current:
             board = self._board_view(agent_id=agent_id, result="Board.")
@@ -358,10 +381,21 @@ class SignalGameScenario(SimulationScenario):
             type=wake_type,
             round=current,
             wake_reasons=reasons,
-            briefings=briefings,
+            briefings=shown_briefings,
             board=board,
             notice=notice,
         ).model_dump_json()
+
+    def take_cycle_prompt(self, agent_id: str) -> str | None:
+        """The briefings held for ``agent_id`` since its last cycle opened, or None.
+
+        Only ``briefing_as_user_message`` holds any, so the next cycle opens with
+        the round's briefing as a user message.
+        """
+        briefings = self._pending_briefings.pop(agent_id, [])
+        if not briefings:
+            return None
+        return "\n\n".join(briefings)
 
     def on_agent_parked(self, agent_id: str) -> None:
         """Resume a waiting player at once when there is something to see, or nothing to wait for.

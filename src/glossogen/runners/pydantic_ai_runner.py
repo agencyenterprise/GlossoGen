@@ -16,7 +16,6 @@ from typing import Any, NamedTuple, cast
 
 from langfuse import propagate_attributes
 from pydantic_ai import Agent, _agent_graph
-from pydantic_ai.agent import AgentRunResult as PydanticAIAgentRunResult
 from pydantic_ai.agent.abstract import EventStreamHandler
 from pydantic_ai.capabilities import AgentCapability, ProcessHistory
 from pydantic_ai.messages import (
@@ -53,6 +52,7 @@ from glossogen.models.event import (
     ClosingPromptAnswered,
     ClosingPromptFailed,
     ContextCompacted,
+    CyclePromptSent,
     LLMResponseReceived,
     StopReason,
     ToolCallInvoked,
@@ -323,17 +323,15 @@ class _RunCheckpoint:
         self.prompt = None
 
 
-def _restart_checkpoint(
-    history: list[ModelMessage] | None, initial: str, continuation: str
-) -> _RunCheckpoint:
-    """Where a cycle starts after the previous one failed every retry.
+class _CycleEnd(NamedTuple):
+    """The agent's history at the end of a cycle, and the scenario's prompt for the next one.
 
-    The last completed cycle's history with the continuation prompt, or the
-    initial prompt when no cycle has completed yet.
+    ``next_prompt`` is None when the agent ended its turn, and the scenario's
+    cycle prompt when the scenario ended the cycle before a model request.
     """
-    if history is None:
-        return _RunCheckpoint(messages=None, prompt=initial)
-    return _RunCheckpoint(messages=history, prompt=continuation)
+
+    messages: list[ModelMessage]
+    next_prompt: str | None
 
 
 @agent_run_retry
@@ -348,7 +346,8 @@ async def _run_agent_call(
     flush_inter_call_response: Callable[[], None],
     before_model_request: Callable[[], None],
     gate_model_response: Callable[[ModelResponse], Awaitable[None]],
-) -> PydanticAIAgentRunResult[str]:
+    take_cycle_prompt: Callable[[], str | None],
+) -> _CycleEnd:
     """Drive ``agent.iter`` so cumulative usage is captured even on cancellation.
 
     ``record_usage`` is invoked once per attempt, from a ``finally`` block, with
@@ -379,6 +378,12 @@ async def _run_agent_call(
     in ``state`` is logged with ``flush_inter_call_response`` before the next
     request, so each model response is one ``LLMResponseReceived``, including
     consecutive responses that hold only tool calls.
+
+    ``take_cycle_prompt`` is asked before each model request. When it returns a
+    prompt, the cycle ends there without sending the request: the returned
+    history ends with that request's tool results, and the prompt opens the next
+    cycle. The last response stays accumulated in ``state`` for the cycle's
+    final flush.
     """
     state.mark_attempt_start()
     async with agent.iter(
@@ -397,6 +402,12 @@ async def _run_agent_call(
                     last_gated_response = node.model_response
                     await gate_model_response(node.model_response)
                 if Agent.is_model_request_node(node):
+                    next_prompt = take_cycle_prompt()
+                    if next_prompt is not None:
+                        return _CycleEnd(
+                            messages=[*agent_run.all_messages(), node.request],
+                            next_prompt=next_prompt,
+                        )
                     if state.accumulated_tool_calls:
                         flush_inter_call_response()
                     before_model_request()
@@ -420,7 +431,7 @@ async def _run_agent_call(
                         await event_stream_handler(run_ctx, stream)
                 node = await agent_run.next(node)
             assert agent_run.result is not None
-            return agent_run.result
+            return _CycleEnd(messages=agent_run.result.all_messages(), next_prompt=None)
         except Exception:
             state.discard_since_attempt_start()
             raise
@@ -562,6 +573,9 @@ class PydanticAIRunner(AgentRunner):
             def _before_model_request() -> None:
                 runtime.scenario.on_model_request_started(agent_id=agent_id)
 
+            def _take_cycle_prompt() -> str | None:
+                return runtime.scenario.take_cycle_prompt(agent_id=agent_id)
+
             async def _gate_model_response(response: ModelResponse) -> None:
                 await runtime.scenario.gate_model_response(
                     agent_id=agent_id,
@@ -627,11 +641,13 @@ class PydanticAIRunner(AgentRunner):
                         usage=None,
                     )
 
+                # The checkpoint advances during the cycle; a failed cycle restarts here.
+                cycle_start = _RunCheckpoint(messages=checkpoint.messages, prompt=checkpoint.prompt)
                 cycle_succeeded = False
-                result: PydanticAIAgentRunResult[str] | None = None
+                cycle_end: _CycleEnd | None = None
                 try:
                     with self._agent_trace_context(agent_config=agent_config):
-                        result = await _run_agent_call(
+                        cycle_end = await _run_agent_call(
                             agent=agent,
                             checkpoint=checkpoint,
                             event_stream_handler=_handle_events,
@@ -641,6 +657,7 @@ class PydanticAIRunner(AgentRunner):
                             flush_inter_call_response=_flush_inter_call_response,
                             before_model_request=_before_model_request,
                             gate_model_response=_gate_model_response,
+                            take_cycle_prompt=_take_cycle_prompt,
                         )
                     cycle_succeeded = True
                 except Exception as exc:
@@ -676,38 +693,37 @@ class PydanticAIRunner(AgentRunner):
                         cost_tracker=cost_tracker,
                     )
 
-                if not cycle_succeeded or result is None:
+                if not cycle_succeeded or cycle_end is None:
                     # Every retry resumed at the failed request and still failed,
-                    # so re-sending it would fail the same way. Restart from the
-                    # last completed cycle, as a fresh cycle.
-                    checkpoint = _restart_checkpoint(
-                        history=last_completed_history,
-                        initial=runner_prompts.initial,
-                        continuation=runner_prompts.continuation,
-                    )
+                    # so re-sending it would fail the same way. Restart the cycle
+                    # from where it started: the last completed cycle's history and
+                    # the prompt this cycle opened with.
+                    checkpoint = cycle_start
                     total_turns += 1
                     continue
 
-                last_completed_history = result.all_messages()
-
-                checkpoint = _RunCheckpoint(
-                    messages=result.all_messages(),
-                    prompt=runner_prompts.continuation,
-                )
+                last_completed_history = cycle_end.messages
+                next_prompt = runner_prompts.continuation
+                if cycle_end.next_prompt is not None:
+                    next_prompt = cycle_end.next_prompt
+                checkpoint = _RunCheckpoint(messages=cycle_end.messages, prompt=next_prompt)
                 total_turns += 1
+
+                # A cycle the scenario ended before a model request still holds the
+                # tool calls of its last response.
+                final_stop_reason = StopReason.END_TURN
+                if state.accumulated_tool_calls:
+                    final_stop_reason = StopReason.TOOL_USE
 
                 # Safety net: flush a compaction block that had no following
                 # generation part this cycle (it normally closes when the response
                 # part after the compaction starts, in _process_stream_event).
                 if state.compaction_occurred:
-                    trailing_stop_reason = StopReason.END_TURN
-                    if state.accumulated_tool_calls:
-                        trailing_stop_reason = StopReason.TOOL_USE
                     self._flush_response_block(
                         agent_id=agent_id,
                         state=state,
                         event_logger=event_logger,
-                        stop_reason=trailing_stop_reason,
+                        stop_reason=final_stop_reason,
                         round_number=runtime.current_round,
                         usage=simulation_token_usage(run_usage=cycle_usage),
                     )
@@ -731,7 +747,7 @@ class PydanticAIRunner(AgentRunner):
                     agent_id=agent_id,
                     state=state,
                     event_logger=event_logger,
-                    stop_reason=StopReason.END_TURN,
+                    stop_reason=final_stop_reason,
                     round_number=runtime.current_round,
                     usage=simulation_token_usage(run_usage=cycle_usage),
                 )
@@ -743,6 +759,15 @@ class PydanticAIRunner(AgentRunner):
                         total_turns,
                     )
                     break
+
+                if cycle_end.next_prompt is not None:
+                    await event_logger.log(
+                        event=CyclePromptSent(
+                            agent_id=agent_id,
+                            round_number=runtime.current_round,
+                            prompt=cycle_end.next_prompt,
+                        )
+                    )
 
             if total_turns >= self._max_turns:
                 logger.warning(

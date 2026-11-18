@@ -45,6 +45,7 @@ from glossogen.models.communication_tool_names import READ_CHANNEL_TOOL_NAME, SE
 from glossogen.models.elapsed_time import elapsed_seconds_since_start, find_simulation_start_time
 from glossogen.models.event import (
     ContextCompacted,
+    CyclePromptSent,
     LLMResponseReceived,
     MessageSent,
     SimulationEvent,
@@ -439,6 +440,86 @@ def _build_orphan_cycle(
     )
 
 
+def _cycle_prompts_before_cutoff(
+    events: Sequence[SimulationEvent],
+    agent_id: str,
+    cutoff_round: int | None,
+    target_timestamp: datetime,
+) -> list[CyclePromptSent]:
+    """The scenario prompts that opened ``agent_id``'s cycles before the cutoff, in log order.
+
+    The cutoff applies as it does to a response: by round when ``cutoff_round``
+    is set, otherwise by timestamp.
+    """
+    prompts: list[CyclePromptSent] = []
+    for event in events:
+        if not isinstance(event, CyclePromptSent) or event.agent_id != agent_id:
+            continue
+        if cutoff_round is not None:
+            if event.round_number >= cutoff_round:
+                continue
+        elif event.timestamp > target_timestamp:
+            continue
+        prompts.append(event)
+    return prompts
+
+
+def _assemble_messages(
+    system_prompt: str,
+    runner_prompts: RunnerPrompts,
+    kept_cycles: list[_KeptCycle],
+    cycle_prompts: list[CyclePromptSent],
+    split_parallel_tool_calls: bool,
+) -> list[ModelMessage]:
+    """The history: the opening request, then each kept cycle with the prompts between them.
+
+    A continuation prompt follows every cycle that ended its turn, except the
+    last. A scenario's cycle prompt goes before the first cycle whose response
+    began after the prompt was sent; the prompts sent after the last cycle end
+    the history. As in the live run, a cycle prompt joins the request that holds
+    the previous cycle's last tool results.
+    """
+    messages: list[ModelMessage] = [
+        ModelRequest(
+            parts=[
+                SystemPromptPart(content=system_prompt),
+                UserPromptPart(content=runner_prompts.initial),
+            ],
+        )
+    ]
+    pending_prompts = list(cycle_prompts)
+    for index, cycle in enumerate(kept_cycles):
+        while pending_prompts and pending_prompts[0].timestamp < cycle.response_timestamp:
+            _append_user_prompt(messages=messages, prompt=pending_prompts.pop(0).prompt)
+        messages.extend(
+            _cycle_to_messages(
+                cycle=cycle,
+                split_parallel_tool_calls=split_parallel_tool_calls,
+            )
+        )
+        is_last = index == len(kept_cycles) - 1
+        if (
+            cycle.stop_reason == StopReason.END_TURN
+            and not cycle.parent_past_cutoff
+            and not is_last
+        ):
+            messages.append(
+                ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
+            )
+    for pending in pending_prompts:
+        _append_user_prompt(messages=messages, prompt=pending.prompt)
+    return messages
+
+
+def _append_user_prompt(messages: list[ModelMessage], prompt: str) -> None:
+    """Add ``prompt`` to the trailing request, or as a new request after a response."""
+    last = messages[-1]
+    if isinstance(last, ModelRequest):
+        messages[-1] = ModelRequest(parts=[*last.parts, UserPromptPart(content=prompt)])
+        return
+    messages.append(ModelRequest(parts=[UserPromptPart(content=prompt)]))
+
+
 def _llm_response_at_or_past_cutoff(
     llm_resp: LLMResponseReceived,
     cutoff_round: int | None,
@@ -626,6 +707,9 @@ def build_message_history(
     only the predecessor's turns, never the replacement's own. Pass
     ``None`` to apply the filters to the whole history.
 
+    A ``CyclePromptSent`` becomes a user prompt between the cycles it
+    separated in the live run.
+
     When ``split_parallel_tool_calls`` is True, any reconstructed turn
     holding more than one tool call is serialized into one single-call
     response per call (see ``_cycle_to_messages``). Set it for self-hosted
@@ -812,30 +896,15 @@ def build_message_history(
     if not kept_cycles:
         return []
 
-    messages: list[ModelMessage] = [
-        ModelRequest(
-            parts=[
-                SystemPromptPart(content=system_prompt),
-                UserPromptPart(content=runner_prompts.initial),
-            ],
-        )
-    ]
-
-    for index, cycle in enumerate(kept_cycles):
-        messages.extend(
-            _cycle_to_messages(
-                cycle=cycle,
-                split_parallel_tool_calls=split_parallel_tool_calls,
-            )
-        )
-        is_last = index == len(kept_cycles) - 1
-        if (
-            cycle.stop_reason == StopReason.END_TURN
-            and not cycle.parent_past_cutoff
-            and not is_last
-        ):
-            messages.append(
-                ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
-            )
-
-    return messages
+    return _assemble_messages(
+        system_prompt=system_prompt,
+        runner_prompts=runner_prompts,
+        kept_cycles=kept_cycles,
+        cycle_prompts=_cycle_prompts_before_cutoff(
+            events=events,
+            agent_id=agent_id,
+            cutoff_round=cutoff_round,
+            target_timestamp=target_timestamp,
+        ),
+        split_parallel_tool_calls=split_parallel_tool_calls,
+    )
