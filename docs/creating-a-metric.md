@@ -329,8 +329,9 @@ Other ways to reach the same runner:
   loads that scenario. Gated by `ENABLE_EVALUATIONS`.
 - **The frontend's "Run Eval" button**, which calls that endpoint.
 
-A metric that raises is logged with its traceback and recorded as failed. The
-remaining metrics still run and the report is still written.
+A metric that raises is logged with its traceback, and the remaining metrics
+still run. The report is written with the ones that succeeded, and then
+`evaluate` exits non-zero, naming the metrics that failed.
 
 ## Testing it
 

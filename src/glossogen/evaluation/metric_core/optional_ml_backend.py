@@ -26,8 +26,7 @@ separate:
   runs them with no ML dependency at all.
 
 Loading goes through ``importlib.import_module`` rather than a module-scope
-import so absence surfaces as a skip at compute time instead of an
-``ImportError`` at registry-import time.
+import for the same reason: the metric modules import without the extra.
 """
 
 import importlib
