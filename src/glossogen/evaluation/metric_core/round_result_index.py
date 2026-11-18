@@ -1,7 +1,8 @@
 """Helpers for reading per-round success from ``RoundResultRecorded`` events.
 
-Used by analysis viewers that need a flat ``dict[int, bool]`` of round →
-success without re-deriving outcomes from scenario-specific events.
+Nothing in this repository calls it: glossogen-research's results viewers import
+it for a flat ``dict[int, bool]`` of round → success without re-deriving outcomes
+from scenario-specific events.
 Multi-team scenarios collapse to "joint success" semantics (every team
 must have succeeded for the round to count as a win).
 """
