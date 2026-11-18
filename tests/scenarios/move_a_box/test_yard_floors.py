@@ -13,13 +13,16 @@ from glossogen.scenarios.move_a_box.depot import (
     RoundDepot,
     YardSetup,
     distances_from,
+    floor_rows,
     generate_depots,
+    landmark_floor_rows,
     manhattan,
     step,
 )
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved, MoveABoxRoundStarted
 from glossogen.scenarios.move_a_box.ids import (
     LANDMARK_CELL_WIDTH,
+    LANDMARK_CRATE_MARK,
     OPERATOR_A,
     OPERATOR_B,
     BayIdentity,
@@ -235,7 +238,10 @@ def test_every_assigned_bay_is_reachable_around_the_landmarks(setup: YardSetup) 
             assert all(bay.cell in reached for bay in depot.first_target.bays[agent_id])
 
 
-@pytest.mark.parametrize("preset_name", ["knobs_landmarks", "knobs_landmarks_shifted"])
+@pytest.mark.parametrize(
+    "preset_name",
+    ["knobs_landmarks", "knobs_landmarks_shifted", "knobs_landmarks_shifted_partner_floor"],
+)
 def test_the_briefing_numbers_no_square(preset_name: str) -> None:
     scenario = build(preset_name=preset_name, overrides={})
     depot = first_depot(scenario=scenario)
@@ -251,7 +257,10 @@ def test_the_briefing_numbers_no_square(preset_name: str) -> None:
             assert drawn_word(rows=rows, cell=landmark.cell) == landmark.kind
 
 
-@pytest.mark.parametrize("preset_name", ["knobs_landmarks", "knobs_landmarks_shifted"])
+@pytest.mark.parametrize(
+    "preset_name",
+    ["knobs_landmarks", "knobs_landmarks_shifted", "knobs_landmarks_shifted_partner_floor"],
+)
 def test_the_system_prompt_says_nothing_of_the_mirror_the_shift_or_the_squares(
     preset_name: str,
 ) -> None:
@@ -607,3 +616,170 @@ def test_a_disclosed_bay_on_shifted_floors_is_named_on_the_other_operators_floor
     assert f"The other crates were left on the bay at {square} of the other operator's floor." in (
         text
     )
+
+
+def test_the_result_draws_the_other_operators_floor_as_that_operator_saw_it() -> None:
+    """With partner_floor_disclosed, round 2's briefing shows operator_b's round 1 floor."""
+    scenario = build(preset_name="knobs_shifted_partner_floor", overrides=TWO_ROUNDS)
+    depot = first_depot(scenario=scenario)
+    target = depot.first_target
+    own = target.bays[OPERATOR_A][0]
+    other = next(
+        bay
+        for bay in target.bays[OPERATOR_B]
+        if bay.number in target.allowed_bays[OPERATOR_B]
+        and bay.number not in target.allowed_bays[OPERATOR_A]
+    )
+    scenario.restore_state_from_events(
+        events=[
+            MoveABoxRoundResolved(
+                round_number=1,
+                final_cells={
+                    CRATE_A: (own.cell.row, own.cell.col),
+                    CRATE_B: (other.cell.row, other.cell.col),
+                },
+                final_bays={CRATE_A: own.number, CRATE_B: other.number},
+                temperatures={CRATE_A: 23, CRATE_B: 23},
+                steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
+                points={OPERATOR_A: 10, OPERATOR_B: 10},
+                matched_slots=(),
+                matched=False,
+                success=False,
+                trigger="all_finished",
+            )
+        ]
+    )
+    text = scenario.get_injection(round_number=2, agent_id=OPERATOR_A)
+    expected = floor_rows(
+        target=target,
+        pallets=depot.pallets[OPERATOR_B],
+        crate=other.cell,
+        agent_id=OPERATOR_B,
+        grid_size=GRID_SIZE,
+    )
+    heading = (
+        "The other operator's floor in round 1, as that operator saw it, "
+        "with C where its crate ended:"
+    )
+    lines = text.split("\n")
+    first = lines.index(heading) + 1
+    assert lines[first : first + GRID_SIZE] == [
+        f"  row {index}:  {row}" for index, row in enumerate(expected, start=1)
+    ]
+    assert expected[other.cell.row - 1].split()[other.cell.col - 1] == "C"
+
+
+def test_on_landmark_floors_the_other_floor_is_drawn_as_the_readers_own_is() -> None:
+    """One word per square, the crate over the bay it ended on, and no row or column numbers."""
+    scenario = build(preset_name="knobs_landmarks_shifted_partner_floor", overrides=TWO_ROUNDS)
+    depot = first_depot(scenario=scenario)
+    target = depot.first_target
+    own = target.bays[OPERATOR_A][0]
+    other = next(
+        bay for bay in target.bays[OPERATOR_B] if bay.number not in target.allowed_bays[OPERATOR_A]
+    )
+    scenario.restore_state_from_events(
+        events=[
+            MoveABoxRoundResolved(
+                round_number=1,
+                final_cells={
+                    CRATE_A: (own.cell.row, own.cell.col),
+                    CRATE_B: (other.cell.row, other.cell.col),
+                },
+                final_bays={CRATE_A: own.number, CRATE_B: other.number},
+                temperatures={CRATE_A: 23, CRATE_B: 23},
+                steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
+                points={OPERATOR_A: 10, OPERATOR_B: 10},
+                matched_slots=(),
+                matched=False,
+                success=False,
+                trigger="all_finished",
+            )
+        ]
+    )
+    text = scenario.get_injection(round_number=2, agent_id=OPERATOR_A)
+    heading = (
+        "The other operator's floor in round 1, as that operator saw it, "
+        "with crate where its crate ended:"
+    )
+    rows = drawing_after(text=text, heading=heading)
+    assert rows == landmark_floor_rows(
+        landmarks=depot.landmarks[OPERATOR_B],
+        bays=target.bays[OPERATOR_B],
+        crates={other.cell: LANDMARK_CRATE_MARK},
+        grid_size=GRID_SIZE,
+    )
+    assert drawn_word(rows=rows, cell=other.cell) == LANDMARK_CRATE_MARK
+    assert "row 1" not in text
+    assert re.search(r"\d,\d", text) is None
+
+
+def test_the_other_floor_is_refused_where_it_would_not_be_drawn_as_the_readers_own() -> None:
+    with pytest.raises(
+        ValueError, match="partner_floor_disclosed needs bay_identity=square or landmark"
+    ):
+        build(preset_name="knobs_symbol_bays", overrides={"partner_floor_disclosed": True})
+    with pytest.raises(ValueError, match="partner_floor_disclosed needs operator_count=2"):
+        build(
+            preset_name="knobs_default",
+            overrides={"partner_floor_disclosed": True, "crates_each": 2},
+        )
+    with pytest.raises(ValueError, match="partner_floor_disclosed needs partner_disclosed"):
+        build(
+            preset_name="knobs_shifted_partner_floor",
+            overrides={"partner_disclosed": False, "channel_disclosed": False},
+        )
+
+
+SHIFT_SENTENCE = (
+    "Their floor shows a different part of the same yard than yours, and how the two floors "
+    "overlap changes every round."
+)
+
+
+TOLD_DESCRIPTION = (
+    "The system prompt tells the operators that the two floors show different parts of one yard "
+    "and overlap differently every round, and gives no offset."
+)
+
+
+@pytest.mark.parametrize(
+    ("preset_name", "untold_description"),
+    [
+        ("knobs_shifted_partner_floor", "Nothing an operator reads mentions the shift."),
+        (
+            "knobs_landmarks_shifted_partner_floor",
+            "Nothing an operator reads says how the floors relate.",
+        ),
+    ],
+)
+def test_the_shift_is_told_only_when_view_shift_disclosed_is_on(
+    preset_name: str, untold_description: str
+) -> None:
+    """The system prompt carries the sentence, and the description says which was played."""
+    told = build(preset_name=preset_name, overrides={"view_shift_disclosed": True})
+    untold = build(preset_name=preset_name, overrides={})
+    told_prompt = told.get_agents(default_model="model", default_provider="openai")[0].system_prompt
+    untold_prompt = untold.get_agents(default_model="model", default_provider="openai")[0]
+    assert SHIFT_SENTENCE in told_prompt
+    assert SHIFT_SENTENCE not in untold_prompt.system_prompt
+    assert TOLD_DESCRIPTION in told.scenario_description()
+    assert untold_description not in told.scenario_description()
+    assert untold_description in untold.scenario_description()
+    assert TOLD_DESCRIPTION not in untold.scenario_description()
+
+
+def test_view_shift_disclosed_needs_a_shift_a_named_partner_and_no_mirror() -> None:
+    with pytest.raises(ValueError, match="view_shift_disclosed needs view_shift above 0"):
+        build(preset_name="knobs_default", overrides={"view_shift_disclosed": True})
+    with pytest.raises(ValueError, match="view_shift_disclosed needs partner_disclosed"):
+        build(
+            preset_name="knobs_shifted",
+            overrides={
+                "view_shift_disclosed": True,
+                "partner_disclosed": False,
+                "channel_disclosed": False,
+            },
+        )
+    with pytest.raises(ValueError, match="view_shift_disclosed needs landmark_mirrored=false"):
+        build(preset_name="knobs_landmarks_shifted", overrides={"view_shift_disclosed": True})

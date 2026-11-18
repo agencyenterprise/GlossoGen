@@ -268,13 +268,15 @@ down and mirrored:
 
 The shared bay is the one above the well on both floors.
 
-Nothing an operator reads names a square or says how the floors relate. An
-action's result draws the floor again with the crate where it stands, the
-readout says only whether the crate is on one of the operator's bays, and a
-refusal names the landmark in the way. A missed round's result says only that
-the other crate was left somewhere else: `partner_bay_disclosed` has to be off,
-because a landmark bay has no name to give and the other crate's square belongs
-to a different floor.
+Nothing an operator reads names a square. Without `view_shift_disclosed`,
+nothing says how the floors relate either. An action's result draws the floor
+again with the crate where it stands, the readout says only whether the crate
+is on one of the operator's bays, and a refusal names the landmark in the way.
+`partner_bay_disclosed` has to be off, because a landmark bay has no name to
+give and the other crate's square belongs to a different floor. A missed
+round's result therefore says only that the other crate was left somewhere
+else, unless `partner_floor_disclosed` draws the other floor (see
+[Showing the other floor](#showing-the-other-floor)).
 
 Measured on gpt-6.1-sol at high thinking with `channel_disclosed`, mirrored and
 unshifted. Told about the mirror, the pair matched 5 of 5 rounds with a
@@ -318,10 +320,34 @@ stand where the other operator's floor does not reach, so the shared bay is the
 only assigned bay both floors show, and the two floors list different bays.
 `knobs_shifted_apart` is `knobs_shifted` with it on.
 
+`view_shift_disclosed` adds one sentence to the system prompt, after the line
+about the other operator: "Their floor shows a different part of the same yard
+than yours, and how the two floors overlap changes every round." The sentence
+gives no offset. It needs `landmark_mirrored` off, because the sentence
+describes a shift only.
+
 On `knobs_shifted_apart` with `partner_bay_disclosed` on, gpt-6-astra and Claude
 Opus 5.5 each matched 1 of 10 rounds, one run each. Both pairs kept sending row
 and column numbers. Both Opus operators' closing answers say that crates on the
 same square number were not on the same bay, and neither found the reason.
+
+## Showing the other floor
+
+With `partner_floor_disclosed`, each round's result draws the other operator's
+floor for the round just played, as that operator saw it. The result says whose
+floor it is, and the drawing uses that floor's own squares. On square floors the
+drawing has numbered rows, the bays and pallets, and `C` on the square where the
+other crate ended, drawn over a bay it ended on. On landmark floors it is drawn
+as the reader's own floor is: one word per square, no numbers, and `crate`
+where the other crate ended. On shifted floors, an operator can compare the
+drawing with its own floor from the same round, but the next round places both
+windows again. It needs square or landmark bays, two operators, one crate each,
+one target a round and `partner_disclosed`.
+
+`knobs_shifted_partner_floor` is `knobs_shifted_apart` with
+`partner_bay_disclosed` and `partner_floor_disclosed` on.
+`knobs_landmarks_shifted_partner_floor` is `knobs_landmarks_shifted` with
+`landmark_mirrored` off and `partner_floor_disclosed` on.
 
 ## Several targets in a round
 
@@ -633,12 +659,14 @@ out before it reaches a bay.
 | `landmark_mirrored` | draws the second operator's `landmark` floor mirrored left to right |
 | `view_shift` | how many squares larger than a floor a `square` or `landmark` yard is, and how far each floor's window moves in it, drawn per operator and per round; 0 shows every floor the whole yard |
 | `private_bays_outside_overlap` | under a shift, puts each operator's private bays where the other operator's floor does not reach |
+| `view_shift_disclosed` | under a shift, the system prompt says that the other floor shows a different part of the same yard and that the overlap changes every round; it gives no offset, and needs `landmark_mirrored` off |
 | `bay_identity_from_round` | rounds at which the marks switch between symbol and letter, as `{"6": "symbol"}`; `{}` keeps `bay_identity` for the whole run |
 | `targets_per_round` | how many targets a round holds, each scored on its own; above 1 needs `crates_each` at 1 |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |
 | `partner_disclosed` | off, nothing says another operator is working; the first round's result is where it can first be inferred |
 | `crate_start` | `corner`, `shared_random` or `separate_random` |
 | `partner_bay_disclosed` | off, a round that did not match reports only that the other crate went somewhere else |
+| `partner_floor_disclosed` | each round's result draws the other operator's floor as that operator saw it, with its crate where it ended |
 | `readout_history` | the whole round's readings, or the current one |
 | `decoy_readings` | the masses and the humidity beside the temperatures |
 | `thermal_table_disclosed` | states what each action does to the reading instead of leaving it to be found |
@@ -670,8 +698,10 @@ channel, and the compaction prompt talks about channels this run does not have.
 | `knobs_two_targets` | `knobs_default` with two targets a round |
 | `knobs_landmarks` | `knobs_default` with `bay_identity=landmark`, 6 landmarks, the second floor mirrored, no shift, no pallets and `partner_bay_disclosed` off |
 | `knobs_landmarks_shifted` | `knobs_landmarks` with 10 landmarks and `view_shift` 4 |
+| `knobs_landmarks_shifted_partner_floor` | `knobs_landmarks_shifted` with `landmark_mirrored` off and `partner_floor_disclosed` on |
 | `knobs_shifted` | `knobs_default` with `view_shift` 4 and `partner_bay_disclosed` off: square floors as shifted windows on one yard |
 | `knobs_shifted_apart` | `knobs_shifted` with `private_bays_outside_overlap`: each operator's private bays off the other's floor |
+| `knobs_shifted_partner_floor` | `knobs_shifted_apart` with `partner_bay_disclosed` and `partner_floor_disclosed` on |
 | `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, and a list of actions landing at once (`step_duration_s` 0) |
 
 Every preset sets `parallel_tool_calls` to false, `batched_actions` and
@@ -679,10 +709,11 @@ Every preset sets `parallel_tool_calls` to false, `batched_actions` and
 `round_count` 10 and `seed` 42. Every preset but `knobs_virtual_clock` sets
 `lockstep` on and `virtual_clock` off. Every preset but `knobs_four_operators` also sets
 `grid_size` to 8 and `crate_start` to `separate_random`, and every preset but
-`knobs_four_operators` and the two landmark presets sets `pallet_density` to `0.1`.
+`knobs_four_operators` and the landmark presets sets `pallet_density` to `0.1`.
 `knobs_four_operators` departs on the floor and the roster, as its row says.
 Only `knobs_symbol_bays`, `knobs_letter_bays` and `knobs_letters_then_symbols`
-name bays by a mark, and only `knobs_landmarks` and `knobs_landmarks_shifted` draw landmarks.
+name bays by a mark, and only `knobs_landmarks`, `knobs_landmarks_shifted` and
+`knobs_landmarks_shifted_partner_floor` draw landmarks.
 
 ## Events
 

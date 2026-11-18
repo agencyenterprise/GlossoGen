@@ -289,7 +289,9 @@ def floor_rows(
     this operator may use it: which bays it may use is stated in the briefing,
     not in the drawing. Under a marked identity it is the operator's own bays,
     each drawn as its symbol or letter. ``crate`` is the square the crate stands
-    on as the target begins, drawn ``C``, or ``@`` on a floor of letters.
+    on, drawn ``C``, or ``@`` on a floor of letters. The crate is drawn over a
+    bay it stands on, which only a round's result shows: a target never starts
+    with a crate on a bay.
     """
     bays = {bay.cell: target.bay_mark(number=bay.number) for bay in target.bays[agent_id]}
     rows: list[str] = []
@@ -297,10 +299,10 @@ def floor_rows(
         marks: list[str] = []
         for col in range(1, grid_size + 1):
             cell = Cell(row=row, col=col)
-            if cell in bays:
-                marks.append(bays[cell])
-            elif cell == crate:
+            if cell == crate:
                 marks.append(target.bay_identity.crate_mark())
+            elif cell in bays:
+                marks.append(bays[cell])
             elif cell in pallets:
                 marks.append("#")
             else:

@@ -260,6 +260,7 @@ class PreviousResult(NamedTuple):
     other_crates: tuple[CrateOutcome, ...]
     matched: bool
     own_points: int
+    partner_floor_rows: tuple[str, ...]
 
 
 class PlayedTarget(NamedTuple):
@@ -437,7 +438,9 @@ class MoveABoxScenario(SimulationScenario):
                 "bay_identity": self._knobs.bay_identity,
                 "landmark_mirrored": self._knobs.landmark_mirrored,
                 "view_shift": self._knobs.view_shift,
+                "view_shift_disclosed": self._knobs.view_shift_disclosed,
                 "private_bays_outside_overlap": self._knobs.private_bays_outside_overlap,
+                "partner_floor_disclosed": self._knobs.partner_floor_disclosed,
                 "identity_switches": self._identity_switches(),
                 "targets_per_round": self._knobs.targets_per_round,
                 "crate_start": self._knobs.crate_start.value,
@@ -494,6 +497,7 @@ class MoveABoxScenario(SimulationScenario):
                 "targets_per_round": self._knobs.targets_per_round,
                 "bay_identity": self._knobs.bay_identity,
                 "view_shift": self._knobs.view_shift,
+                "view_shift_disclosed": self._knobs.view_shift_disclosed,
                 "partner_disclosed": self._knobs.partner_disclosed,
                 "decoy_readings": self._knobs.decoy_readings,
                 "channel_disclosed": self._knobs.channel_disclosed,
@@ -811,6 +815,7 @@ class MoveABoxScenario(SimulationScenario):
             target_number=played.target_number,
             closes_round=True,
             layout=played.layout,
+            final_cells=outcome.final_cells,
             final_bays=outcome.final_bays,
             matched=len(outcome.matched_slots) == self._knobs.crates_each,
             own_points=outcome.points[agent_id],
@@ -823,6 +828,7 @@ class MoveABoxScenario(SimulationScenario):
         target_number: int,
         closes_round: bool,
         layout: TargetLayout,
+        final_cells: dict[str, Cell],
         final_bays: dict[str, int | None],
         matched: bool,
         own_points: int,
@@ -852,6 +858,35 @@ class MoveABoxScenario(SimulationScenario):
             ),
             matched=matched,
             own_points=own_points,
+            partner_floor_rows=self._partner_floor_rows(
+                agent_id=agent_id, round_number=round_number, layout=layout, final_cells=final_cells
+            ),
+        )
+
+    def _partner_floor_rows(
+        self,
+        agent_id: str,
+        round_number: int,
+        layout: TargetLayout,
+        final_cells: dict[str, Cell],
+    ) -> tuple[str, ...]:
+        """The other operator's floor for round ``round_number``, with its crate where it ended.
+
+        Empty unless ``partner_floor_disclosed`` is on. The floor is drawn as the
+        other operator saw it, in its own squares, so it is never converted to
+        the reader's floor.
+        """
+        if not self._knobs.partner_floor_disclosed:
+            return ()
+        [other] = others_of(agent_id=agent_id, agent_ids=self._agent_ids)
+        [crate_id] = self._world.crates_of(agent_id=other)
+        return tuple(
+            self._floor_drawing(
+                agent_id=other,
+                round_number=round_number,
+                target=layout,
+                crate=final_cells[crate_id],
+            )
         )
 
     def _floor_drawing(
@@ -1953,6 +1988,7 @@ class MoveABoxScenario(SimulationScenario):
                         target_number=outcome.target_number,
                         closes_round=False,
                         layout=scored_layout,
+                        final_cells=outcome.final_cells,
                         final_bays=outcome.final_bays,
                         matched=outcome.matched,
                         own_points=outcome.points[agent_id],

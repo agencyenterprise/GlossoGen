@@ -61,7 +61,8 @@ class MoveABoxKnobs(BaseKnobs):
     its operator was assigned, the drawing numbers no square, and the landmarks
     block the crate the way pallets do. ``landmark_mirrored`` draws the second
     operator's floor mirrored left to right. Nothing an operator reads mentions
-    the mirror, and a round result never says where the other crate went. It
+    the mirror, and a round result says where the other crate went only by
+    drawing the other floor under ``partner_floor_disclosed``. It
     needs two operators, one crate each, one target a round, no pallets and
     ``partner_bay_disclosed`` off.
 
@@ -74,7 +75,10 @@ class MoveABoxKnobs(BaseKnobs):
     shows it, so one bay stands on different squares of the two floors. Nothing
     an operator reads mentions the shift. At 0 every floor shows the whole yard.
     Under a shift, ``partner_bay_disclosed`` names the other crate's bay by its
-    square on the other operator's floor, and says so.
+    square on the other operator's floor, and says so. ``view_shift_disclosed``
+    adds one sentence to the system prompt: the other operator's floor shows a
+    different part of the same yard, and how the two floors overlap changes every
+    round. It gives no offset, and it needs ``landmark_mirrored`` off.
     ``private_bays_outside_overlap`` puts each operator's private bays where the
     other operator's floor does not reach, so the shared bay is the only
     assigned bay both floors show; it needs a shift and ``bays_differ``.
@@ -112,6 +116,13 @@ class MoveABoxKnobs(BaseKnobs):
     round result. Off, a round that did not match reports only that the other
     crate went somewhere else, so an operator learns whether it agreed and
     nothing more.
+
+    ``partner_floor_disclosed`` draws, in each round's result, the other
+    operator's floor for the round just played, as that operator saw it, with
+    its crate drawn on the square where it ended. The result says whose floor it
+    is. A landmark floor is drawn as the reader's own is, with no row numbers.
+    It needs square or landmark bays, two operators, one crate each, one target
+    a round and ``partner_disclosed``.
 
     ``partner_disclosed`` tells each operator in its briefing that another
     operator is working and that matching bays scores. Off, the system prompt
@@ -186,11 +197,13 @@ class MoveABoxKnobs(BaseKnobs):
     landmark_count: int = Field(ge=0, le=MAX_LANDMARKS)
     landmark_mirrored: bool
     view_shift: int = Field(ge=0)
+    view_shift_disclosed: bool
     private_bays_outside_overlap: bool
     crate_start: CrateStart
     partner_readout: bool
     partner_disclosed: bool
     partner_bay_disclosed: bool
+    partner_floor_disclosed: bool
     readout_history: bool
     decoy_readings: bool
     thermal_table_disclosed: bool
@@ -242,6 +255,8 @@ class MoveABoxKnobs(BaseKnobs):
         self._validate_landmarks()
         self._validate_view_shift()
         self._validate_private_bays()
+        self._validate_view_shift_disclosed()
+        self._validate_partner_floor()
         if self.targets_per_round > 1 and self.crates_each > 1:
             raise ValueError(
                 "targets_per_round above 1 needs crates_each=1: a target starts where each "
@@ -362,6 +377,26 @@ class MoveABoxKnobs(BaseKnobs):
                 "shared start square names a square of one floor that another floor may not show"
             )
 
+    def _validate_view_shift_disclosed(self) -> None:
+        """Refuse telling the operators of a shift that is not there or of an unnamed partner."""
+        if not self.view_shift_disclosed:
+            return
+        if not self.view_shift:
+            raise ValueError(
+                "view_shift_disclosed needs view_shift above 0: it tells the operators that "
+                "their floors overlap differently every round"
+            )
+        if not self.partner_disclosed:
+            raise ValueError(
+                "view_shift_disclosed needs partner_disclosed: the sentence is about the other "
+                "operator's floor"
+            )
+        if self.landmark_mirrored:
+            raise ValueError(
+                "view_shift_disclosed needs landmark_mirrored=false: the sentence tells of a "
+                "shift only, and the operators would take it for all that sets the floors apart"
+            )
+
     def _validate_private_bays(self) -> None:
         """Refuse private bays kept apart where there is no shift or nothing private."""
         if not self.private_bays_outside_overlap:
@@ -375,6 +410,27 @@ class MoveABoxKnobs(BaseKnobs):
             raise ValueError(
                 "private_bays_outside_overlap needs bays_differ: with one list for everyone "
                 "there are no private bays to keep apart"
+            )
+
+    def _validate_partner_floor(self) -> None:
+        """Refuse drawing the other operator's floor where the drawing would not be one floor."""
+        if not self.partner_floor_disclosed:
+            return
+        if self.bay_identity.is_marked():
+            raise ValueError(
+                "partner_floor_disclosed needs bay_identity=square or landmark: it draws the "
+                "other operator's floor the way the reader's own floor is drawn, and a floor of "
+                "marked bays names its bays by marks the reader may never have seen"
+            )
+        if self.operator_count != 2 or self.crates_each != 1 or self.targets_per_round != 1:
+            raise ValueError(
+                "partner_floor_disclosed needs operator_count=2, crates_each=1 and "
+                "targets_per_round=1: the result draws one other floor with one crate on it"
+            )
+        if not self.partner_disclosed:
+            raise ValueError(
+                "partner_floor_disclosed needs partner_disclosed: it draws the floor of an "
+                "operator that the briefing would not mention"
             )
 
     def yard_setup(self) -> YardSetup:
