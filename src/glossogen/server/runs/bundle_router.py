@@ -22,9 +22,10 @@ from fastapi.responses import StreamingResponse
 from glossogen.models.event import RunStatus, SimulationStarted
 from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_bytes
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
+from glossogen.run_storage.archive_member_filter import is_always_excluded
 from glossogen.run_storage.event_parsing import parse_event_bytes
 from glossogen.run_storage.jsonl_lines import first_nonblank_line
-from glossogen.run_storage.run_archive import claim_run_dir, strip_legacy_git_dir
+from glossogen.run_storage.run_archive import claim_run_dir
 from glossogen.run_storage.run_bundle import (
     BUNDLE_MANIFEST_FILENAME,
     BundleManifest,
@@ -189,6 +190,35 @@ def _validate_tar_members(tar: tarfile.TarFile) -> None:
         check_raw_bytes(total_bytes=total_bytes)
 
 
+def _reject_link_members(tar: tarfile.TarFile) -> None:
+    """Reject any member that is not a regular file or a directory.
+
+    An export writes only those. A link member would let a later member be written
+    through it into a file whose name :func:`_run_owned_members` never sees, such as
+    ``stream.json``.
+    """
+    for member in tar.getmembers():
+        if not member.isreg() and not member.isdir():
+            raise ValueError(
+                f"Unsupported tar member type (not a file or directory): {member.name}"
+            )
+
+
+def _run_owned_members(tar: tarfile.TarFile) -> list[tarfile.TarInfo]:
+    """Return the members to extract: all but the live-state files no archive carries.
+
+    An export leaves them out, so a bundle that holds one is stale or hand-built. The
+    server trusts ``stream.json`` for the PID it signals on stop and delete and for
+    the address it proxies the event stream from, so extracting it would let an
+    uploader choose both.
+    """
+    return [
+        member
+        for member in tar.getmembers()
+        if not is_always_excluded(relative_path=Path(member.name))
+    ]
+
+
 def _extract_manifest(tar: tarfile.TarFile) -> BundleManifest:
     """Extract and parse the bundle manifest from the tar archive."""
     member = tar.getmember(BUNDLE_MANIFEST_FILENAME)
@@ -278,6 +308,7 @@ def _extract_and_validate_bundle(
     """
     with BundleTarFile.open(fileobj=tar_source, mode="r:gz") as tar:
         _validate_tar_members(tar=tar)
+        _reject_link_members(tar=tar)
 
         try:
             manifest = _extract_manifest(tar=tar)
@@ -336,7 +367,11 @@ def _extract_and_validate_bundle(
         )
 
         try:
-            tar.extractall(path=str(run_dir), filter="data")
+            tar.extractall(
+                path=str(run_dir),
+                members=_run_owned_members(tar=tar),
+                filter="data",
+            )
         except Exception:
             logger.exception("Failed to extract bundle to %s", run_dir)
             shutil.rmtree(run_dir, ignore_errors=True)
@@ -414,7 +449,6 @@ async def import_run_bundle(
 
     if outcome.freshly_extracted:
         run_dir = Path(outcome.response.run_dir)
-        strip_legacy_git_dir(run_dir=run_dir)
         timeline_parent = read_timeline_parent(run_dir=run_dir)
         source_run_scenario: str | None = None
         source_run_dir_name: str | None = None

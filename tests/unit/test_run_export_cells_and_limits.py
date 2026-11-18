@@ -32,7 +32,10 @@ from glossogen.run_export.knob_flattening import knob_cells_by_key
 from glossogen.run_export.lineage_columns import lineage_cells
 from glossogen.run_export.run_metadata_columns import run_metadata_cells
 from glossogen.run_export.run_selection_resolution import resolve_selection
-from glossogen.run_storage.archive_member_filter import should_include_in_archive
+from glossogen.run_storage.archive_member_filter import (
+    is_always_excluded,
+    should_include_in_archive,
+)
 from glossogen.run_storage.run_summary_models import (
     AgentModelSummary,
     ForkAtRoundSource,
@@ -217,6 +220,13 @@ def test_a_file_inside_a_git_directory_is_excluded(tmp_path: Path) -> None:
     path = nested / "HEAD"
     path.write_text("x")
     assert not should_include_in_archive(path=path, run_dir=tmp_path, include_logs=True)
+
+
+def test_a_live_state_name_is_excluded_whatever_its_case() -> None:
+    """A case-insensitive filesystem reads `Stream.json` back as `stream.json`."""
+    assert is_always_excluded(relative_path=Path("Stream.json"))
+    assert is_always_excluded(relative_path=Path("EVAL_IN_PROGRESS.json"))
+    assert not is_always_excluded(relative_path=Path("veyru.jsonl"))
 
 
 def test_the_log_suffixes_flip_with_the_setting(tmp_path: Path) -> None:
