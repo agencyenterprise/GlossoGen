@@ -14,6 +14,10 @@ from enum import StrEnum
 
 NO_CHARACTER_LIMIT = -1
 
+USE_THE_DISCUSSION_CHANNEL = "Use the discussion channel instead."
+
+USE_A_PARTNER_CHANNEL = "Use a discussion channel you share with one teammate instead."
+
 
 class PostmortemMode(StrEnum):
     """Who may post in a discussion phase, and on which channel."""

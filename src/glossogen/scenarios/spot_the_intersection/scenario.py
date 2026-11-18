@@ -84,18 +84,23 @@ from glossogen.scenarios.spot_the_intersection.knobs import (
 )
 from glossogen.scenarios.spot_the_intersection.messaging import (
     DIRECT_MESSAGES_CLOSED_IN_DISCUSSION,
+    LINK_CLOSED_IN_DISCUSSION,
     LINK_IS_NOTICES_ONLY,
     ONE_TO_ONE_SEND_DESCRIPTION,
     Messaging,
     direct_channel_refusal,
 )
 from glossogen.scenarios.spot_the_intersection.partner_channels import (
+    PartnerChannel,
+    declared_partner_channels,
     every_partner_channel_id,
     partner_channel_entries,
-    partner_channel_members,
-    partner_channels,
+    partner_channels_of,
+    partner_channels_of_teams,
 )
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
+    USE_A_PARTNER_CHANNEL,
+    USE_THE_DISCUSSION_CHANNEL,
     PostmortemMode,
     author_index,
     not_the_author_refusal,
@@ -122,6 +127,15 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _LINK_CHANNELS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_ID})
 _VIEWER_ROLE_GROUP = "viewer"
+
+
+def _closed_in_discussion(channel_id: str) -> str | None:
+    """Why ``channel_id``, a link or direct channel, is shut in a discussion phase, or ``None``."""
+    if channel_id in _LINK_CHANNELS:
+        return LINK_CLOSED_IN_DISCUSSION
+    if channel_id.startswith(DIRECT_CHANNEL_PREFIX):
+        return DIRECT_MESSAGES_CLOSED_IN_DISCUSSION
+    return None
 
 
 @scenario(name="spot_the_intersection")
@@ -183,12 +197,12 @@ class SpotTheIntersectionScenario(SimulationScenario):
         self._role_names = {
             role.agent_id: role.role_name for team in self._team_specs for role in team.roles
         }
-        self._partner_channel_members: dict[str, tuple[str, str]] = {}
+        self._partner_channels: tuple[PartnerChannel, ...] = ()
         if (
             self._postmortem_initially_active
             and knobs.postmortem_mode == PostmortemMode.CHOSEN_PARTNER
         ):
-            self._partner_channel_members = partner_channel_members(teams=self._team_specs)
+            self._partner_channels = partner_channels_of_teams(teams=self._team_specs)
         self._discussion: DiscussionPhase | None = None
         self._world = SpotTheIntersectionWorld(
             rounds=generate_rounds(
@@ -240,7 +254,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 "channels": [
                     *channels,
                     *partner_channel_entries(
-                        members=self._partner_channel_members,
+                        pairs=self._partner_channels,
                         role_names=self._role_names,
                         agent_id=role.agent_id,
                     ),
@@ -280,26 +294,23 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 update={
                     "channel_ids": [
                         *config.channel_ids,
-                        *self._partner_channel_ids_of(agent_id=config.agent_id),
+                        *(
+                            pair.channel_id
+                            for pair in partner_channels_of(
+                                pairs=self._partner_channels, agent_id=config.agent_id
+                            )
+                        ),
                     ]
                 }
             )
             for config in configs
         ]
 
-    def _partner_channel_ids_of(self, agent_id: str) -> list[str]:
-        """The pair channels ``agent_id`` belongs to; none outside a ``chosen_partner`` run."""
-        return [
-            channel_id
-            for channel_id, members in self._partner_channel_members.items()
-            if agent_id in members
-        ]
-
     def get_channels(self) -> list[Channel]:
         """Return each team's link, then its debrief or pair channels when this run holds them."""
         return [
             *team_structure.channels(teams=self._team_specs),
-            *partner_channels(members=self._partner_channel_members, role_names=self._role_names),
+            *declared_partner_channels(pairs=self._partner_channels, role_names=self._role_names),
         ]
 
     def get_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -350,7 +361,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
         self._discussion = DiscussionPhase(
             round_number=round_number,
             character_limit=self._knobs.postmortem_character_limit,
-            partner_channels=self._partner_channel_members,
+            partner_channels=self._partner_channels,
             role_names=self._role_names,
         )
 
@@ -422,20 +433,17 @@ class SpotTheIntersectionScenario(SimulationScenario):
 
         With one-to-one messaging the link carries only the world's notices, so
         a viewer cannot post on it. In a phase one viewer writes, only that
-        viewer posts on the discussion channel.
+        viewer posts on the discussion channel. A refusal on a channel the phase
+        closes says where the viewer may post instead.
         """
         if channel_id in type(self).postmortem_channel_ids:
             return self._discussion_channel_refusal(agent_id=agent_id)
         if channel_id in _LINK_CHANNELS and self._knobs.messaging == Messaging.ONE_TO_ONE:
             return LINK_IS_NOTICES_ONLY
-        if channel_id in _LINK_CHANNELS and self._world.in_postmortem:
-            return (
-                "The link channel is closed during the post-round discussion phase. "
-                "Use the discussion channel instead."
-            )
-        if channel_id.startswith(DIRECT_CHANNEL_PREFIX) and self._world.in_postmortem:
-            return DIRECT_MESSAGES_CLOSED_IN_DISCUSSION
-        return None
+        closed = _closed_in_discussion(channel_id=channel_id)
+        if closed is None or not self._world.in_postmortem:
+            return None
+        return f"{closed} {self._where_to_post_in_discussion(agent_id=agent_id)}"
 
     def _discussion_channel_refusal(self, agent_id: str) -> str | None:
         """Why ``agent_id`` may not post on a discussion channel now, or ``None``."""
@@ -446,6 +454,22 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 "The discussion channel is only available during the post-round "
                 "discussion phase. Wait for the discussion phase to begin."
             )
+        return self._not_the_author_refusal(agent_id=agent_id)
+
+    def _where_to_post_in_discussion(self, agent_id: str) -> str:
+        """Where ``agent_id`` may post in this discussion phase, for a refusal elsewhere.
+
+        A viewer that is not this phase's author is told who is.
+        """
+        refusal = self._not_the_author_refusal(agent_id=agent_id)
+        if refusal is not None:
+            return refusal
+        if self._knobs.postmortem_mode == PostmortemMode.CHOSEN_PARTNER:
+            return USE_A_PARTNER_CHANNEL
+        return USE_THE_DISCUSSION_CHANNEL
+
+    def _not_the_author_refusal(self, agent_id: str) -> str | None:
+        """Who writes this phase when it is not ``agent_id``, or ``None`` when it may post."""
         seat = self._world.seats[agent_id]
         author = author_index(
             mode=self._knobs.postmortem_mode,

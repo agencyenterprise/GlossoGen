@@ -138,10 +138,11 @@ glossogen analyze --runs-dir ./runs --scenario spot_the_intersection --label <co
 
 The system prompt states the grid and its cell names, that exactly one object is
 on every board, the submission rule, how the team's characters are counted, the
-competition, and who may post in the discussion phase and how much. With one-to-one messaging it also lists the viewer's teammates
-by agent id. It does not mention near-misses, twins, decoys, or that every board
-is needed. Each round's briefing lists the viewer's own board and the previous
-round's result, never the answer.
+competition, and who may post in the discussion phase and how much. With
+one-to-one messaging it also lists the viewer's teammates by agent id. It does
+not mention near-misses, twins, decoys, or that every board is needed. Each
+round's briefing lists the viewer's own board and the previous round's result,
+never the answer.
 
 ## Messaging
 
@@ -186,8 +187,9 @@ who posts in it:
   first teammate it messages in a phase. A message to any other teammate is
   then refused until the next phase. Receiving a message does not choose a
   partner, and neither does a message that was refused or held for unread
-  messages. This mode needs `messaging: "broadcast"`, because a viewer
-  addresses a pair channel by its `channel_id`.
+  messages. This mode is written for `messaging: "broadcast"` only. The
+  one-to-one prompts tell a viewer to name a teammate by agent id, which
+  reaches their direct channel, and direct channels are closed in the phase.
 
 `postmortem_character_limit` caps the characters each viewer sends in one
 phase, in any mode. `-1` sets no limit. A message that would take the viewer
@@ -197,8 +199,9 @@ at once, they are checked one after the other, so they cannot both choose a
 partner or both fit under the limit.
 
 The system prompt and the message that opens each phase state the mode and the
-limit, and the run's description names both. A run with `postmortem_enabled:
-false` must set `whole_team` and `-1`. Every shipped preset sets `whole_team`
+limit, and the run's description names both. A run with no discussion phase,
+because `postmortem_enabled` is false or `postmortem_disabled_at_start` is
+true, must set `whole_team` and `-1`. Every shipped preset sets `whole_team`
 and `-1`.
 
 ## Modes

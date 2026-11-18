@@ -8,11 +8,30 @@ the other.
 
 from collections.abc import Mapping
 from itertools import combinations
+from typing import NamedTuple
 
 from glossogen.engine.team_declaration import TeamSpec
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.scenarios.spot_the_intersection.ids import TEAM_A_ID, TEAM_B_ID, TEAM_SOLO_ID
 from glossogen.scenarios.spot_the_intersection.seats import postmortem_channel_id_for
+
+
+class PartnerChannel(NamedTuple):
+    """One pair channel and its two members, lower seat first."""
+
+    channel_id: str
+    first: str
+    second: str
+
+    def has_member(self, agent_id: str) -> bool:
+        """Whether ``agent_id`` is one of the pair."""
+        return agent_id in (self.first, self.second)
+
+    def other(self, agent_id: str) -> str:
+        """The member of the pair that is not ``agent_id``, a member."""
+        if agent_id == self.first:
+            return self.second
+        return self.first
 
 
 def partner_channel_id_for(team_id: str, first_index: int, second_index: int) -> str:
@@ -30,46 +49,50 @@ def every_partner_channel_id(max_team_size: int) -> frozenset[str]:
     )
 
 
-def partner_channel_members(teams: tuple[TeamSpec, ...]) -> dict[str, tuple[str, str]]:
-    """Map each pair channel of ``teams`` to its two members, lower seat first."""
-    members: dict[str, tuple[str, str]] = {}
-    for team in teams:
-        for first, second in combinations(range(len(team.roles)), 2):
-            channel_id = partner_channel_id_for(
+def partner_channels_of_teams(teams: tuple[TeamSpec, ...]) -> tuple[PartnerChannel, ...]:
+    """Every pair channel of ``teams``, team by team in seat order."""
+    return tuple(
+        PartnerChannel(
+            channel_id=partner_channel_id_for(
                 team_id=team.team_id, first_index=first, second_index=second
-            )
-            members[channel_id] = (team.roles[first].agent_id, team.roles[second].agent_id)
-    return members
+            ),
+            first=team.roles[first].agent_id,
+            second=team.roles[second].agent_id,
+        )
+        for team in teams
+        for first, second in combinations(range(len(team.roles)), 2)
+    )
 
 
-def partner_channels(
-    members: Mapping[str, tuple[str, str]], role_names: Mapping[str, str]
+def partner_channels_of(
+    pairs: tuple[PartnerChannel, ...], agent_id: str
+) -> tuple[PartnerChannel, ...]:
+    """The pair channels of ``pairs`` that ``agent_id`` belongs to."""
+    return tuple(pair for pair in pairs if pair.has_member(agent_id=agent_id))
+
+
+def declared_partner_channels(
+    pairs: tuple[PartnerChannel, ...], role_names: Mapping[str, str]
 ) -> list[Channel]:
-    """One channel for each entry of ``members``, named after both viewers."""
+    """One declared channel for each of ``pairs``, named after both viewers."""
     return [
         Channel(
-            channel_id=channel_id,
-            name=f"discussion between {role_names[first]} and {role_names[second]}",
-            member_agent_ids=[first, second],
+            channel_id=pair.channel_id,
+            name=f"discussion between {role_names[pair.first]} and {role_names[pair.second]}",
+            member_agent_ids=[pair.first, pair.second],
         )
-        for channel_id, (first, second) in members.items()
+        for pair in pairs
     ]
 
 
 def partner_channel_entries(
-    members: Mapping[str, tuple[str, str]], role_names: Mapping[str, str], agent_id: str
+    pairs: tuple[PartnerChannel, ...], role_names: Mapping[str, str], agent_id: str
 ) -> list[ChannelTemplateEntry]:
     """The pair channels ``agent_id`` belongs to, each named after the other member."""
-    entries: list[ChannelTemplateEntry] = []
-    for channel_id, (first, second) in members.items():
-        if agent_id not in (first, second):
-            continue
-        other = first
-        if first == agent_id:
-            other = second
-        entries.append(
-            ChannelTemplateEntry(
-                display_name=f"discussion with {role_names[other]}", channel_id=channel_id
-            )
+    return [
+        ChannelTemplateEntry(
+            display_name=f"discussion with {role_names[pair.other(agent_id=agent_id)]}",
+            channel_id=pair.channel_id,
         )
-    return entries
+        for pair in partner_channels_of(pairs=pairs, agent_id=agent_id)
+    ]

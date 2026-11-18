@@ -31,7 +31,7 @@ from glossogen.scenarios.spot_the_intersection.seats import (
 
 
 def _viewer(team_id: str, index: int) -> RoleSpec:
-    """Build one viewer; every viewer is present from round one and holds the debrief."""
+    """Build one viewer, present from round one and a member of the team's debrief, if any."""
     return RoleSpec(
         agent_id=viewer_id(team_id=team_id, index=index),
         role_name=viewer_role_name(team_id=team_id, index=index),

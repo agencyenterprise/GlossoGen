@@ -66,8 +66,9 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     (``single_author``, ``rotating_author``), or each viewer to one teammate it
     picks on a channel the two share (``chosen_partner``, broadcast messaging
     only). ``postmortem_character_limit`` caps the characters each viewer sends
-    in one discussion phase (``-1`` for none). A run with ``postmortem_enabled``
-    off sets ``whole_team`` and ``-1``.
+    in one discussion phase (``-1`` for none). A run with no discussion phase,
+    because ``postmortem_enabled`` is off or ``postmortem_disabled_at_start`` is
+    on, sets ``whole_team`` and ``-1``.
     """
 
     round_time_budget_seconds: int
@@ -164,14 +165,16 @@ class SpotTheIntersectionKnobs(BaseKnobs):
 
     @model_validator(mode="after")
     def _validate_postmortem_rules_need_a_postmortem(self) -> Self:
-        if self.postmortem_enabled:
+        if self.postmortem_enabled and not self.postmortem_disabled_at_start:
             return self
         if (
             self.postmortem_mode != PostmortemMode.WHOLE_TEAM
             or self.postmortem_character_limit != NO_CHARACTER_LIMIT
         ):
             raise ValueError(
-                "with postmortem_enabled=False there is no discussion phase, so set "
+                "this run has no discussion phase "
+                f"(postmortem_enabled={self.postmortem_enabled}, "
+                f"postmortem_disabled_at_start={self.postmortem_disabled_at_start}), so set "
                 f"postmortem_mode={PostmortemMode.WHOLE_TEAM.value!r} and "
                 f"postmortem_character_limit={NO_CHARACTER_LIMIT} "
                 f"(got postmortem_mode={self.postmortem_mode.value!r}, "
@@ -186,9 +189,11 @@ class SpotTheIntersectionKnobs(BaseKnobs):
             and self.messaging != Messaging.BROADCAST
         ):
             raise ValueError(
-                f"postmortem_mode={PostmortemMode.CHOSEN_PARTNER.value!r} addresses a partner "
-                "by the channel_id the two share, so it needs "
-                f"messaging={Messaging.BROADCAST.value!r} (got messaging={self.messaging.value!r})"
+                f"postmortem_mode={PostmortemMode.CHOSEN_PARTNER.value!r} is written for "
+                f"messaging={Messaging.BROADCAST.value!r} only: the one-to-one prompts tell a "
+                "viewer to name a teammate by agent id, which reaches their direct channel, and "
+                "direct channels are closed in the discussion phase "
+                f"(got messaging={self.messaging.value!r})"
             )
         return self
 

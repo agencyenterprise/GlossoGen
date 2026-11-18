@@ -32,9 +32,10 @@ LINK_IS_NOTICES_ONLY = (
     "to that teammate's agent id."
 )
 
+LINK_CLOSED_IN_DISCUSSION = "The link channel is closed during the post-round discussion phase."
+
 DIRECT_MESSAGES_CLOSED_IN_DISCUSSION = (
-    "Direct messages are closed during the post-round discussion phase. Use the discussion "
-    "channel instead."
+    "Direct messages are closed during the post-round discussion phase."
 )
 
 
