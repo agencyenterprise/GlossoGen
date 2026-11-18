@@ -9,12 +9,15 @@ download has to step over.
 
 import csv
 import io
+import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
 from typing import Any
 
 import httpx
+import orjson
 import pytest
 
 from glossogen.run_export import export_limits
@@ -102,6 +105,110 @@ async def test_a_bundle_imports_into_another_server_as_the_same_run(
 
     assert detail.status_code == 200
     assert [m["text"] for m in detail.json()["messages"]] == ["symptoms"]
+
+
+def bundle_with_extra_files(bundle: bytes, extra_files: dict[str, bytes]) -> bytes:
+    """Return ``bundle`` repacked with ``extra_files`` added at the given member names."""
+    repacked = io.BytesIO()
+    with (
+        tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as source,
+        tarfile.open(fileobj=repacked, mode="w:gz") as target,
+    ):
+        for member in source.getmembers():
+            target.addfile(tarinfo=member, fileobj=source.extractfile(member))
+        for name, content in extra_files.items():
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            target.addfile(tarinfo=info, fileobj=io.BytesIO(content))
+    return repacked.getvalue()
+
+
+async def test_an_imported_bundle_cannot_plant_the_files_that_mark_a_run_as_live(
+    client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    # `stream.json` names the PID that stopping or deleting a run signals and the
+    # host:port its event stream proxies to. A bundle that carries one would hand
+    # whoever uploads it a SIGTERM to any PID the server can signal. The target
+    # here is a child process of the test, so the test never signals itself.
+    target = subprocess.Popen([sys.executable, "-c", "import signal; signal.pause()"])
+    try:
+        async with client:
+            exported = await client.get(f"{GROUP_API}/runs/{RUN_ID}/export/bundle")
+        planted = bundle_with_extra_files(
+            bundle=exported.content,
+            extra_files={
+                "stream.json": orjson.dumps(
+                    {"host": "127.0.0.1", "port": 9, "run_id": RUN_ID, "pid": target.pid}
+                ),
+                "eval_in_progress.json": orjson.dumps({"pid": target.pid}),
+            },
+        )
+
+        other_runs_dir = tmp_path / "other_runs"
+        other_runs_dir.mkdir()
+        async with local_client(app=build_local_app(runs_dir=other_runs_dir)) as other:
+            imported = await other.post(
+                f"{GROUP_API}/runs/import",
+                files={"file": ("bundle.tar.gz", planted, "application/gzip")},
+            )
+            assert imported.status_code == 200
+            imported_run = imported.json()
+            stopped = await other.post(f"{GROUP_API}/runs/{imported_run['run_id']}/stop")
+            streamed = await other.get(f"{GROUP_API}/runs/{imported_run['run_id']}/events")
+
+        assert stopped.status_code == 409
+        assert streamed.status_code == 409
+        assert target.poll() is None
+        imported_dir = Path(imported_run["run_dir"])
+        assert not (imported_dir / "stream.json").exists()
+        assert not (imported_dir / "eval_in_progress.json").exists()
+    finally:
+        target.kill()
+        target.wait()
+
+
+async def test_an_imported_bundle_cannot_plant_stream_json_through_a_symlink(
+    client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    # A symlink member named `notes` pointing at `stream.json`, then a regular file
+    # member named `notes`: neither name is excluded, and extraction writes the file
+    # through the link, so `stream.json` lands in the run directory anyway.
+    target = subprocess.Popen([sys.executable, "-c", "import signal; signal.pause()"])
+    try:
+        async with client:
+            exported = await client.get(f"{GROUP_API}/runs/{RUN_ID}/export/bundle")
+        manifest = orjson.dumps(
+            {"host": "127.0.0.1", "port": 9, "run_id": RUN_ID, "pid": target.pid}
+        )
+        repacked = io.BytesIO()
+        with (
+            tarfile.open(fileobj=io.BytesIO(exported.content), mode="r:gz") as source,
+            tarfile.open(fileobj=repacked, mode="w:gz") as planted,
+        ):
+            for member in source.getmembers():
+                planted.addfile(tarinfo=member, fileobj=source.extractfile(member))
+            link = tarfile.TarInfo(name="notes")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "stream.json"
+            planted.addfile(tarinfo=link)
+            payload = tarfile.TarInfo(name="notes")
+            payload.size = len(manifest)
+            planted.addfile(tarinfo=payload, fileobj=io.BytesIO(manifest))
+
+        other_runs_dir = tmp_path / "other_runs"
+        other_runs_dir.mkdir()
+        async with local_client(app=build_local_app(runs_dir=other_runs_dir)) as other:
+            imported = await other.post(
+                f"{GROUP_API}/runs/import",
+                files={"file": ("bundle.tar.gz", repacked.getvalue(), "application/gzip")},
+            )
+
+        assert imported.status_code == 422
+        assert target.poll() is None
+        assert not any(other_runs_dir.rglob("stream.json"))
+    finally:
+        target.kill()
+        target.wait()
 
 
 async def test_the_raw_export_nests_the_run_under_its_scenario(
