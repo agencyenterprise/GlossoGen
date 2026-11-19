@@ -390,7 +390,7 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
 
 def test_a_bay_count_too_small_for_the_roster_is_refused() -> None:
     """Five operators at three bays each need 11 bays; nine cannot seat them."""
-    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_unshifted")
     config.update({"operator_count": 5, "bays_allowed_each": 3, "bay_count": 9, "grid_size": 9})
     with pytest.raises(ValueError, match="bay_count must be at least 11"):
         MoveABoxKnobs.model_validate(config)
@@ -424,7 +424,7 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
 
 def test_a_crate_cannot_have_more_crates_than_bays_on_its_list() -> None:
     """Three crates at two bays each leaves a slot with nowhere of its own to meet."""
-    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_unshifted")
     config.update({"crates_each": 3, "bays_allowed_each": 2})
     with pytest.raises(ValueError, match="bays_allowed_each must be at least crates_each=3"):
         MoveABoxKnobs.model_validate(config)

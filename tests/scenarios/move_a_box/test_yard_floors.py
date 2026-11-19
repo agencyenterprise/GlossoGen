@@ -378,9 +378,9 @@ def test_a_matched_round_says_the_crates_met() -> None:
 
 def test_landmark_knob_combinations_are_refused() -> None:
     with pytest.raises(ValueError, match="apply only with bay_identity=landmark"):
-        build(preset_name="knobs_default", overrides={"landmark_count": 3})
+        build(preset_name="knobs_unshifted", overrides={"landmark_count": 3})
     with pytest.raises(ValueError, match="apply only with bay_identity=landmark"):
-        build(preset_name="knobs_default", overrides={"landmark_mirrored": True})
+        build(preset_name="knobs_unshifted", overrides={"landmark_mirrored": True})
     for landmark_count in (0, 1):
         with pytest.raises(ValueError, match="needs landmark_count of at least 2"):
             build(preset_name="knobs_landmarks", overrides={"landmark_count": landmark_count})
@@ -636,7 +636,7 @@ def test_private_bays_stand_where_the_other_floor_does_not_reach() -> None:
 
 def test_private_bays_apart_needs_a_shift_and_private_bays() -> None:
     with pytest.raises(ValueError, match="private_bays_outside_overlap needs view_shift above 0"):
-        build(preset_name="knobs_default", overrides={"private_bays_outside_overlap": True})
+        build(preset_name="knobs_unshifted", overrides={"private_bays_outside_overlap": True})
     with pytest.raises(ValueError, match="private_bays_outside_overlap needs bays_differ"):
         build(preset_name="knobs_shifted_apart", overrides={"bays_differ": False})
 
@@ -785,7 +785,7 @@ def test_the_other_floor_is_refused_where_it_would_not_be_drawn_as_the_readers_o
         build(preset_name="knobs_symbol_bays", overrides={"partner_floor_disclosed": True})
     with pytest.raises(ValueError, match="partner_floor_disclosed needs operator_count=2"):
         build(
-            preset_name="knobs_default",
+            preset_name="knobs_unshifted",
             overrides={"partner_floor_disclosed": True, "crates_each": 2},
         )
     with pytest.raises(ValueError, match="partner_floor_disclosed needs partner_disclosed"):
@@ -835,7 +835,7 @@ def test_the_shift_is_told_only_when_view_shift_disclosed_is_on(
 
 def test_view_shift_disclosed_needs_a_shift_a_named_partner_and_no_mirror() -> None:
     with pytest.raises(ValueError, match="view_shift_disclosed needs view_shift above 0"):
-        build(preset_name="knobs_default", overrides={"view_shift_disclosed": True})
+        build(preset_name="knobs_unshifted", overrides={"view_shift_disclosed": True})
     with pytest.raises(ValueError, match="view_shift_disclosed needs partner_disclosed"):
         build(
             preset_name="knobs_shifted",

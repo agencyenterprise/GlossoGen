@@ -76,7 +76,7 @@ def temperatures_of(result: SimulationResult, agent_id: str) -> list[int]:
 async def test_both_crates_on_one_bay_score_the_bonus(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()]
         for agent_id in (OPERATOR_A, OPERATOR_B)
@@ -100,7 +100,7 @@ async def test_both_crates_on_one_bay_score_the_bonus(
 async def test_different_bays_score_delivery_without_the_bonus(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -129,7 +129,7 @@ async def test_different_bays_score_delivery_without_the_bonus(
 async def test_a_crate_left_off_a_bay_scores_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
         OPERATOR_B: [
@@ -152,7 +152,7 @@ async def test_a_bay_the_depot_did_not_assign_scores_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Bay 1 is open floor for operator_a, but the depot assigned it to operator_b."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -256,7 +256,7 @@ async def test_the_other_floor_s_bay_square_is_open_floor_under_marked_bays(
 async def test_each_action_moves_the_reading_by_its_own_amount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -286,7 +286,7 @@ async def test_the_readout_shows_the_other_crate_only_as_a_reading(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The other crate's line carries its reading and status, never where it stands."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
         OPERATOR_B: [
@@ -317,7 +317,7 @@ async def test_lockstep_shows_each_operator_the_other_crate_moving(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A held action returns only once the other crate's reading has moved on."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
         OPERATOR_B: [read(), *to_shared_bay(method="drag"), finish(), wait_for_next_round()],
@@ -337,7 +337,7 @@ async def test_a_haul_off_the_floor_is_refused_and_spends_no_step(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The crate starts in the corner, so up and left leave the floor."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -360,7 +360,9 @@ async def test_a_haul_off_the_floor_is_refused_and_spends_no_step(
 async def test_the_notepad_is_private_and_costs_no_step(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides={**ONE_ROUND, "notepad_enabled": True})
+    scenario = build(
+        preset_name="knobs_unshifted", overrides={**ONE_ROUND, "notepad_enabled": True}
+    )
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -388,7 +390,7 @@ async def test_a_crate_that_stopped_off_the_bays_is_not_called_delivered(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Status is the only field besides the reading that crosses, so it must be true."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
         OPERATOR_B: [

@@ -66,7 +66,7 @@ def test_each_change_of_method_counts_once() -> None:
 async def test_thermal_excess_is_zero_when_nobody_varies_the_method(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()]
         for agent_id in (OPERATOR_A, OPERATOR_B)
@@ -85,7 +85,7 @@ async def test_thermal_excess_counts_what_one_operator_spent_on_the_reading(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """operator_a: drag, stand_by, pack_ice, sled, cart — two cooling actions, two changes."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -113,7 +113,7 @@ async def test_thermal_excess_counts_what_one_operator_spent_on_the_reading(
 
 
 async def test_thermal_excess_skips_a_run_with_no_rounds(tmp_path: Path) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     assert (
         await measure(metric=ThermalExcessMetric(), scenario=scenario, events=[], tmp_path=tmp_path)
         == []

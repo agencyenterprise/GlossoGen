@@ -8,7 +8,7 @@ same bay as the other crate scores again.
 
 There is no channel and no tool that takes text. The depot readout returns every
 crate's temperature after every action, and how an operator carries its crate
-decides what that temperature does. Nothing in the task says the temperature
+decides what that temperature does. Unless `channel_disclosed` is on, nothing in the task says the temperature
 means anything.
 
 ```bash
@@ -59,8 +59,8 @@ did not assign scores nothing, and the briefing names the list each round.
 Pallets are a separate thing. `pallet_density` scatters them, drawn separately for
 each operator, and they never close a bay off: a draw is kept only when every bay
 is still reachable around them. They cost an operator steps, never a delivery. At
-`0.0` the floors are clear and every bay is the same walk for both, which is
-the one thing a shipped preset does not want: every preset scatters a few.
+`0.0` the floors are clear and every bay is the same walk for both. Every preset
+with square, symbol or letter bays scatters a few, except `knobs_four_operators`.
 
 `crate_start` places the crates. `corner` puts both on row 1, col 1 every round;
 `shared_random` draws one square a round and puts both crates on it;
@@ -303,7 +303,7 @@ reads mentions the shift. With
 crate was left somewhere else, as on landmark floors. With it on, the result
 names the other crate's bay by its square on the other floor and says so: "The
 other crates were left on the bay at 2,3 of the other operator's floor."
-`knobs_shifted` is `knobs_default` with `view_shift` 4 and
+`knobs_shifted` is `knobs_unshifted` with `view_shift` 4 and
 `partner_bay_disclosed` off.
 
 A shift keeps reading order, so when both windows cover the same bays, "the
@@ -405,7 +405,7 @@ as before. Every later target is drawn from the seed, the round and the target,
 around the squares the crates stand on, so the same play draws the same targets.
 
 Several targets need `crates_each` at 1, since a target starts where each
-operator's crate was left. `knobs_two_targets` is `knobs_default` with two
+operator's crate was left. `knobs_two_targets` is `knobs_unshifted` with two
 targets a round.
 
 ## The actions
@@ -684,33 +684,34 @@ channel, and the compaction prompt talks about channels this run does not have.
 
 | Preset | What it sets |
 |---|---|
-| `knobs_default` | The task as described: an 8x8 floor, `bays_differ`, scattered pallets, a separate start square per operator, nothing disclosed |
-| `knobs_channel_disclosed` | `channel_disclosed` and `thermal_table_disclosed` on. States the mechanism and the goal, gives no encoding, so only the protocol is left to invent |
-| `knobs_shared_bays_control` | `bays_differ` off. Every operator is assigned the same bays, so none needs anything from the others |
-| `knobs_no_readout_control` | `partner_readout` and `partner_disclosed` off. The other crates' lines are absent from the readout |
+| `knobs_default` | `knobs_landmarks_shifted_partner_floor` with `view_shift_disclosed` and `channel_disclosed` on: landmark floors that are windows on one yard, placed again every round, with the other operator's floor drawn after each round, and a system prompt that says the floors show different parts of one yard and that the reading is the channel |
+| `knobs_unshifted` | An 8x8 floor of square bays that every operator sees whole, `bays_differ`, scattered pallets, a separate start square per operator, nothing disclosed |
+| `knobs_channel_disclosed` | `knobs_unshifted` with `channel_disclosed` and `thermal_table_disclosed` on. States the mechanism and the goal, gives no encoding, so only the protocol is left to invent |
+| `knobs_shared_bays_control` | `knobs_unshifted` with `bays_differ` off. Every operator is assigned the same bays, so none needs anything from the others |
+| `knobs_no_readout_control` | `knobs_unshifted` with `partner_readout` and `partner_disclosed` off. The other crates' lines are absent from the readout |
 | `knobs_four_operators` | Four operators on a 9x9 floor of 9 bays, three each, clear floors, all starting on one square, the channel and the thermal table both disclosed |
-| `knobs_symbol_bays` | `knobs_default` with `bay_identity=symbol`: each floor holds its operator's bays on squares of its own, and only the symbol says which bay is which |
-| `knobs_letter_bays` | `knobs_default` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
+| `knobs_symbol_bays` | `knobs_unshifted` with `bay_identity=symbol`: each floor holds its operator's bays on squares of its own, and only the symbol says which bay is which |
+| `knobs_letter_bays` | `knobs_unshifted` with `bay_identity=letter`: as `knobs_symbol_bays`, with letters for symbols |
 | `knobs_letters_then_symbols` | `knobs_letter_bays` switching to symbols from round 6 |
-| `knobs_two_targets` | `knobs_default` with two targets a round |
-| `knobs_landmarks` | `knobs_default` with `bay_identity=landmark`, 6 landmarks, the second floor mirrored, no shift, no pallets and `partner_bay_disclosed` off |
+| `knobs_two_targets` | `knobs_unshifted` with two targets a round |
+| `knobs_landmarks` | `knobs_unshifted` with `bay_identity=landmark`, 6 landmarks, the second floor mirrored, no shift, no pallets and `partner_bay_disclosed` off |
 | `knobs_landmarks_shifted` | `knobs_landmarks` with 10 landmarks and `view_shift` 4 |
 | `knobs_landmarks_shifted_partner_floor` | `knobs_landmarks_shifted` with `landmark_mirrored` off and `partner_floor_disclosed` on |
-| `knobs_shifted` | `knobs_default` with `view_shift` 4 and `partner_bay_disclosed` off: square floors as shifted windows on one yard |
+| `knobs_shifted` | `knobs_unshifted` with `view_shift` 4 and `partner_bay_disclosed` off: square floors as shifted windows on one yard |
 | `knobs_shifted_apart` | `knobs_shifted` with `private_bays_outside_overlap`: each operator's private bays off the other's floor |
 | `knobs_shifted_partner_floor` | `knobs_shifted_apart` with `partner_bay_disclosed` and `partner_floor_disclosed` on |
-| `knobs_virtual_clock` | `knobs_default` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, and a list of actions landing at once (`step_duration_s` 0) |
+| `knobs_virtual_clock` | `knobs_unshifted` on the virtual clock: `lockstep` off, a second plus 50 output tokens a second per request, and a list of actions landing at once (`step_duration_s` 0) |
 
 Every preset sets `parallel_tool_calls` to false, `batched_actions` and
 `describe_protocol_at_end` on, `notepad_enabled` off, `steps_per_round` 500,
 `round_count` 10 and `seed` 42. Every preset but `knobs_virtual_clock` sets
 `lockstep` on and `virtual_clock` off. Every preset but `knobs_four_operators` also sets
 `grid_size` to 8 and `crate_start` to `separate_random`, and every preset but
-`knobs_four_operators` and the landmark presets sets `pallet_density` to `0.1`.
+`knobs_four_operators` and the presets that draw landmarks sets `pallet_density` to `0.1`.
 `knobs_four_operators` departs on the floor and the roster, as its row says.
 Only `knobs_symbol_bays`, `knobs_letter_bays` and `knobs_letters_then_symbols`
-name bays by a mark, and only `knobs_landmarks`, `knobs_landmarks_shifted` and
-`knobs_landmarks_shifted_partner_floor` draw landmarks.
+name bays by a mark, and only `knobs_default`, `knobs_landmarks`, `knobs_landmarks_shifted`
+and `knobs_landmarks_shifted_partner_floor` draw landmarks.
 
 ## Events
 
@@ -777,7 +778,7 @@ crate's reading and the other operator sees it, and the goal, that they use it t
 settle on one bay. It gives no encoding, so the pair still has to agree on what a
 reading means with nothing but readings.
 
-Running that preset beside the default splits one question into two. A pair that
+Running that preset beside `knobs_unshifted` splits one question into two. A pair that
 scores no better told than untold cannot work a channel it has been handed, which
 is a different failure from not finding one.
 
