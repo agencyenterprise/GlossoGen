@@ -289,12 +289,11 @@ class MoveABoxWorld(ScenarioWorld):
         state = self._round()
         here = state.cells[crate_id]
         there = step(cell=here, direction=direction, grid_size=self._grid_size)
-        landmarks = state.depot.landmarks[owner_of(crate_id)]
-        if there is None and landmarks:
+        if there is None and self.target.bay_identity.is_landmark():
             return f"Hauling {direction.value} from here leaves the floor. No step spent."
         if there is None:
             return f"Hauling {direction.value} from {here.label()} leaves the floor. No step spent."
-        for landmark in landmarks:
+        for landmark in state.depot.landmarks[owner_of(crate_id)]:
             if landmark.cell == there:
                 return (
                     f"A {landmark.kind} stands there, so the crate cannot go {direction.value} "

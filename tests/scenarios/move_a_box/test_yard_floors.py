@@ -8,6 +8,7 @@ import pytest
 
 from glossogen.models.event import ToolResultReceived
 from glossogen.scenarios.move_a_box.depot import (
+    MIN_START_SEPARATION,
     Cell,
     FloorView,
     RoundDepot,
@@ -21,6 +22,7 @@ from glossogen.scenarios.move_a_box.depot import (
 )
 from glossogen.scenarios.move_a_box.events import MoveABoxRoundResolved, MoveABoxRoundStarted
 from glossogen.scenarios.move_a_box.ids import (
+    CORNER_CELL,
     LANDMARK_CELL_WIDTH,
     LANDMARK_CRATE_MARK,
     OPERATOR_A,
@@ -72,7 +74,9 @@ TWO_ROUNDS: dict[str, Any] = {"round_count": 2}
 FINISH = act_step(action="finish", direction=None)
 
 
-def landmark_depots(setup: YardSetup, round_count: int) -> list[RoundDepot]:
+def landmark_depots(
+    setup: YardSetup, round_count: int, crate_start: CrateStart
+) -> list[RoundDepot]:
     """``round_count`` landmark rounds of ``setup`` on the presets' floor."""
     return generate_depots(
         seed=42,
@@ -83,7 +87,7 @@ def landmark_depots(setup: YardSetup, round_count: int) -> list[RoundDepot]:
         bays_allowed_each=3,
         crates_each=1,
         bays_differ=True,
-        crate_start=CrateStart.SEPARATE_RANDOM,
+        crate_start=crate_start,
         pallet_density=0.0,
         yard_setup=setup,
     )
@@ -152,7 +156,9 @@ def drawing_after(text: str, heading: str) -> list[str]:
 @pytest.mark.parametrize("setup", [MIRRORED, UNMIRRORED, SHIFTED, SHIFTED_UNMIRRORED])
 def test_both_floors_show_one_yard(setup: YardSetup) -> None:
     """Where two floors overlap they show the same landmarks; each shows its own bays only."""
-    for depot in landmark_depots(setup=setup, round_count=30):
+    for depot in landmark_depots(
+        setup=setup, round_count=30, crate_start=CrateStart.SEPARATE_RANDOM
+    ):
         yard_a = yard_of(depot=depot, agent_id=OPERATOR_A)
         yard_b = yard_of(depot=depot, agent_id=OPERATOR_B)
         shared_bay = f"bay {shared_number(depot=depot)}"
@@ -167,7 +173,9 @@ def test_both_floors_show_one_yard(setup: YardSetup) -> None:
 
 
 def test_without_a_shift_or_a_mirror_both_floors_are_drawn_alike() -> None:
-    for depot in landmark_depots(setup=UNMIRRORED, round_count=10):
+    for depot in landmark_depots(
+        setup=UNMIRRORED, round_count=10, crate_start=CrateStart.SEPARATE_RANDOM
+    ):
         assert depot.landmarks[OPERATOR_A] == depot.landmarks[OPERATOR_B]
         number = shared_number(depot=depot)
         assert bay_cell(depot=depot, agent_id=OPERATOR_A, number=number) == bay_cell(
@@ -176,7 +184,9 @@ def test_without_a_shift_or_a_mirror_both_floors_are_drawn_alike() -> None:
 
 
 def test_without_a_shift_the_mirror_swaps_left_and_right() -> None:
-    for depot in landmark_depots(setup=MIRRORED, round_count=10):
+    for depot in landmark_depots(
+        setup=MIRRORED, round_count=10, crate_start=CrateStart.SEPARATE_RANDOM
+    ):
         number = shared_number(depot=depot)
         cell_a = bay_cell(depot=depot, agent_id=OPERATOR_A, number=number)
         cell_b = bay_cell(depot=depot, agent_id=OPERATOR_B, number=number)
@@ -184,8 +194,10 @@ def test_without_a_shift_the_mirror_swaps_left_and_right() -> None:
 
 
 @pytest.mark.parametrize("setup", [SHIFTED, SHIFTED_UNMIRRORED])
-def test_the_shift_moves_each_floor_every_round(setup: YardSetup) -> None:
-    depots = landmark_depots(setup=setup, round_count=30)
+def test_the_shift_places_the_floors_at_many_offsets_and_never_on_one_corner(
+    setup: YardSetup,
+) -> None:
+    depots = landmark_depots(setup=setup, round_count=30, crate_start=CrateStart.SEPARATE_RANDOM)
     offsets: set[tuple[int, int]] = set()
     for depot in depots:
         view_a = depot.views[OPERATOR_A]
@@ -198,11 +210,49 @@ def test_the_shift_moves_each_floor_every_round(setup: YardSetup) -> None:
     assert (0, 0) not in offsets
 
 
+@pytest.mark.parametrize("crate_start", [CrateStart.CORNER, CrateStart.SHARED_RANDOM])
+def test_a_corner_or_shared_start_puts_both_crates_on_one_yard_square_away_from_the_bays(
+    crate_start: CrateStart,
+) -> None:
+    for depot in landmark_depots(setup=MIRRORED, round_count=10, crate_start=crate_start):
+        yard_starts = {
+            yard_square(view=depot.views[agent_id], cell=depot.starts[agent_id])
+            for agent_id in (OPERATOR_A, OPERATOR_B)
+        }
+        assert len(yard_starts) == 1
+        if crate_start is CrateStart.CORNER:
+            assert yard_starts == {Cell(row=CORNER_CELL[0], col=CORNER_CELL[1])}
+        for agent_id in (OPERATOR_A, OPERATOR_B):
+            assert depot.starts[agent_id] not in depot.pallets[agent_id]
+            for bay in depot.first_target.bays[agent_id]:
+                assert (
+                    manhattan(first=depot.starts[agent_id], second=bay.cell) >= MIN_START_SEPARATION
+                )
+
+
+def test_a_haul_off_a_landmark_floor_names_no_square() -> None:
+    scenario = build(preset_name="knobs_landmarks", overrides=ONE_ROUND_UNASKED)
+    depot = first_depot(scenario=scenario)
+    edge = next(
+        Cell(row=1, col=col)
+        for col in range(1, GRID_SIZE + 1)
+        if Cell(row=1, col=col) not in depot.pallets[OPERATOR_A]
+    )
+    world = scenario.get_world()
+    world.start_round(depot=depot._replace(starts={**depot.starts, OPERATOR_A: edge}))
+
+    refusal = world.haul_refusal(crate_id=CRATE_A, direction=Direction.UP)
+
+    assert refusal == "Hauling up from here leaves the floor. No step spent."
+
+
 @pytest.mark.parametrize("setup", [MIRRORED, SHIFTED, SHIFTED_UNMIRRORED])
 def test_every_bay_stands_beside_a_landmark_and_the_shared_one_beside_one_both_floors_show(
     setup: YardSetup,
 ) -> None:
-    for depot in landmark_depots(setup=setup, round_count=30):
+    for depot in landmark_depots(
+        setup=setup, round_count=30, crate_start=CrateStart.SEPARATE_RANDOM
+    ):
         target = depot.first_target
         for agent_id in (OPERATOR_A, OPERATOR_B):
             assert sorted(bay.number for bay in target.bays[agent_id]) == list(
@@ -228,7 +278,9 @@ def test_every_bay_stands_beside_a_landmark_and_the_shared_one_beside_one_both_f
 
 @pytest.mark.parametrize("setup", [MIRRORED, SHIFTED])
 def test_every_assigned_bay_is_reachable_around_the_landmarks(setup: YardSetup) -> None:
-    for depot in landmark_depots(setup=setup, round_count=30):
+    for depot in landmark_depots(
+        setup=setup, round_count=30, crate_start=CrateStart.SEPARATE_RANDOM
+    ):
         for agent_id in (OPERATOR_A, OPERATOR_B):
             reached = distances_from(
                 start=depot.starts[agent_id],
@@ -278,6 +330,9 @@ def briefing_after(bays: dict[str, int | None], matched: bool) -> str:
     scenario = build(preset_name="knobs_landmarks", overrides=TWO_ROUNDS)
     depot = first_depot(scenario=scenario)
     own = depot.first_target.bays[OPERATOR_A][0].cell
+    matched_slots: tuple[int, ...] = ()
+    if matched:
+        matched_slots = (1,)
     scenario.restore_state_from_events(
         events=[
             MoveABoxRoundResolved(
@@ -287,7 +342,7 @@ def briefing_after(bays: dict[str, int | None], matched: bool) -> str:
                 temperatures={CRATE_A: 23, CRATE_B: 23},
                 steps_used={OPERATOR_A: 3, OPERATOR_B: 3},
                 points={OPERATOR_A: 20, OPERATOR_B: 20},
-                matched_slots=(1,) if matched else (),
+                matched_slots=matched_slots,
                 matched=matched,
                 success=matched,
                 trigger="all_finished",
@@ -326,8 +381,17 @@ def test_landmark_knob_combinations_are_refused() -> None:
         build(preset_name="knobs_default", overrides={"landmark_count": 3})
     with pytest.raises(ValueError, match="apply only with bay_identity=landmark"):
         build(preset_name="knobs_default", overrides={"landmark_mirrored": True})
-    with pytest.raises(ValueError, match="needs landmark_count of at least 1"):
-        build(preset_name="knobs_landmarks", overrides={"landmark_count": 0})
+    for landmark_count in (0, 1):
+        with pytest.raises(ValueError, match="needs landmark_count of at least 2"):
+            build(preset_name="knobs_landmarks", overrides={"landmark_count": landmark_count})
+    with pytest.raises(ValueError, match="needs crates_each=1 and targets_per_round=1"):
+        build(preset_name="knobs_landmarks", overrides={"crates_each": 2})
+    with pytest.raises(ValueError, match="needs crates_each=1 and targets_per_round=1"):
+        build(preset_name="knobs_landmarks", overrides={"targets_per_round": 2})
+    with pytest.raises(ValueError, match="has too few squares for 6 bays, 30 landmarks"):
+        build(preset_name="knobs_landmarks", overrides={"grid_size": 6, "landmark_count": 30})
+    with pytest.raises(ValueError, match="landmark_count=40 on a 8x8 floor"):
+        build(preset_name="knobs_landmarks", overrides={"landmark_count": 40})
     with pytest.raises(ValueError, match="needs pallet_density=0"):
         build(preset_name="knobs_landmarks", overrides={"pallet_density": 0.1})
     with pytest.raises(ValueError, match="needs operator_count=2"):
@@ -733,13 +797,13 @@ def test_the_other_floor_is_refused_where_it_would_not_be_drawn_as_the_readers_o
 
 SHIFT_SENTENCE = (
     "Their floor shows a different part of the same yard than yours, and how the two floors "
-    "overlap changes every round."
+    "overlap can change from one round to the next."
 )
 
 
 TOLD_DESCRIPTION = (
     "The system prompt tells the operators that the two floors show different parts of one yard "
-    "and overlap differently every round, and gives no offset."
+    "and that how they overlap can change from one round to the next, and gives no offset."
 )
 
 

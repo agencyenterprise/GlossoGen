@@ -205,12 +205,13 @@ word per square and numbers no row and no column. Two knobs set how the floors
 relate:
 
 - `landmark_mirrored` draws the second operator's floor mirrored left to right.
-- `view_shift` makes the yard that many squares wider and taller than
-  a floor; it also applies to square floors, as described below. Every round, each operator's floor is placed anywhere up to that many
-  squares down and right of the yard's corner, so the two floors overlap by a
-  different amount each round. They always share at least 4 rows and 4
-  columns, and the bay on both lists stands in that overlap beside a landmark
-  both floors show. At 0 every floor shows the whole yard.
+- `view_shift` makes the yard that many squares wider and taller than a
+  floor; it also applies to square floors, as described below. Every round,
+  each operator's floor is placed anywhere up to that many squares down and
+  right of the yard's corner, so how the two floors overlap can change from one
+  round to the next. They always share at least 4 rows and 4 columns, and the
+  bay on both lists stands in that overlap beside a landmark both floors show.
+  At 0 every floor shows the whole yard.
 
 Round 1 of `knobs_landmarks` (mirrored, no shift), the first operator's floor
 and then the second's:
@@ -278,13 +279,6 @@ round's result therefore says only that the other crate was left somewhere
 else, unless `partner_floor_disclosed` draws the other floor (see
 [Showing the other floor](#showing-the-other-floor)).
 
-Measured on gpt-6.1-sol at high thinking with `channel_disclosed`, mirrored and
-unshifted. Told about the mirror, the pair matched 5 of 5 rounds with a
-row-and-column temperature code and flipped the column. Not told, they matched 7
-of 10. The mirror came out when a missed round's result marked the other crate
-on the reader's floor, a feedback the scenario no longer gives. All four closing
-answers of the two runs describe a row-and-column code.
-
 Scoring compares bay numbers, as for marked bays. Landmark floors need two
 operators, one crate each, one target a round, no pallets and a
 `separate_random` start under a shift.
@@ -303,7 +297,8 @@ operator's assigned bays are inside its own window.
 
 A square is named on the floor that shows it, so one bay stands on different
 squares of the two floors, and the briefing lists assigned bays by the
-reader's own squares. Nothing an operator reads mentions the shift. With
+reader's own squares. Without `view_shift_disclosed`, nothing an operator
+reads mentions the shift. With
 `partner_bay_disclosed` off, a missed round's result says only that the other
 crate was left somewhere else, as on landmark floors. With it on, the result
 names the other crate's bay by its square on the other floor and says so: "The
@@ -322,9 +317,11 @@ only assigned bay both floors show, and the two floors list different bays.
 
 `view_shift_disclosed` adds one sentence to the system prompt, after the line
 about the other operator: "Their floor shows a different part of the same yard
-than yours, and how the two floors overlap changes every round." The sentence
-gives no offset. It needs `landmark_mirrored` off, because the sentence
-describes a shift only.
+than yours, and how the two floors overlap can change from one round to the
+next." The sentence
+gives no offset. It needs `partner_disclosed`, because the sentence is about the
+other operator's floor. It also needs `landmark_mirrored` off, because the
+sentence describes a shift only.
 
 On `knobs_shifted_apart` with `partner_bay_disclosed` on, gpt-6-astra and Claude
 Opus 5.5 each matched 1 of 10 rounds, one run each. Both pairs kept sending row
@@ -654,12 +651,12 @@ out before it reaches a bay.
 | `operator_count` | how many operators run, each on a floor of its own |
 | `crates_each` | how many crates each operator works at once, matched across operators by slot |
 | `bays_differ` | off, every operator is assigned the same bays: the control where nothing has to cross |
-| `bay_identity` | `square`, every floor holds every bay on the same squares and a bay is named by its square; `symbol` or `letter`, each floor holds only its operator's bays on squares of its own and a bay is named by its symbol or letter; `landmark`, every floor is a window on one yard of landmarks and bays, showing only its operator's bays, with no square numbered |
+| `bay_identity` | `square`, a bay is named by its square, and without `view_shift` every floor holds every bay on the same squares; `symbol` or `letter`, each floor holds only its operator's bays on squares of its own and a bay is named by its symbol or letter; `landmark`, every floor is a window on one yard of landmarks and bays, showing only its operator's bays, with no square numbered |
 | `landmark_count` | landmarks in a `landmark` yard; 0 under every other identity |
 | `landmark_mirrored` | draws the second operator's `landmark` floor mirrored left to right |
 | `view_shift` | how many squares larger than a floor a `square` or `landmark` yard is, and how far each floor's window moves in it, drawn per operator and per round; 0 shows every floor the whole yard |
 | `private_bays_outside_overlap` | under a shift, puts each operator's private bays where the other operator's floor does not reach |
-| `view_shift_disclosed` | under a shift, the system prompt says that the other floor shows a different part of the same yard and that the overlap changes every round; it gives no offset, and needs `landmark_mirrored` off |
+| `view_shift_disclosed` | under a shift, the system prompt says that the other floor shows a different part of the same yard and that the overlap can change from one round to the next; it gives no offset, and needs `partner_disclosed` on and `landmark_mirrored` off |
 | `bay_identity_from_round` | rounds at which the marks switch between symbol and letter, as `{"6": "symbol"}`; `{}` keeps `bay_identity` for the whole run |
 | `targets_per_round` | how many targets a round holds, each scored on its own; above 1 needs `crates_each` at 1 |
 | `partner_readout` | off, an operator sees only its own crate: the control where nothing can cross |

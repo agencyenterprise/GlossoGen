@@ -130,17 +130,20 @@ LETTER_FLOOR_CRATE_MARK = "@"
 class BayIdentity(str, Enum):
     """What tells the operators which bay is which, and so what has to match across floors.
 
-    ``SQUARE`` puts every bay on the same square of every floor and names it by
-    that square. ``SYMBOL`` and ``LETTER`` mark each bay with a symbol or a
-    letter, and put each operator's bays on squares of its own floor, squares no
-    other floor's bays stand on, so only the mark says which bay is which. The
-    value is also the word the prompts use for that mark.
+    ``SQUARE`` names a bay by the square it stands on. Without ``view_shift``
+    every floor holds every bay on the same square. With it, each floor shows
+    the bays in its own part of the yard, so one bay can stand on different
+    squares of two floors. ``SYMBOL`` and ``LETTER`` mark each bay with a
+    symbol or a letter, and put each operator's bays on squares of its own
+    floor, squares no other floor's bays stand on, so only the mark says which
+    bay is which. The value is also the word the prompts use for that mark.
 
-    ``LANDMARK`` puts the same landmarks and bays on both operators' floors,
-    and draws the second operator's floor mirrored left to right. A floor shows
-    only its operator's bays, each beside a landmark, and no square is numbered.
-    A bay has no name, so only where it stands among the landmarks says which
-    bay it is.
+    ``LANDMARK`` makes every floor a window on one yard of landmarks and bays.
+    A floor shows the landmarks in its window and only its operator's bays, each
+    beside a landmark, and no square is numbered. Every window shows the whole
+    yard unless ``view_shift`` moves it, and ``landmark_mirrored`` draws the
+    second operator's floor mirrored left to right. A bay has no name, so only
+    where it stands among the landmarks says which bay it is.
     """
 
     SQUARE = "square"
@@ -153,7 +156,7 @@ class BayIdentity(str, Enum):
         return self in (BayIdentity.SYMBOL, BayIdentity.LETTER)
 
     def is_landmark(self) -> bool:
-        """Whether the floors share one layout of landmarks and bays, with no square numbered."""
+        """Whether every floor is a window on one yard of landmarks, with no square numbered."""
         return self is BayIdentity.LANDMARK
 
     def crate_mark(self) -> str:

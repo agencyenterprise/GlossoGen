@@ -1,5 +1,6 @@
 """Knobs for move_a_box: the floor, the step budget, what the readout shows and how it is paced."""
 
+from math import ceil
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -15,6 +16,7 @@ from glossogen.scenarios.move_a_box.ids import (
     MAX_TARGETS_PER_ROUND,
     BayIdentity,
     CrateStart,
+    Direction,
 )
 
 MIN_BAY_COUNT = 3
@@ -24,7 +26,7 @@ MAX_LANDMARKS = 40
 """Most landmarks one landmark yard can hold."""
 
 MIN_VIEW_OVERLAP = 4
-"""Fewest rows and columns two landmark floors share however far the shift moves them."""
+"""Fewest rows and columns two shifted floors share however far the shift moves them."""
 
 
 class MoveABoxKnobs(BaseKnobs):
@@ -68,17 +70,19 @@ class MoveABoxKnobs(BaseKnobs):
 
     ``view_shift`` applies to ``square`` and ``landmark`` floors. It makes the
     yard that many squares wider and taller than a floor and draws, every round
-    and for each operator, where its floor sits in it, so the two floors overlap
-    by a different amount each round. On square floors the pallets belong to
-    the yard, so both floors show the same ones where they overlap, and each
-    floor draws every bay its window covers. A square is named on the floor that
-    shows it, so one bay stands on different squares of the two floors. Nothing
-    an operator reads mentions the shift. At 0 every floor shows the whole yard.
-    Under a shift, ``partner_bay_disclosed`` names the other crate's bay by its
-    square on the other operator's floor, and says so. ``view_shift_disclosed``
-    adds one sentence to the system prompt: the other operator's floor shows a
-    different part of the same yard, and how the two floors overlap changes every
-    round. It gives no offset, and it needs ``landmark_mirrored`` off.
+    and for each operator, where its floor sits in it, so how the two floors
+    overlap can change from one round to the next. On square floors the pallets
+    belong to the yard, so both floors show the same ones where they overlap,
+    and each floor draws every bay its window covers. A square is named on the
+    floor that shows it, so one bay stands on different squares of the two
+    floors. Without ``view_shift_disclosed``, nothing an operator reads mentions
+    the shift. At 0 every floor shows the whole yard. Under a shift,
+    ``partner_bay_disclosed`` names the other crate's bay by its square on the
+    other operator's floor, and says so. ``view_shift_disclosed`` adds one
+    sentence to the system prompt: the other operator's floor shows a different
+    part of the same yard, and how the two floors overlap can change from one
+    round to the next. It gives no offset. It needs a shift and
+    ``partner_disclosed`` on, and ``landmark_mirrored`` off.
     ``private_bays_outside_overlap`` puts each operator's private bays where the
     other operator's floor does not reach, so the shared bay is the only
     assigned bay both floors show; it needs a shift and ``bays_differ``.
@@ -318,15 +322,17 @@ class MoveABoxKnobs(BaseKnobs):
                     "landmark_count and landmark_mirrored apply only with bay_identity=landmark"
                 )
             return
-        if self.landmark_count < 1:
+        fewest_landmarks = ceil(self.bay_count / len(Direction))
+        if self.landmark_count < fewest_landmarks:
             raise ValueError(
-                "bay_identity=landmark needs landmark_count of at least 1: every bay stands "
-                "beside a landmark"
+                f"bay_identity=landmark with bay_count={self.bay_count} needs landmark_count of "
+                f"at least {fewest_landmarks}: every bay stands beside a landmark, and a landmark "
+                f"has {len(Direction)} sides"
             )
         if self.operator_count != 2:
             raise ValueError(
-                "bay_identity=landmark needs operator_count=2: the second floor is the first "
-                "one mirrored, and a third operator has no mirror of its own"
+                "bay_identity=landmark needs operator_count=2: a landmark yard is laid out for "
+                "one pair of floors, and landmark_mirrored mirrors the second one"
             )
         if self.crates_each != 1 or self.targets_per_round != 1:
             raise ValueError(
@@ -336,7 +342,7 @@ class MoveABoxKnobs(BaseKnobs):
         if self.pallet_density:
             raise ValueError(
                 "bay_identity=landmark needs pallet_density=0: the landmarks are what block "
-                "the crate, and both floors hold the same ones"
+                "the crate, and they belong to the yard that every floor is a window on"
             )
         if self.partner_bay_disclosed:
             raise ValueError(
@@ -384,7 +390,7 @@ class MoveABoxKnobs(BaseKnobs):
         if not self.view_shift:
             raise ValueError(
                 "view_shift_disclosed needs view_shift above 0: it tells the operators that "
-                "their floors overlap differently every round"
+                "how their floors overlap can change from one round to the next"
             )
         if not self.partner_disclosed:
             raise ValueError(

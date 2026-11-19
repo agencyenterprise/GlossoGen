@@ -38,11 +38,11 @@ BAY_COUNT = 6
 BAYS_ALLOWED_EACH = 3
 STEPS = 400
 AGENT_IDS = operator_ids(operator_count=2)
+"""These checks are about the two-operator geometry, so they name that roster."""
 NO_LANDMARKS = YardSetup(
     landmark_count=0, mirrored=False, view_shift=0, private_bays_outside_overlap=False
 )
 """The landmark setup of every identity but landmark."""
-"""These checks are about the two-operator geometry, so they name that roster."""
 
 
 def depots(
