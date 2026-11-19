@@ -160,12 +160,15 @@ colour. Seed 42 gives player_a `green, yellow, red, blue` and player_b
 
 Under `briefing_as_user_message` the briefing leaves the wait's result. The runner
 ends the player's cycle before its next model request, and the next cycle sends the
-wait's result followed by the briefing as a user message (`take_cycle_prompt`). Each
-round is then one cycle. A chat template that drops the reasoning of turns before the
-last user message then sends the model the current round's reasoning only, and no
-earlier round's. GLM 5.3's template does this with
+wait's result followed by the briefing as a user message (`take_cycle_prompt`). The
+first cycle holds only the startup `read_notifications` call. After it, each briefing
+opens a cycle. When a player receives two briefings in one wait, as when a round ends
+during a long model request, they open one cycle together. A chat template that drops
+the reasoning of turns before the last user message then sends the model no reasoning
+from earlier rounds. GLM 5.3's template does this with
 `chat_template_kwargs.clear_thinking` true, and Qwen3.8's with
-`chat_template_kwargs.preserve_thinking` false. Both keep all reasoning by default.
+`chat_template_kwargs.preserve_thinking` false. Both templates keep all reasoning by
+default. `modal/serve_qwen3_8.py` sets `preserve_thinking` to false for every request.
 
 Under the platform's `wait_reasoning` knob, off by default, both `read_notifications`
 forms also take a `reasoning`, one sentence on why the player waits

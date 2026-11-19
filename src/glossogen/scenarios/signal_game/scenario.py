@@ -66,6 +66,7 @@ from glossogen.scenarios.signal_game.ids import (
     PROTOCOL_CONTINUE_TEMPLATE,
     PROTOCOL_INITIAL_TEMPLATE,
     PROTOCOL_SUFFIX_TEMPLATE,
+    READ_NOTIFICATIONS_DESCRIPTION_TEMPLATE,
     RELEASE_NOTICE_TEMPLATE,
     SYSTEM_TEMPLATE,
     Direction,
@@ -96,23 +97,6 @@ END_ROUND_DESCRIPTION = (
 END_ROUND_WITH_REASONING_DESCRIPTION = (
     f"{END_ROUND_DESCRIPTION} reasoning is one sentence on why you are finishing on this "
     "square; your partner never sees it."
-)
-READ_NOTIFICATIONS_DESCRIPTION = (
-    "read_notifications() returns your round briefing at startup and after a round changes; "
-    "during a round it waits until your partner acts, then returns the board with its "
-    "actions. read_notifications(wait_for='next_round') declares you are done with this round "
-    "and waits for the next briefing. The result is a wake package: the reasons, any "
-    "briefings, the board, and a notice when the wait was cut short; type done ends the game. "
-    "Must be the only tool call in its response."
-)
-READ_NOTIFICATIONS_BRIEFING_MESSAGE_DESCRIPTION = (
-    "Each round's briefing arrives as a message right after the read_notifications() call "
-    "that waited for the round: the one at startup, or the one after a round changes. During "
-    "a round, read_notifications() waits until your partner acts, then returns the board with "
-    "its actions. read_notifications(wait_for='next_round') declares you are done with this "
-    "round and waits for the next one. The result is a wake package: the reasons, the board, "
-    "and a notice when the wait was cut short; type done ends the game. Must be the only tool "
-    "call in its response."
 )
 
 
@@ -326,9 +310,10 @@ class SignalGameScenario(SimulationScenario):
 
     def read_notifications_description(self) -> str:
         """Describe the wake package and the waits a player uses."""
-        if self._knobs.briefing_as_user_message:
-            return READ_NOTIFICATIONS_BRIEFING_MESSAGE_DESCRIPTION
-        return READ_NOTIFICATIONS_DESCRIPTION
+        return self._renderer.render(
+            template_name=READ_NOTIFICATIONS_DESCRIPTION_TEMPLATE,
+            template_variables={"briefing_as_user_message": self._knobs.briefing_as_user_message},
+        )
 
     def default_any_wait_timeout_s(self) -> float | None:
         """A plain wait ends only when something arrives: only the players change the board."""

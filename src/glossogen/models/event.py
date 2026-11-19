@@ -327,8 +327,9 @@ class CyclePromptSent(EventBase):
     The scenario handed ``prompt`` over through ``take_cycle_prompt``. The agent's
     previous cycle ended before its next model request, and the new cycle sends
     that request's tool results followed by ``prompt`` as a user message, in one
-    request. History rebuilds add the prompt to the request after the agent's last
-    response logged before this event.
+    request. History rebuilds add the prompt after the agent's last response that
+    began before this event, by timestamp: the log can hold this event before that
+    response's ``LLMResponseReceived``, which is written from a background task.
     """
 
     event_type: Literal["cycle_prompt_sent"] = "cycle_prompt_sent"

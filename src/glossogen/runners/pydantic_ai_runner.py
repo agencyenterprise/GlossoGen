@@ -61,6 +61,7 @@ from glossogen.models.event import (
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.run_replay.message_history_builder import with_user_prompt
 from glossogen.runners.agent_run_retry import agent_run_retry
 from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.closing_prompt import answer_closing_prompt
@@ -323,6 +324,27 @@ class _RunCheckpoint:
         self.prompt = None
 
 
+def _restart_checkpoint(
+    history: list[ModelMessage] | None,
+    opening_prompt: str | None,
+    initial: str,
+    continuation: str,
+) -> _RunCheckpoint:
+    """Where a cycle starts after the previous one failed every retry.
+
+    The last completed cycle's history with the continuation prompt, or the
+    initial prompt when no cycle has completed yet. ``opening_prompt`` is the
+    scenario's cycle prompt that opened the failed cycle, or None. It stays in the
+    history as a message the agent received, and is not sent again as the latest
+    prompt, because the run may have moved on while the cycle failed.
+    """
+    if history is None:
+        return _RunCheckpoint(messages=None, prompt=initial)
+    if opening_prompt is not None:
+        history = with_user_prompt(messages=history, prompt=opening_prompt)
+    return _RunCheckpoint(messages=history, prompt=continuation)
+
+
 class _CycleEnd(NamedTuple):
     """The agent's history at the end of a cycle, and the scenario's prompt for the next one.
 
@@ -563,6 +585,8 @@ class PydanticAIRunner(AgentRunner):
             total_turns = 0
             cumulative_cost = 0.0
             last_completed_history = message_history
+            # The scenario's cycle prompt that opens the current cycle, or None.
+            opening_prompt: str | None = None
             if message_history is not None:
                 checkpoint = _RunCheckpoint(
                     messages=message_history, prompt=runner_prompts.continuation
@@ -641,8 +665,6 @@ class PydanticAIRunner(AgentRunner):
                         usage=None,
                     )
 
-                # The checkpoint advances during the cycle; a failed cycle restarts here.
-                cycle_start = _RunCheckpoint(messages=checkpoint.messages, prompt=checkpoint.prompt)
                 cycle_succeeded = False
                 cycle_end: _CycleEnd | None = None
                 try:
@@ -695,14 +717,21 @@ class PydanticAIRunner(AgentRunner):
 
                 if not cycle_succeeded or cycle_end is None:
                     # Every retry resumed at the failed request and still failed,
-                    # so re-sending it would fail the same way. Restart the cycle
-                    # from where it started: the last completed cycle's history and
-                    # the prompt this cycle opened with.
-                    checkpoint = cycle_start
+                    # so re-sending it would fail the same way. Restart from the
+                    # last completed cycle, as a fresh cycle.
+                    checkpoint = _restart_checkpoint(
+                        history=last_completed_history,
+                        opening_prompt=opening_prompt,
+                        initial=runner_prompts.initial,
+                        continuation=runner_prompts.continuation,
+                    )
+                    last_completed_history = checkpoint.messages
+                    opening_prompt = None
                     total_turns += 1
                     continue
 
                 last_completed_history = cycle_end.messages
+                opening_prompt = cycle_end.next_prompt
                 next_prompt = runner_prompts.continuation
                 if cycle_end.next_prompt is not None:
                     next_prompt = cycle_end.next_prompt

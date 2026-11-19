@@ -44,7 +44,7 @@ in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 | `session_id` | the run id, `<scenario>/<run_dir_name>` |
 | `agent` | the agent's `agent_registered` event: role and model, [tool definitions](#tool-definitions); `agent_id`, provider, channels and the agent's `model_settings` (output cap, thinking level) under `extra` |
 | `system` step | the registered system prompt, then each context compaction summary |
-| `user` step | the prompt the runner opens each agent cycle with: the initial prompt on a fresh agent, the continue prompt after that |
+| `user` step | the prompt the runner opens each agent cycle with: the initial prompt on a fresh agent, then the continue prompt, or a prompt that the scenario supplied (`cycle_prompt_sent`) |
 | `agent` step | each LLM response: text, `reasoning_content`, `tool_calls` |
 | `observation` | the tool results, matched to their call by `tool_call_id` |
 | root `extra` | scenario name, `scenario_config`, cutoff round, generation |
@@ -52,7 +52,8 @@ in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 Scenario injections, world events and the other agents' channel messages are not
 steps of their own. The model receives them as the results of its
 `read_notifications` and `read_channel` calls, and that is where a trajectory
-holds them. Round verdicts and postmortem phases are not part of any trajectory;
+holds them. A scenario that sends an injection as a cycle prompt instead, such as
+signal_game under `briefing_as_user_message`, gives it a `user` step. Round verdicts and postmortem phases are not part of any trajectory;
 read the event log or the [CSV tables](exporting-runs.md) for those.
 
 An agent step from the run above, with the tool result cut short:

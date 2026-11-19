@@ -233,6 +233,22 @@ def _response_in_filtered_window(
     return llm_resp.round_number < filter_below_round
 
 
+def _at_or_past_cutoff(
+    round_number: int,
+    timestamp: datetime,
+    cutoff_round: int | None,
+    target_timestamp: datetime,
+) -> bool:
+    """Return True when an event of ``round_number`` at ``timestamp`` falls at or past the cutoff.
+
+    By round when ``cutoff_round`` is set (the round itself is excluded), otherwise
+    by timestamp (later than ``target_timestamp`` is excluded).
+    """
+    if cutoff_round is not None:
+        return round_number >= cutoff_round
+    return timestamp > target_timestamp
+
+
 def _tool_call_at_or_past_cutoff(
     call_id: str,
     invoked_by_id: dict[str, ToolCallInvoked],
@@ -251,9 +267,12 @@ def _tool_call_at_or_past_cutoff(
     invoked = invoked_by_id.get(call_id)
     if invoked is None:
         return True
-    if cutoff_round is not None:
-        return invoked.round_number >= cutoff_round
-    return invoked.timestamp > target_timestamp
+    return _at_or_past_cutoff(
+        round_number=invoked.round_number,
+        timestamp=invoked.timestamp,
+        cutoff_round=cutoff_round,
+        target_timestamp=target_timestamp,
+    )
 
 
 def _drop_call_without_result(
@@ -440,25 +459,38 @@ def _build_orphan_cycle(
     )
 
 
-def _cycle_prompts_before_cutoff(
+def _kept_cycle_prompts(
     events: Sequence[SimulationEvent],
     agent_id: str,
     cutoff_round: int | None,
     target_timestamp: datetime,
+    nonchannel_round_floor: int | None,
+    filter_below_round: int | None,
 ) -> list[CyclePromptSent]:
-    """The scenario prompts that opened ``agent_id``'s cycles before the cutoff, in log order.
+    """The scenario prompts that opened ``agent_id``'s cycles and stay in the history, in log order.
 
-    The cutoff applies as it does to a response: by round when ``cutoff_round``
-    is set, otherwise by timestamp.
+    A prompt at or past the cutoff is dropped, as a response is. A prompt from a
+    round below ``nonchannel_round_floor`` is dropped as a non-channel tool call
+    is, inside the window that ``filter_below_round`` bounds, so a history window
+    keeps no briefing from the rounds it hides.
     """
     prompts: list[CyclePromptSent] = []
     for event in events:
         if not isinstance(event, CyclePromptSent) or event.agent_id != agent_id:
             continue
-        if cutoff_round is not None:
-            if event.round_number >= cutoff_round:
-                continue
-        elif event.timestamp > target_timestamp:
+        if _at_or_past_cutoff(
+            round_number=event.round_number,
+            timestamp=event.timestamp,
+            cutoff_round=cutoff_round,
+            target_timestamp=target_timestamp,
+        ):
+            continue
+        in_window = filter_below_round is None or event.round_number < filter_below_round
+        if (
+            in_window
+            and nonchannel_round_floor is not None
+            and event.round_number < nonchannel_round_floor
+        ):
             continue
         prompts.append(event)
     return prompts
@@ -490,7 +522,7 @@ def _assemble_messages(
     pending_prompts = list(cycle_prompts)
     for index, cycle in enumerate(kept_cycles):
         while pending_prompts and pending_prompts[0].timestamp < cycle.response_timestamp:
-            _append_user_prompt(messages=messages, prompt=pending_prompts.pop(0).prompt)
+            messages = with_user_prompt(messages=messages, prompt=pending_prompts.pop(0).prompt)
         messages.extend(
             _cycle_to_messages(
                 cycle=cycle,
@@ -507,17 +539,20 @@ def _assemble_messages(
                 ModelRequest(parts=[UserPromptPart(content=runner_prompts.continuation)])
             )
     for pending in pending_prompts:
-        _append_user_prompt(messages=messages, prompt=pending.prompt)
+        messages = with_user_prompt(messages=messages, prompt=pending.prompt)
     return messages
 
 
-def _append_user_prompt(messages: list[ModelMessage], prompt: str) -> None:
-    """Add ``prompt`` to the trailing request, or as a new request after a response."""
+def with_user_prompt(messages: list[ModelMessage], prompt: str) -> list[ModelMessage]:
+    """``messages`` with ``prompt`` added as a user message, as pydantic-ai adds a new prompt.
+
+    The prompt joins a trailing request, such as the one that holds pending tool
+    results, and follows a trailing response as a request of its own.
+    """
     last = messages[-1]
     if isinstance(last, ModelRequest):
-        messages[-1] = ModelRequest(parts=[*last.parts, UserPromptPart(content=prompt)])
-        return
-    messages.append(ModelRequest(parts=[UserPromptPart(content=prompt)]))
+        return [*messages[:-1], ModelRequest(parts=[*last.parts, UserPromptPart(content=prompt)])]
+    return [*messages, ModelRequest(parts=[UserPromptPart(content=prompt)])]
 
 
 def _llm_response_at_or_past_cutoff(
@@ -526,9 +561,12 @@ def _llm_response_at_or_past_cutoff(
     target_timestamp: datetime,
 ) -> bool:
     """Return True when the parent LLM response itself falls at or past the cutoff."""
-    if cutoff_round is not None:
-        return llm_resp.round_number >= cutoff_round
-    return llm_resp.timestamp > target_timestamp
+    return _at_or_past_cutoff(
+        round_number=llm_resp.round_number,
+        timestamp=llm_resp.timestamp,
+        cutoff_round=cutoff_round,
+        target_timestamp=target_timestamp,
+    )
 
 
 def _cycle_to_messages(
@@ -627,10 +665,12 @@ def _compactions_by_following_response(
         if getattr(event, "agent_id", None) != agent_id:
             continue
         if isinstance(event, ContextCompacted):
-            if cutoff_round is not None:
-                if event.round_number >= cutoff_round:
-                    continue
-            elif event.timestamp > target_timestamp:
+            if _at_or_past_cutoff(
+                round_number=event.round_number,
+                timestamp=event.timestamp,
+                cutoff_round=cutoff_round,
+                target_timestamp=target_timestamp,
+            ):
                 continue
             part = _recorded_compaction_part(event=event)
             if part is not None:
@@ -708,7 +748,8 @@ def build_message_history(
     ``None`` to apply the filters to the whole history.
 
     A ``CyclePromptSent`` becomes a user prompt between the cycles it
-    separated in the live run.
+    separated in the live run. The round floor and ``filter_below_round``
+    drop it as they drop a non-channel tool call of its round.
 
     When ``split_parallel_tool_calls`` is True, any reconstructed turn
     holding more than one tool call is serialized into one single-call
@@ -900,11 +941,13 @@ def build_message_history(
         system_prompt=system_prompt,
         runner_prompts=runner_prompts,
         kept_cycles=kept_cycles,
-        cycle_prompts=_cycle_prompts_before_cutoff(
+        cycle_prompts=_kept_cycle_prompts(
             events=events,
             agent_id=agent_id,
             cutoff_round=cutoff_round,
             target_timestamp=target_timestamp,
+            nonchannel_round_floor=nonchannel_round_floor,
+            filter_below_round=filter_below_round,
         ),
         split_parallel_tool_calls=split_parallel_tool_calls,
     )
