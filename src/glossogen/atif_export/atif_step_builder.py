@@ -30,6 +30,7 @@ class RunnerPromptKind(str, Enum):
 
     INITIAL = "initial_prompt"
     CONTINUE = "continue_prompt"
+    CYCLE = "cycle_prompt"
 
 
 def copied_flag(copied: bool) -> bool | None:

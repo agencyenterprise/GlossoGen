@@ -98,7 +98,7 @@ The runtime owns the runner interface and `runners/` implements it. `AgentRunner
 - A configurable `max_turns` limit (default: 200)
 - An initial prompt instructing the agent to start by checking for messages
 
-The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first, with tool calls switched off, then exits. The supervisor creates one runner per agent through the factory.
+The runner uses `agent.run()` with an `event_stream_handler` to stream token deltas and message previews to the EventBus. It re-prompts the agent via `message_history` after each cycle and stops when a done notification arrives via `read_notifications`. Before each model request it asks the scenario's `take_cycle_prompt`; a prompt ends the cycle there, and the next cycle sends the pending tool results and the prompt as a user message. A cycle that fails every retry restarts from the last completed cycle with the continuation prompt. A cycle prompt that opened the failed cycle stays in the history as a message the agent received. When the run completed and the agent's runner prompts set `closing`, it sends that closing prompt first, with tool calls switched off, then exits. The supervisor creates one runner per agent through the factory.
 
 An agent on an open-weight provider, one whose `PROVIDER_SPECS` row has `weights=WeightClass.OPEN`, also gets `OpenModelAntiCorruptionLayer`. It is a pydantic-ai capability that drops the top-level arguments a tool's schema does not declare, before the call is validated. The tools keep their strict schemas, and agents on other providers reach them unchanged. Each drop is logged as a warning with the call's id, and the event log keeps the call as the model sent it.
 
@@ -316,6 +316,7 @@ A run is read back with the platform's event types plus those its scenario decla
 - `injection_delivered` — agent ID, round number, injection text
 - `message_sent` — full SimulationMessage (channel, sender, content, timestamp)
 - `llm_response_received` — agent ID, text (includes thinking blocks), tool calls, stop reason, token usage
+- `cycle_prompt_sent` — agent ID and the prompt a scenario's `take_cycle_prompt` opened the agent's next cycle with. History rebuilds place it as a user prompt between the cycles
 - `closing_prompt_answered` — agent ID, model, the scenario's closing prompt, the agent's text answer, token usage. Logged after the agent's last turn, for scenarios whose runner prompts set `closing`
 - `closing_prompt_failed` — the same exchange when no answer came back: error type and message, token usage
 - `simulation_ended` — reason (RunStatus enum), total_messages

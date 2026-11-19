@@ -34,6 +34,7 @@ from glossogen.models.event import (
     AgentSwappedMidRun,
     CaseInjectedMidRun,
     ChannelCreated,
+    CyclePromptSent,
     InjectionDelivered,
     MessageSent,
     PostmortemDisabledMidRun,
@@ -114,6 +115,22 @@ _PASS_THROUGH_FILTER = AgentHistoryFilter(
 )
 
 
+def _injection_was_read(
+    injection: InjectionDelivered,
+    notification_results: dict[tuple[str, int], list[str]],
+    cycle_prompts: dict[str, list[CyclePromptSent]],
+) -> bool:
+    """Whether the agent received ``injection``: in a ``read_notifications`` result of
+    its round, or in a cycle prompt sent in its round or later."""
+    results = notification_results.get((injection.agent_id, injection.round_number), [])
+    if any(_result_contains_text(result=result, text=injection.text) for result in results):
+        return True
+    return any(
+        prompt.round_number >= injection.round_number and injection.text in prompt.prompt
+        for prompt in cycle_prompts.get(injection.agent_id, [])
+    )
+
+
 def _result_contains_text(result: str, text: str) -> bool:
     """Return whether a JSON tool result contains ``text`` as a complete value."""
     try:
@@ -173,8 +190,9 @@ class RewindState(NamedTuple):
     repeat the first one or skip the second one.
 
     ``injected_rounds`` records the latest round briefing that appeared in each
-    agent's completed ``read_notifications`` result. A delivery event without a
-    matching result is omitted so a crash cannot discard an unread briefing.
+    agent's completed ``read_notifications`` result, or in a cycle prompt sent to
+    the agent. A delivery event that reached neither is omitted so a crash cannot
+    discard an unread briefing.
     """
 
     round_number: int
@@ -274,6 +292,7 @@ def _build_rewind_state_at_timestamp(
     injected_rounds: dict[str, int] = {}
     delivered_injections: list[InjectionDelivered] = []
     notification_results: dict[tuple[str, int], list[str]] = {}
+    cycle_prompts: dict[str, list[CyclePromptSent]] = {}
     scenario_name = ""
     scenario_config: dict[str, Any] = {}
     agent_registrations: list[AgentRegistered] = []
@@ -314,6 +333,9 @@ def _build_rewind_state_at_timestamp(
         elif isinstance(event, InjectionDelivered):
             delivered_injections.append(event)
 
+        elif isinstance(event, CyclePromptSent):
+            cycle_prompts.setdefault(event.agent_id, []).append(event)
+
         elif (
             isinstance(event, ToolResultReceived)
             and event.tool_name == READ_NOTIFICATIONS_TOOL_NAME
@@ -340,11 +362,11 @@ def _build_rewind_state_at_timestamp(
             running_channel_counts[channel_id] = running_channel_counts.get(channel_id, 0) + 1
 
     for injection in delivered_injections:
-        results = notification_results.get(
-            (injection.agent_id, injection.round_number),
-            [],
-        )
-        if any(_result_contains_text(result=result, text=injection.text) for result in results):
+        if _injection_was_read(
+            injection=injection,
+            notification_results=notification_results,
+            cycle_prompts=cycle_prompts,
+        ):
             current = injected_rounds.get(injection.agent_id, 0)
             if injection.round_number > current:
                 injected_rounds[injection.agent_id] = injection.round_number

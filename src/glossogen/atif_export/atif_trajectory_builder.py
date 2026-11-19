@@ -44,6 +44,7 @@ from glossogen.models.event import (
     AgentRunCycleFailed,
     AgentSwappedMidRun,
     ContextCompacted,
+    CyclePromptSent,
     LLMResponseReceived,
     SimulationEvent,
     ToolCallInvoked,
@@ -228,6 +229,8 @@ def _build_steps(context: AtifRunContext, generation: _Generation) -> _BuiltStep
 
     Injections and world events are not steps of their own: they reach the model
     as the result of its ``read_notifications`` calls, where they already appear.
+    A scenario's cycle prompt is a user step of its own, and opens the cycle in
+    place of the continuation prompt.
     A cycle's responses are counted so the step that closes it, the one carrying
     the cycle's usage, says how many LLM calls its metrics cover.
     """
@@ -260,6 +263,16 @@ def _build_steps(context: AtifRunContext, generation: _Generation) -> _BuiltStep
             next_prompt = RunnerPromptKind.CONTINUE
         elif isinstance(event, ContextCompacted):
             steps.append(build_compaction_step(step_id=len(steps) + 1, event=event, copied=copied))
+        elif isinstance(event, CyclePromptSent):
+            steps.append(
+                build_runner_prompt_step(
+                    step_id=len(steps) + 1,
+                    prompt=event.prompt,
+                    kind=RunnerPromptKind.CYCLE,
+                    copied=copied,
+                )
+            )
+            next_prompt = None
         elif isinstance(event, AgentRunCycleFailed):
             failed_cycles.append(event)
             next_prompt = RunnerPromptKind.CONTINUE

@@ -36,6 +36,7 @@ RELEASE_NOTICE_TEMPLATE = "release_notice.jinja"
 PROTOCOL_SUFFIX_TEMPLATE = "protocol_suffix.jinja"
 PROTOCOL_INITIAL_TEMPLATE = "protocol_initial.jinja"
 PROTOCOL_CONTINUE_TEMPLATE = "protocol_continue.jinja"
+READ_NOTIFICATIONS_DESCRIPTION_TEMPLATE = "read_notifications_description.jinja"
 
 
 class Direction(str, Enum):

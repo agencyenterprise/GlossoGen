@@ -687,6 +687,18 @@ class ScenarioBase(ABC):
         """The runner is about to issue a model request for ``agent_id``. Default: nothing."""
         _ = agent_id
 
+    def take_cycle_prompt(self, agent_id: str) -> str | None:
+        """A user prompt that opens a new cycle for ``agent_id``, or None to go on with this one.
+
+        The runner asks before each of the agent's model requests. Given a prompt,
+        it ends the cycle there, without sending the request, and opens the next
+        cycle with the request's tool results followed by the prompt as a user
+        message. The runner logs ``CyclePromptSent``, so history rebuilds place
+        the prompt where the agent saw it. Return each prompt once. Default: None.
+        """
+        _ = agent_id
+        return None
+
     async def gate_model_response(
         self,
         agent_id: str,

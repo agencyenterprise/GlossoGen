@@ -7,19 +7,13 @@ A request that fails every retry is not re-sent: the next cycle restarts from th
 last completed one.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart
-from pydantic_ai.models.function import (
-    AgentInfo,
-    BuiltinToolCallsReturns,
-    DeltaThinkingCalls,
-    DeltaToolCalls,
-    FunctionModel,
-)
+from pydantic_ai.models.function import FunctionModel
 
 from glossogen.models.event import AgentRunCycleFailed, LLMResponseReceived
 from glossogen.models.event_base import TokenUsage
@@ -34,46 +28,11 @@ from glossogen.testing.smoke_scenario import (
     SmokeKnobs,
     SmokeScenario,
 )
+from tests.fakes.flaky_model import BUILD_SCRIPTED_MODEL, FlakyModelRecorder, no_retry_pause
 
 FAILING_REQUEST_NUMBER = 2
 EXHAUSTED_REQUEST_NUMBERS = frozenset({2, 3, 4})
 RECORD_TURN = ToolTurn(tool_name=RECORD_TOOL_NAME, args={"finding": "retry probe"})
-# Captured at import, so a test that runs the harness twice wraps the harness's own
-# builder both times rather than wrapping its first wrapper.
-BUILD_SCRIPTED_MODEL = simulation_harness.build_scripted_model
-
-
-async def no_retry_pause(_seconds: float) -> None:
-    """Stand in for tenacity's sleep: the retry pause is wall-clock time a test does not spend."""
-    return None
-
-
-class ProviderUnavailable(RuntimeError):
-    """The error the flaky model raises once."""
-
-
-class FlakyModelRecorder:
-    """Wraps a scripted model so the requests numbered in ``failing`` fail, and records all."""
-
-    def __init__(self, scripted: FunctionModel, failing: frozenset[int]) -> None:
-        self._scripted = scripted
-        self._failing = failing
-        self.requests: list[list[ModelMessage]] = []
-
-    def model(self) -> FunctionModel:
-        """Return the wrapping model."""
-
-        async def stream(
-            messages: list[ModelMessage], info: AgentInfo
-        ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
-            self.requests.append(list(messages))
-            if len(self.requests) in self._failing:
-                raise ProviderUnavailable("provider unavailable")
-            assert self._scripted.stream_function is not None
-            async for chunk in self._scripted.stream_function(messages, info):
-                yield chunk
-
-        return FunctionModel(stream_function=stream)
 
 
 def tool_returns_named(messages: Sequence[ModelMessage], tool_name: str) -> list[ToolReturnPart]:

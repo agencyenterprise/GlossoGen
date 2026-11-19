@@ -525,6 +525,13 @@ agent's system prompt (`system_suffix`), the user prompt that opens its first cy
 from your own `prompts/` templates. The registration records a replacement, so
 fork, resume, probes and exports render what the run used.
 
+To send an agent a user prompt in the middle of the run, return it from
+`take_cycle_prompt(agent_id)`. The runner asks before each model request. A prompt
+ends the agent's cycle there, without sending the request, and the next cycle sends
+that request's tool results followed by the prompt as a user message. The run logs
+`cycle_prompt_sent`, so history rebuilds place the prompt where the agent saw it.
+Return each prompt once; the default returns None.
+
 `closing` is optional, and `None` sends nothing. Set, it is one more user prompt
 the runner sends each agent once the run has completed, after its last turn and in
 the conversation it played in. The agent may call no tool in reply, so it answers in

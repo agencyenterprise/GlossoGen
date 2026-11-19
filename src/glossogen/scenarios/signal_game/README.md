@@ -158,6 +158,18 @@ colour. Seed 42 gives player_a `green, yellow, red, blue` and player_b
 | `read_notifications()` | At startup and after a round changes, the briefing. Mid-round, waits until the partner acts and returns the board |
 | `read_notifications(wait_for="next_round")` | After `end_round`, waits for the next briefing |
 
+Under `briefing_as_user_message` the briefing leaves the wait's result. The runner
+ends the player's cycle before its next model request, and the next cycle sends the
+wait's result followed by the briefing as a user message (`take_cycle_prompt`). The
+first cycle holds only the startup `read_notifications` call. After it, each briefing
+opens a cycle. When a player receives two briefings in one wait, as when a round ends
+during a long model request, they open one cycle together. A chat template that drops
+the reasoning of turns before the last user message then sends the model no reasoning
+from earlier rounds. GLM 5.3's template does this with
+`chat_template_kwargs.clear_thinking` true, and Qwen3.8's with
+`chat_template_kwargs.preserve_thinking` false. Both templates keep all reasoning by
+default. `modal/serve_qwen3_8.py` sets `preserve_thinking` to false for every request.
+
 Under the platform's `wait_reasoning` knob, off by default, both `read_notifications`
 forms also take a `reasoning`, one sentence on why the player waits
 ([Reasoning on waits](../../../../docs/running-simulations.md#reasoning-on-waits)).
@@ -170,6 +182,7 @@ refuses any message.
 
 A resumed `read_notifications` returns a JSON wake package: `type` (`done` once the
 game is over), `round`, `wake_reasons`, `briefings`, `board` and `notice`.
+`briefings` is empty under `briefing_as_user_message`.
 
 ### Waiting
 
@@ -210,10 +223,12 @@ the other platform knobs. The scenario adds:
 | `max_moves_per_call` | Steps one `move` call takes, at most 1000 | 10 |
 | `partner_colours_visible` | Show each player the partner's colours (or coloured shapes) too | `false` |
 | `move_reasoning` | `move` and `end_round` take a `reasoning`: one sentence, logged and never shown to the partner. Off, `move` takes only `directions` and `end_round` nothing | `true` |
+| `briefing_as_user_message` | Each round's briefing reaches the player as a user message that opens a new cycle, after the `read_notifications` call that waited for the round, instead of inside that call's result | `false` |
 | `seed` | The grids and start squares | 42 |
 
-A config recorded before `shape_count`, `fill_count`, `word_count` and
-`max_moves_per_call` existed reads as 0, 0, 0 and 10, the game it played, so its runs still fork and resume. A grid can
+A config recorded before `shape_count`, `fill_count`, `word_count`,
+`max_moves_per_call` and `briefing_as_user_message` existed reads as 0, 0, 0, 10 and
+`false`, the game it played, so its runs still fork and resume. A grid can
 hold fewer squares than there are items; every round still shares at least one item.
 
 `knobs_default` also sets `round_count` 10 and `max_round_duration_seconds` 600. The
