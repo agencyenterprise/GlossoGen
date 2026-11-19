@@ -6,11 +6,16 @@ which is the recoverable half of a blank cell: a knob a scenario never declared
 and a knob it declared as null both render empty, and only the legend says which
 columns were sparse.
 
-It covers the structural columns of each table it wrote, not only the ones a
-caller could pick. Those carry no coverage count, since they are emitted on every
-row of their table by construction, but they do carry the units: nothing else in
-the export says that `character_entropy_bits` is bits per character or that
-`repetition_factor` counts encodings per information unit.
+It covers every metric column the tables carry: the score, the `metric_rounds`
+denominator, and with summaries on, the unit, summary and note text. The text
+columns carry no coverage count, since they describe a measurement rather than
+make one.
+
+It also covers the structural columns of each table it wrote, not only the ones
+a caller could pick. Those carry no coverage count, since they are emitted on
+every row of their table by construction, but they do carry the units: nothing
+else in the export says that `character_entropy_bits` is bits per character or
+that `repetition_factor` counts encodings per information unit.
 
 A single-frame export is the bare CSV, so a double-click opens it. It has no
 legend, which is the tradeoff a caller accepts by asking for one table.
@@ -26,12 +31,20 @@ from glossogen.run_export.agent_level_frame import AGENT_COLUMNS, build_agent_le
 from glossogen.run_export.csv_frame import CsvFrame
 from glossogen.run_export.csv_frame_writer import write_frame
 from glossogen.run_export.export_column_catalog import build_export_preview
+from glossogen.run_export.export_preview_models import ExportMetricColumn
 from glossogen.run_export.export_request_models import CsvExportRequest, ExportFrame
 from glossogen.run_export.export_run_record import ExportRunRecord
 from glossogen.run_export.message_level_frame import (
     MESSAGE_COLUMN_UNITS,
     MESSAGE_COLUMNS,
     build_message_level_frame,
+)
+from glossogen.run_export.metric_column_projection import (
+    METRIC_COLUMN_PREFIX,
+    METRIC_NOTE_COLUMN_PREFIX,
+    METRIC_ROUNDS_COLUMN_PREFIX,
+    METRIC_SUMMARY_COLUMN_PREFIX,
+    METRIC_UNIT_COLUMN_PREFIX,
 )
 from glossogen.run_export.round_context_frame import build_round_context_frame
 from glossogen.run_export.round_level_frame import ROUND_NUMBER_COLUMN, build_round_level_frame
@@ -129,11 +142,50 @@ def _structural_rows(request: CsvExportRequest) -> list[list[str]]:
     return rows
 
 
+_METRIC_FRAMES = {ExportFrame.RUN_LEVEL, ExportFrame.ROUND_LEVEL, ExportFrame.AGENT_LEVEL}
+_NOTE_FRAMES = {ExportFrame.ROUND_LEVEL, ExportFrame.AGENT_LEVEL}
+
+
+def _metric_rows(
+    name: str,
+    metric: ExportMetricColumn | None,
+    request: CsvExportRequest,
+    run_count: int,
+) -> list[list[str]]:
+    """Describe the columns one requested metric adds to the tables ``request`` wrote.
+
+    ``metric`` is ``None`` when no selected run reported the metric. The tables still
+    carry its columns, all blank, so the legend names them with a coverage of ``0``.
+    ``metric_rounds`` is filled exactly where the score is, so it shares the score's
+    coverage. The unit, summary and note columns leave coverage empty.
+    """
+    score_unit = ""
+    coverage = "0"
+    if metric is not None:
+        score_unit = metric.score_unit
+        coverage = str(metric.runs_with_value)
+    frames = set(request.frames)
+    total = str(run_count)
+    rows: list[list[str]] = []
+    if frames & _METRIC_FRAMES:
+        rows.append([f"{METRIC_COLUMN_PREFIX}{name}", "metric", score_unit, coverage, total])
+    if ExportFrame.RUN_LEVEL in frames:
+        rows.append([f"{METRIC_ROUNDS_COLUMN_PREFIX}{name}", "metric", "rounds", coverage, total])
+    if not request.include_metric_summaries:
+        return rows
+    if ExportFrame.RUN_LEVEL in frames:
+        rows.append([f"{METRIC_UNIT_COLUMN_PREFIX}{name}", "metric", "", "", ""])
+        rows.append([f"{METRIC_SUMMARY_COLUMN_PREFIX}{name}", "metric", "", "", ""])
+    if frames & _NOTE_FRAMES:
+        rows.append([f"{METRIC_NOTE_COLUMN_PREFIX}{name}", "metric", "", "", ""])
+    return rows
+
+
 def build_legend_frame(records: list[ExportRunRecord], request: CsvExportRequest) -> CsvFrame:
     """Build the legend naming each column the export wrote, its family, and its coverage."""
     preview = build_export_preview(records=records, missing_run_ids=[], raw_bytes_estimate=None)
     requested_columns = set(request.columns)
-    requested_metrics = set(request.metrics)
+    reported_metrics = {metric.metric_name: metric for metric in preview.metrics}
 
     rows: list[list[str]] = []
     for column in preview.columns:
@@ -142,17 +194,14 @@ def build_legend_frame(records: list[ExportRunRecord], request: CsvExportRequest
         rows.append(
             [column.key, column.group, "", str(column.runs_with_value), str(preview.run_count)]
         )
-    for metric in preview.metrics:
-        if metric.metric_name not in requested_metrics:
-            continue
-        rows.append(
-            [
-                f"metric.{metric.metric_name}",
-                "metric",
-                metric.score_unit,
-                str(metric.runs_with_value),
-                str(preview.run_count),
-            ]
+    for name in dict.fromkeys(request.metrics):
+        rows.extend(
+            _metric_rows(
+                name=name,
+                metric=reported_metrics.get(name),
+                request=request,
+                run_count=preview.run_count,
+            )
         )
 
     rows.extend(_structural_rows(request=request))

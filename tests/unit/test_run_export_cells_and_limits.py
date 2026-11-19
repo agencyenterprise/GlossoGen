@@ -38,9 +38,11 @@ from glossogen.run_storage.archive_member_filter import (
 )
 from glossogen.run_storage.run_summary_models import (
     AgentModelSummary,
+    CrossRunReplaceAgentSource,
     ForkAtRoundSource,
     ForkSource,
     PlayedModel,
+    ReplaceAgentSource,
     RunSummary,
 )
 
@@ -296,6 +298,58 @@ def test_a_forked_at_round_run_is_named_as_such() -> None:
     assert cells["lineage.after_round"] == "15"
 
 
+def test_a_replace_agent_run_names_the_seat_and_the_model_that_took_it() -> None:
+    """A swap experiment groups by which agent was replaced and by what."""
+    summary = make_summary(
+        run_id="veyru/4",
+        scenario_name="veyru",
+        labels=[],
+        status=RunStatus.SCENARIO_COMPLETE,
+    )
+    summary.replace_agent_source = ReplaceAgentSource(
+        source_run_id="veyru/1",
+        after_round=5,
+        target_event_id="e-7",
+        replaced_agent_id="field_observer",
+        replacement_model="claude-haiku-4-5",
+        replacement_provider="anthropic",
+        replaced_at=datetime(2026, 5, 4, tzinfo=UTC),
+    )
+    cells = lineage_cells(summary=summary)
+
+    assert cells["derivation_type"] == "replace_agent"
+    assert cells["lineage.replaced_agent_id"] == "field_observer"
+    assert cells["lineage.replacement_model"] == "claude-haiku-4-5"
+
+
+def test_a_cross_run_replace_agent_run_names_both_sources() -> None:
+    """The imported agent came from another run, and the CSV has to say which."""
+    summary = make_summary(
+        run_id="veyru/5",
+        scenario_name="veyru",
+        labels=[],
+        status=RunStatus.SCENARIO_COMPLETE,
+    )
+    summary.cross_run_replace_agent_source = CrossRunReplaceAgentSource(
+        source_a_run_id="veyru/1",
+        source_b_run_id="veyru/2",
+        after_round=5,
+        source_b_round_end=8,
+        target_event_id="e-7",
+        replaced_agent_id="field_observer",
+        imported_model="gpt-5",
+        imported_provider="openai",
+        replaced_at=datetime(2026, 5, 4, tzinfo=UTC),
+    )
+    cells = lineage_cells(summary=summary)
+
+    assert cells["derivation_type"] == "cross_run_replace_agent"
+    assert cells["lineage.source_a_run_id"] == "veyru/1"
+    assert cells["lineage.source_b_run_id"] == "veyru/2"
+    assert cells["lineage.source_b_round_end"] == "8"
+    assert "lineage.source_run_id" not in cells
+
+
 # --- the filter branch of selection ---------------------------------------------
 
 
@@ -379,6 +433,41 @@ def test_status_narrows_to_one_state() -> None:
 def test_filters_compose_as_an_intersection() -> None:
     """Adding a filter narrows; it never grows the result."""
     assert matched(filter_selection(["veyru"], ["baseline_oss"], "1", None)) == ["veyru/1"]
+
+
+def test_contains_agent_id_keeps_only_runs_that_registered_that_agent() -> None:
+    """A cohort of runs sharing a seat is selected by the roster, not by a label."""
+    with_observer = make_summary(
+        run_id="veyru/1",
+        scenario_name="veyru",
+        labels=[],
+        status=RunStatus.SCENARIO_COMPLETE,
+    )
+    with_observer.agent_models = [
+        agent(agent_id="field_observer", role_name="Field Observer", model="claude-sonnet-4-6")
+    ]
+    without_observer = make_summary(
+        run_id="veyru/2",
+        scenario_name="veyru",
+        labels=[],
+        status=RunStatus.SCENARIO_COMPLETE,
+    )
+    without_observer.agent_models = [
+        agent(agent_id="scout", role_name="Scout", model="claude-sonnet-4-6")
+    ]
+    resolved = resolve_selection(
+        candidates=[with_observer, without_observer],
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            knob=[],
+            status=None,
+            contains_agent_id="field_observer",
+        ),
+    )
+    assert [s.run_id for s in resolved.summaries] == ["veyru/1"]
 
 
 def test_an_explicit_selection_ignores_runs_it_did_not_name() -> None:

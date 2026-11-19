@@ -18,7 +18,7 @@ from glossogen.evaluation.reports.evaluation_report import EvaluationReport
 from glossogen.llm.judge_cost import EvaluationCost, EvaluationTokenUsage
 from glossogen.models.event import RunStatus
 from glossogen.run_export.agent_level_frame import build_agent_level_frame
-from glossogen.run_export.csv_export_archive import build_export_frames
+from glossogen.run_export.csv_export_archive import build_export_frames, build_legend_frame
 from glossogen.run_export.export_column_catalog import build_export_preview
 from glossogen.run_export.export_request_models import (
     CsvExportRequest,
@@ -217,6 +217,43 @@ def test_a_run_scored_by_a_different_metric_gets_an_empty_cell() -> None:
 
     assert rows[0][header.index("metric.round_success")] == "0.6"
     assert rows[0][header.index("metric.perplexity")] == ""
+
+
+def test_metric_rounds_is_zero_for_a_run_level_score_and_empty_when_nothing_ran() -> None:
+    """`0` rounds means a run-level score with no per-round values; blank means no metric."""
+    record = make_record(
+        run_id="veyru/1",
+        scenario_name="veyru",
+        scenario_config={},
+        labels=[],
+        measurements=[
+            described_measurement(
+                metric_name="round_success",
+                per_round=[(1, "won"), (2, "lost")],
+                per_agent=[],
+            ),
+            described_measurement(metric_name="perplexity", per_round=[], per_agent=[]),
+        ],
+    )
+    unscored = make_record(
+        run_id="veyru/2",
+        scenario_name="veyru",
+        scenario_config={},
+        labels=[],
+        measurements=None,
+    )
+    header, rows = run_level_rows(
+        records=[record, unscored],
+        columns=[],
+        metrics=["round_success", "perplexity", "neologism"],
+    )
+    scored_row = dict(zip(header, rows[0]))
+    unscored_row = dict(zip(header, rows[1]))
+
+    assert scored_row["metric_rounds.round_success"] == "2"
+    assert scored_row["metric_rounds.perplexity"] == "0"
+    assert scored_row["metric_rounds.neologism"] == ""
+    assert unscored_row["metric_rounds.round_success"] == ""
 
 
 # --- knob flattening ------------------------------------------------------------
@@ -822,3 +859,299 @@ def test_a_repeated_column_key_emits_the_column_once() -> None:
         "metric_rounds.round_success",
     ]
     assert len(frame.header) == len(set(frame.header))
+
+
+# --- the opt-in unit, summary and note columns ----------------------------------
+
+
+def described_measurement(
+    metric_name: str,
+    per_round: list[tuple[int, str]],
+    per_agent: list[tuple[str, str]],
+) -> Measurement:
+    """Build a measurement whose unit, summary and notes all name the metric.
+
+    Each text cell then says which metric it came from, so a cell that lands under
+    another metric's column shows up as a wrong value rather than a plausible one.
+    """
+    return Measurement(
+        metric_name=metric_name,
+        score=0.5,
+        score_unit=f"{metric_name} unit",
+        summary=f"{metric_name} summary",
+        per_round=[
+            RoundObservation(round_number=round_number, value=0.5, note=note)
+            for round_number, note in per_round
+        ],
+        per_agent=[
+            AgentObservation(agent_id=agent_id, value=0.5, note=note)
+            for agent_id, note in per_agent
+        ],
+    )
+
+
+def frames_with_summaries(
+    records: list[ExportRunRecord],
+    metrics: list[str],
+) -> dict[str, list[dict[str, str]]]:
+    """Build the three metric tables with summaries on, as rows keyed by header."""
+    request = CsvExportRequest(
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            knob=[],
+            status=None,
+            contains_agent_id=None,
+        ),
+        frames=[ExportFrame.RUN_LEVEL, ExportFrame.ROUND_LEVEL, ExportFrame.AGENT_LEVEL],
+        columns=[],
+        metrics=metrics,
+        repeat_run_columns=False,
+        include_metric_summaries=True,
+    )
+    tables: dict[str, list[dict[str, str]]] = {}
+    for frame in build_export_frames(records=records, request=request):
+        rows = list(frame.rows)
+        assert all(len(row) == len(frame.header) for row in rows), frame.name
+        tables[frame.name] = [dict(zip(frame.header, row)) for row in rows]
+    return tables
+
+
+def test_the_run_table_puts_each_metrics_unit_and_summary_under_its_name() -> None:
+    """With summaries on, every text cell sits under its own metric, and a gap stays blank."""
+    records = [
+        make_record(
+            run_id="veyru/1",
+            scenario_name="veyru",
+            scenario_config={},
+            labels=[],
+            measurements=[
+                described_measurement(metric_name="round_success", per_round=[], per_agent=[]),
+                described_measurement(metric_name="perplexity", per_round=[], per_agent=[]),
+            ],
+        ),
+        make_record(
+            run_id="veyru/2",
+            scenario_name="veyru",
+            scenario_config={},
+            labels=[],
+            measurements=None,
+        ),
+    ]
+    [scored, unscored] = frames_with_summaries(
+        records=records, metrics=["round_success", "perplexity", "neologism"]
+    )["run_level"]
+
+    assert scored["metric_unit.round_success"] == "round_success unit"
+    assert scored["metric_summary.round_success"] == "round_success summary"
+    assert scored["metric_unit.perplexity"] == "perplexity unit"
+    assert scored["metric_summary.perplexity"] == "perplexity summary"
+    assert scored["metric_unit.neologism"] == ""
+    assert scored["metric_summary.neologism"] == ""
+    assert unscored["metric_unit.round_success"] == ""
+    assert unscored["metric_summary.round_success"] == ""
+
+
+def test_the_round_table_puts_each_note_under_its_metric_and_round() -> None:
+    """A round one metric skipped has a blank note for it, beside the other's note."""
+    records = [
+        make_record(
+            run_id="veyru/1",
+            scenario_name="veyru",
+            scenario_config={},
+            labels=[],
+            measurements=[
+                described_measurement(
+                    metric_name="round_success",
+                    per_round=[(1, "round_success r1"), (2, "round_success r2")],
+                    per_agent=[],
+                ),
+                described_measurement(
+                    metric_name="neologism",
+                    per_round=[(2, "neologism r2")],
+                    per_agent=[],
+                ),
+            ],
+        )
+    ]
+    rows = frames_with_summaries(records=records, metrics=["round_success", "neologism"])[
+        "round_level"
+    ]
+
+    assert [row["round_number"] for row in rows] == ["1", "2"]
+    assert rows[0]["metric_note.round_success"] == "round_success r1"
+    assert rows[0]["metric_note.neologism"] == ""
+    assert rows[0]["metric.neologism"] == ""
+    assert rows[1]["metric_note.round_success"] == "round_success r2"
+    assert rows[1]["metric_note.neologism"] == "neologism r2"
+
+
+def test_the_agent_table_puts_each_note_under_its_metric_and_agent() -> None:
+    """An agent a metric did not score keeps its row, with a blank note for that metric."""
+    records = [
+        make_record(
+            run_id="veyru/1",
+            scenario_name="veyru",
+            scenario_config={},
+            labels=[],
+            measurements=[
+                described_measurement(
+                    metric_name="perplexity",
+                    per_round=[],
+                    per_agent=[("field_observer", "perplexity observer")],
+                ),
+                described_measurement(metric_name="round_success", per_round=[], per_agent=[]),
+            ],
+        )
+    ]
+    [row] = frames_with_summaries(records=records, metrics=["perplexity", "round_success"])[
+        "agent_level"
+    ]
+
+    assert row["agent_id"] == "field_observer"
+    assert row["metric_note.perplexity"] == "perplexity observer"
+    assert row["metric_note.round_success"] == ""
+    assert row["metric.round_success"] == ""
+
+
+# --- the legend's metric rows ---------------------------------------------------
+
+
+def metric_export_request(
+    frames: list[ExportFrame], include_metric_summaries: bool
+) -> CsvExportRequest:
+    """Request `round_success` on ``frames``, with or without the summary columns."""
+    return CsvExportRequest(
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            knob=[],
+            status=None,
+            contains_agent_id=None,
+        ),
+        frames=frames,
+        columns=[],
+        metrics=["round_success"],
+        repeat_run_columns=False,
+        include_metric_summaries=include_metric_summaries,
+    )
+
+
+LEGEND_RECORDS = [
+    make_record(
+        run_id="veyru/1",
+        scenario_name="veyru",
+        scenario_config={},
+        labels=[],
+        measurements=[
+            described_measurement(
+                metric_name="round_success",
+                per_round=[(1, "won")],
+                per_agent=[("field_observer", "steady")],
+            )
+        ],
+    ),
+    make_record(
+        run_id="veyru/2",
+        scenario_name="veyru",
+        scenario_config={},
+        labels=[],
+        measurements=None,
+    ),
+]
+
+
+def legend_rows(request: CsvExportRequest) -> dict[str, dict[str, str]]:
+    """Return the legend's rows keyed by the column each describes."""
+    legend = build_legend_frame(records=LEGEND_RECORDS, request=request)
+    return {row[0]: dict(zip(legend.header, row)) for row in legend.rows}
+
+
+def test_the_legend_names_every_column_the_metric_tables_wrote() -> None:
+    """A column missing from the legend is one a reader has no codebook entry for."""
+    request = metric_export_request(
+        frames=[ExportFrame.RUN_LEVEL, ExportFrame.ROUND_LEVEL, ExportFrame.AGENT_LEVEL],
+        include_metric_summaries=True,
+    )
+    written = {
+        column
+        for frame in build_export_frames(records=LEGEND_RECORDS, request=request)
+        for column in frame.header
+    }
+
+    assert written <= set(legend_rows(request=request))
+
+
+def test_metric_rounds_in_the_legend_shares_the_scores_coverage() -> None:
+    """`metric_rounds` is blank exactly where the score is, so it fills the same runs."""
+    rows = legend_rows(
+        request=metric_export_request(
+            frames=[ExportFrame.RUN_LEVEL], include_metric_summaries=False
+        )
+    )
+
+    assert rows["metric_rounds.round_success"]["unit"] == "rounds"
+    assert rows["metric_rounds.round_success"]["runs_with_value"] == "1"
+    assert rows["metric_rounds.round_success"]["run_count"] == "2"
+    assert rows["metric.round_success"]["runs_with_value"] == "1"
+
+
+def test_the_legend_leaves_out_metric_columns_no_table_wrote() -> None:
+    """Summaries off, or only the message table, and those columns are not in the legend."""
+    without_summaries = legend_rows(
+        request=metric_export_request(
+            frames=[ExportFrame.RUN_LEVEL, ExportFrame.ROUND_LEVEL],
+            include_metric_summaries=False,
+        )
+    )
+    messages_only = legend_rows(
+        request=metric_export_request(
+            frames=[ExportFrame.MESSAGE_LEVEL], include_metric_summaries=True
+        )
+    )
+    round_only = legend_rows(
+        request=metric_export_request(
+            frames=[ExportFrame.ROUND_LEVEL], include_metric_summaries=True
+        )
+    )
+
+    assert "metric_unit.round_success" not in without_summaries
+    assert "metric_note.round_success" not in without_summaries
+    assert not [column for column in messages_only if column.startswith("metric")]
+    assert "metric_note.round_success" in round_only
+    assert "metric_rounds.round_success" not in round_only
+    assert "metric_summary.round_success" not in round_only
+
+
+def test_the_legend_names_a_requested_metric_no_selected_run_carries() -> None:
+    """A requested metric no run reported still gets blank columns, with a coverage of 0."""
+    request = CsvExportRequest(
+        selection=FilterRunSelection(
+            kind="filters",
+            scenario=[],
+            labels=[],
+            run_id_contains=None,
+            knob=[],
+            status=None,
+            contains_agent_id=None,
+        ),
+        frames=[ExportFrame.RUN_LEVEL],
+        columns=[],
+        metrics=["round_success", "neologism"],
+        repeat_run_columns=False,
+        include_metric_summaries=False,
+    )
+    written = {
+        column
+        for frame in build_export_frames(records=LEGEND_RECORDS, request=request)
+        for column in frame.header
+    }
+    rows = legend_rows(request=request)
+
+    assert written <= set(rows)
+    assert rows["metric.neologism"]["runs_with_value"] == "0"
+    assert rows["metric_rounds.neologism"]["run_count"] == "2"
