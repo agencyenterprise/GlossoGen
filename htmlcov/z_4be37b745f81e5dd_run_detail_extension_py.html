@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_4be37b745f81e5dd_scenario_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.3">coverage.py v7.17.3</a>,
-            created at 2026-11-19 14:37 +0000
+            created at 2026-11-19 16:33 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -275,9 +275,9 @@
     <p class="pln"><span class="n"><a id="t191" href="#t191">191</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t192" href="#t192">192</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t193" href="#t193">193</a></span><span class="t"><span class="key">def</span> <span class="nam">_floor_bay</span><span class="op">(</span><span class="nam">bay</span><span class="op">:</span> <span class="nam">MoveABoxBay</span><span class="op">,</span> <span class="nam">bay_identity</span><span class="op">:</span> <span class="nam">str</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">MoveABoxFloorBay</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t194" href="#t194">194</a></span><span class="t">    <span class="str">&quot;&quot;&quot;One bay of a floor as the panel draws it.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t194" href="#t194">194</a></span><span class="t">    <span class="str">&quot;&quot;&quot;One bay of a floor as the panel draws it, by number where every bay carries one mark.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t195" href="#t195">195</a></span><span class="t">    <span class="nam">label</span> <span class="op">=</span> <span class="nam">bay</span><span class="op">.</span><span class="nam">mark</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t196" href="#t196">196</a></span><span class="t">    <span class="key">if</span> <span class="nam">bay_identity</span> <span class="op">==</span> <span class="nam">BayIdentity</span><span class="op">.</span><span class="nam">SQUARE</span><span class="op">.</span><span class="nam">value</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t196" href="#t196">196</a></span><span class="t">    <span class="key">if</span> <span class="nam">bay_identity</span> <span class="key">in</span> <span class="op">(</span><span class="nam">BayIdentity</span><span class="op">.</span><span class="nam">SQUARE</span><span class="op">.</span><span class="nam">value</span><span class="op">,</span> <span class="nam">BayIdentity</span><span class="op">.</span><span class="nam">LANDMARK</span><span class="op">.</span><span class="nam">value</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t197" href="#t197">197</a></span><span class="t">        <span class="nam">label</span> <span class="op">=</span> <span class="nam">str</span><span class="op">(</span><span class="nam">bay</span><span class="op">.</span><span class="nam">number</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t198" href="#t198">198</a></span><span class="t">    <span class="key">return</span> <span class="nam">MoveABoxFloorBay</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t199" href="#t199">199</a></span><span class="t">        <span class="nam">number</span><span class="op">=</span><span class="nam">bay</span><span class="op">.</span><span class="nam">number</span><span class="op">,</span> <span class="nam">name</span><span class="op">=</span><span class="nam">bay</span><span class="op">.</span><span class="nam">name</span><span class="op">,</span> <span class="nam">label</span><span class="op">=</span><span class="nam">label</span><span class="op">,</span> <span class="nam">cell</span><span class="op">=</span><span class="nam">_cell</span><span class="op">(</span><span class="nam">pair</span><span class="op">=</span><span class="nam">bay</span><span class="op">.</span><span class="nam">cell</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -537,7 +537,7 @@
             <a class="nav" href="z_4be37b745f81e5dd_scenario_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.3">coverage.py v7.17.3</a>,
-            created at 2026-11-19 14:37 +0000
+            created at 2026-11-19 16:33 +0000
         </p>
     </div>
 </footer>
