@@ -43,7 +43,7 @@ def briefing_after(preset_name: str, overrides: dict[str, Any], bays: dict[str, 
 def test_a_disclosed_bay_is_named_by_its_square() -> None:
     """A bay has no number an operator could read, so the result gives its square."""
     text = briefing_after(
-        preset_name="knobs_default",
+        preset_name="knobs_unshifted",
         overrides={"partner_bay_disclosed": True},
         bays={CRATE_A: 1, CRATE_B: 4},
     )
@@ -53,7 +53,7 @@ def test_a_disclosed_bay_is_named_by_its_square() -> None:
 
 def test_an_undisclosed_bay_is_only_somewhere_else() -> None:
     text = briefing_after(
-        preset_name="knobs_default",
+        preset_name="knobs_unshifted",
         overrides={"partner_bay_disclosed": False},
         bays={CRATE_A: 1, CRATE_B: 4},
     )
@@ -65,7 +65,7 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
     """Both crates on one bay is the score, so it is told either way."""
     for disclosed in (True, False):
         text = briefing_after(
-            preset_name="knobs_default",
+            preset_name="knobs_unshifted",
             overrides={"partner_bay_disclosed": disclosed},
             bays={CRATE_A: 1, CRATE_B: 1},
         )
@@ -75,7 +75,7 @@ def test_a_match_is_reported_whether_or_not_bays_are_disclosed() -> None:
 def test_an_undisclosed_miss_does_not_say_the_other_crate_missed_every_bay() -> None:
     """A crate left off the bays reads the same as one left on a different bay."""
     text = briefing_after(
-        preset_name="knobs_default",
+        preset_name="knobs_unshifted",
         overrides={"partner_bay_disclosed": False},
         bays={CRATE_A: 1, CRATE_B: None},
     )
@@ -84,7 +84,9 @@ def test_an_undisclosed_miss_does_not_say_the_other_crate_missed_every_bay() -> 
 
 
 def test_a_corner_start_briefs_both_operators_on_the_same_square() -> None:
-    scenario = build(preset_name="knobs_default", overrides={**TWO_ROUNDS, "crate_start": "corner"})
+    scenario = build(
+        preset_name="knobs_unshifted", overrides={**TWO_ROUNDS, "crate_start": "corner"}
+    )
     texts = [scenario.get_injection(round_number=1, agent_id=a) for a in (OPERATOR_A, OPERATOR_B)]
     for text in texts:
         assert "The crate starts at 1,1." in text
@@ -92,7 +94,7 @@ def test_a_corner_start_briefs_both_operators_on_the_same_square() -> None:
 
 def test_separate_random_starts_brief_each_operator_on_its_own_square() -> None:
     scenario = build(
-        preset_name="knobs_default", overrides={**TWO_ROUNDS, "crate_start": "separate_random"}
+        preset_name="knobs_unshifted", overrides={**TWO_ROUNDS, "crate_start": "separate_random"}
     )
     starts = [
         line
@@ -106,7 +108,7 @@ def test_separate_random_starts_brief_each_operator_on_its_own_square() -> None:
 
 def test_an_undisclosed_channel_never_points_at_the_temperature() -> None:
     """The default condition leaves the readout unexplained, which is the whole task."""
-    scenario = build(preset_name="knobs_default", overrides=TWO_ROUNDS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_ROUNDS)
     prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
     assert "temperature" in prompt
     assert "Use it" not in prompt
@@ -132,7 +134,7 @@ def test_a_disclosed_channel_states_what_each_action_does_to_the_reading() -> No
 def test_a_shared_random_start_briefs_both_operators_on_one_drawn_square() -> None:
     """Both are told the same square, and it is not the corner every round."""
     scenario = build(
-        preset_name="knobs_default", overrides={**TWO_ROUNDS, "crate_start": "shared_random"}
+        preset_name="knobs_unshifted", overrides={**TWO_ROUNDS, "crate_start": "shared_random"}
     )
     lines = [
         line
@@ -308,7 +310,7 @@ def test_a_two_target_system_prompt_explains_targets_and_matches_per_target() ->
 
 
 def test_a_one_target_system_prompt_never_mentions_targets() -> None:
-    scenario = build(preset_name="knobs_default", overrides=TWO_ROUNDS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_ROUNDS)
     prompt = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
     assert "target" not in prompt
 

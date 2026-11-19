@@ -29,7 +29,7 @@ ONE_ROUND_ASKED: dict[str, Any] = {**ONE_ROUND, "describe_protocol_at_end": True
 
 
 def test_the_question_asks_about_a_convention_without_naming_the_reading() -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND_ASKED)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND_ASKED)
     prompts = scenario.runner_prompts(agent_id=OPERATOR_A)
     assert prompts is not None
     assert prompts.closing is not None
@@ -40,7 +40,7 @@ def test_the_question_asks_about_a_convention_without_naming_the_reading() -> No
 
 
 def test_with_the_knob_off_there_is_no_closing_question() -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     prompts = scenario.runner_prompts(agent_id=OPERATOR_A)
     assert prompts is not None
     assert prompts.closing is None
@@ -49,7 +49,7 @@ def test_with_the_knob_off_there_is_no_closing_question() -> None:
 async def test_each_operator_answers_once_the_run_is_over(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND_ASKED)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND_ASKED)
     answers = {OPERATOR_A: "cart meant the shared bay", OPERATOR_B: "we never agreed on anything"}
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [

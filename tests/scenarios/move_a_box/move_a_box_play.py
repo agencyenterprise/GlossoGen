@@ -115,6 +115,7 @@ def first_depot(scenario: MoveABoxScenario) -> RoundDepot:
         bays_differ=knobs.bays_differ,
         crate_start=knobs.crate_start,
         pallet_density=knobs.pallet_density,
+        yard_setup=knobs.yard_setup(),
     )
     return depot
 

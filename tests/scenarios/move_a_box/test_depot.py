@@ -15,6 +15,7 @@ from glossogen.scenarios.move_a_box.depot import (
     MIN_START_SEPARATION,
     Cell,
     RoundDepot,
+    YardSetup,
     crate_tags,
     distances_from,
     draw_next_target,
@@ -38,6 +39,10 @@ BAYS_ALLOWED_EACH = 3
 STEPS = 400
 AGENT_IDS = operator_ids(operator_count=2)
 """These checks are about the two-operator geometry, so they name that roster."""
+NO_LANDMARKS = YardSetup(
+    landmark_count=0, mirrored=False, view_shift=0, private_bays_outside_overlap=False
+)
+"""The landmark setup of every identity but landmark."""
 
 
 def depots(
@@ -58,6 +63,7 @@ def depots(
         bays_differ=bays_differ,
         crate_start=crate_start,
         pallet_density=pallet_density,
+        yard_setup=NO_LANDMARKS,
     )
 
 
@@ -291,6 +297,7 @@ def test_a_floor_too_small_for_its_bays_is_refused() -> None:
             bays_differ=True,
             crate_start=CrateStart.CORNER,
             pallet_density=0.0,
+            yard_setup=NO_LANDMARKS,
         )
 
 
@@ -364,6 +371,7 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
         bays_differ=True,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
+        yard_setup=NO_LANDMARKS,
     )
     for depot in layouts:
         assert sorted(depot.first_target.allowed_bays) == sorted(four)
@@ -382,7 +390,7 @@ def test_four_operators_share_exactly_one_bay_and_keep_the_rest_apart() -> None:
 
 def test_a_bay_count_too_small_for_the_roster_is_refused() -> None:
     """Five operators at three bays each need 11 bays; nine cannot seat them."""
-    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_unshifted")
     config.update({"operator_count": 5, "bays_allowed_each": 3, "bay_count": 9, "grid_size": 9})
     with pytest.raises(ValueError, match="bay_count must be at least 11"):
         MoveABoxKnobs.model_validate(config)
@@ -402,6 +410,7 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
         bays_differ=True,
         crate_start=CrateStart.CORNER,
         pallet_density=0.0,
+        yard_setup=NO_LANDMARKS,
     )
     for depot in layouts:
         lists: list[set[int]] = [
@@ -415,7 +424,7 @@ def test_two_crates_each_share_one_bay_per_slot() -> None:
 
 def test_a_crate_cannot_have_more_crates_than_bays_on_its_list() -> None:
     """Three crates at two bays each leaves a slot with nowhere of its own to meet."""
-    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_default")
+    config = MoveABoxScenario.load_knobs_preset(preset_name="knobs_unshifted")
     config.update({"crates_each": 3, "bays_allowed_each": 2})
     with pytest.raises(ValueError, match="bays_allowed_each must be at least crates_each=3"):
         MoveABoxKnobs.model_validate(config)
@@ -522,12 +531,14 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
     [symbol_depot] = marked_depots(
         bay_identity=BayIdentity.SYMBOL, round_count=1, pallet_density=0.0
     )
-    assert symbol_depot.first_target.bay_name(number=1) == BAY_SYMBOLS[0].name
+    assert (
+        symbol_depot.first_target.bay_name(number=1, agent_id=AGENT_IDS[0]) == BAY_SYMBOLS[0].name
+    )
     assert symbol_depot.first_target.bay_mark(number=1) == BAY_SYMBOLS[0].glyph
     [letter_depot] = marked_depots(
         bay_identity=BayIdentity.LETTER, round_count=1, pallet_density=0.0
     )
-    assert letter_depot.first_target.bay_name(number=4) == "D"
+    assert letter_depot.first_target.bay_name(number=4, agent_id=AGENT_IDS[0]) == "D"
     assert letter_depot.first_target.bay_mark(number=4) == "D"
     [square_depot] = depots(
         bays_differ=True,
@@ -537,7 +548,10 @@ def test_a_bay_is_named_by_its_symbol_its_letter_or_its_square() -> None:
         pallet_density=0.0,
     )
     first = square_depot.first_target.bays[AGENT_IDS[0]][0]
-    assert square_depot.first_target.bay_name(number=first.number) == first.cell.label()
+    assert (
+        square_depot.first_target.bay_name(number=first.number, agent_id=AGENT_IDS[0])
+        == first.cell.label()
+    )
 
 
 @pytest.mark.parametrize("preset_name", ["knobs_symbol_bays", "knobs_letter_bays"])
@@ -565,6 +579,7 @@ def test_a_switch_from_letters_to_symbols_keeps_every_square_and_changes_only_th
             bays_differ=True,
             crate_start=CrateStart.SEPARATE_RANDOM,
             pallet_density=0.1,
+            yard_setup=NO_LANDMARKS,
         )
         for identities in (letters, switched)
     )
