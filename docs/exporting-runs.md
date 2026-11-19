@@ -32,7 +32,10 @@ come back as a zip with a `columns.csv` legend naming each column's family, its
 unit where it has one, and how many runs filled it. `glossogen export` writes the
 legend beside the tables in `--out` whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
 scenario never declared and a knob it declared as null both render empty. The
-legend is what says which columns were sparse.
+legend is what says which columns were sparse. It lists every metric column the
+tables carry, `metric_rounds.` and the summary columns included. The unit,
+summary and note columns carry no coverage count, since they describe a
+measurement rather than make one.
 
 `agent_level.csv` is keyed on the run's registered agents rather than on what
 the metrics reported. It is the roster of who ran under which model even when no
