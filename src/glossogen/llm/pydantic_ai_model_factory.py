@@ -10,11 +10,12 @@ from collections.abc import Sequence
 
 from pydantic_ai.models import ModelRequestParameters, infer_model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings, ThinkingLevel, merge_model_settings
 
+from glossogen.llm.self_hosted_chat_model import SelfHostedChatModel
 from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
     SELF_HOSTED_BASE_URLS_VAR,
@@ -44,11 +45,11 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
-def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatModel:
+def build_pydantic_ai_model(model: str, provider: Provider) -> str | SelfHostedChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
     For ``self-hosted`` providers the function returns a fully-constructed
-    ``OpenAIChatModel`` pointing at the OpenAI-compatible base URL. For all
+    ``SelfHostedChatModel`` pointing at the OpenAI-compatible base URL. For all
     other providers it returns the ``"<prefix>:<model>"`` string literal that
     pydantic-ai uses to look up the right backend, with the prefix from the
     provider's row in ``PROVIDER_SPECS``.
@@ -62,7 +63,7 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatM
             base_url=base_url,
             api_key=os.environ[SELF_HOSTED_API_KEY_VAR],
         )
-        return OpenAIChatModel(model, provider=oai_provider)
+        return SelfHostedChatModel(model_name=model, provider=oai_provider)
     return f"{spec.pydantic_ai_prefix}:{model}"
 
 
