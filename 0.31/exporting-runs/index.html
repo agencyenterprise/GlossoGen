@@ -1756,7 +1756,10 @@ come back as a zip with a <code>columns.csv</code> legend naming each column's f
 unit where it has one, and how many runs filled it. <code>glossogen export</code> writes the
 legend beside the tables in <code>--out</code> whatever the number of tables. That coverage count matters because a blank is ambiguous: a knob a
 scenario never declared and a knob it declared as null both render empty. The
-legend is what says which columns were sparse.</p>
+legend is what says which columns were sparse. It lists every metric column the
+tables carry, <code>metric_rounds.</code> and the summary columns included. The unit,
+summary and note columns carry no coverage count, since they describe a
+measurement rather than make one.</p>
 <p><code>agent_level.csv</code> is keyed on the run's registered agents rather than on what
 the metrics reported. It is the roster of who ran under which model even when no
 metric has a per-agent number to add.</p>
