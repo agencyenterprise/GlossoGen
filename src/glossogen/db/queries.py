@@ -210,17 +210,24 @@ async def list_derived_source_counts(
     source_run_dir_name)``; a row is emitted only for parents that have at
     least one derivation (replace-agent, fork-at-round, or
     cross-run-replace-agent source A). Newest parent first.
+
+    A parent is emitted only when ``group_id`` also owns it. An imported bundle
+    records whatever parent its own manifest names, and the caller reads each
+    parent's files from disk, so an unowned parent would expose another group's run.
     """
     async with conn.cursor() as cur:
         await cur.execute(
             """
-            SELECT source_run_scenario, source_run_dir_name, count(*)
-            FROM runs
-            WHERE group_id = %s
-              AND source_run_scenario IS NOT NULL
-              AND source_run_dir_name IS NOT NULL
-            GROUP BY source_run_scenario, source_run_dir_name
-            ORDER BY split_part(source_run_dir_name, '_', 1)::bigint DESC, source_run_dir_name DESC
+            SELECT child.source_run_scenario, child.source_run_dir_name, count(*)
+            FROM runs AS child
+            JOIN runs AS parent
+              ON parent.group_id = child.group_id
+             AND parent.scenario = child.source_run_scenario
+             AND parent.run_dir_name = child.source_run_dir_name
+            WHERE child.group_id = %s
+            GROUP BY child.source_run_scenario, child.source_run_dir_name
+            ORDER BY split_part(child.source_run_dir_name, '_', 1)::bigint DESC,
+                     child.source_run_dir_name DESC
             """,
             (group_id,),
         )
