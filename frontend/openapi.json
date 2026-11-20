@@ -1865,6 +1865,46 @@
         }
       }
     },
+    "/mcp/consent-request/{request_id}": {
+      "get": {
+        "summary": "Describe Consent Request",
+        "description": "Return the client name, redirect URI and scopes of a parked consent request.\n\n404 when the request expired, was already approved, or its client is gone.",
+        "operationId": "describe_consent_request_mcp_consent_request__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentRequestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -3624,6 +3664,40 @@
         ],
         "title": "ClosingExchangeStatus",
         "description": "How an agent's closing exchange ended: with an answer, or with a failure."
+      },
+      "ConsentRequestResponse": {
+        "properties": {
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_name",
+          "redirect_uri",
+          "scopes"
+        ],
+        "title": "ConsentRequestResponse",
+        "description": "Response for ``GET /mcp/consent-request/{request_id}``.\n\n``client_name`` is chosen by whoever registered the client. ``redirect_uri`` is\nwhere the authorization code goes once the request is approved."
       },
       "ContainerYardAttribute": {
         "properties": {

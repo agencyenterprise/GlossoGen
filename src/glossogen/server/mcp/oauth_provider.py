@@ -36,7 +36,7 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
 
 from glossogen.server.identity.identity_provider import IdentityProvider
-from glossogen.server.mcp.oauth_records import PendingConsentRequest
+from glossogen.server.mcp.oauth_records import PendingConsentDescription, PendingConsentRequest
 from glossogen.server.mcp.oauth_storage import (
     ACCESS_TOKEN_LIFETIME,
     AUTHORIZATION_CODE_LIFETIME,
@@ -170,6 +170,24 @@ class GlossoGenOAuthProvider:
         )
         await self._storage.save_pending_consent(request=pending)
         return self._identity_provider.deferred_consent_url(request_id=request_id)
+
+    async def describe_pending_consent(self, request_id: str) -> PendingConsentDescription | None:
+        """Return the client and redirect URI a parked request would authorize.
+
+        Returns ``None`` when the request expired, was already approved, or its client
+        is gone, the same cases in which :meth:`approve_pending_consent` refuses it.
+        """
+        pending = await self._storage.load_pending_consent(request_id=request_id)
+        if pending is None:
+            return None
+        client = await self._storage.get_client(client_id=pending.client_id)
+        if client is None:
+            return None
+        return PendingConsentDescription(
+            client_name=client.client_name,
+            redirect_uri=pending.redirect_uri,
+            scopes=pending.scopes,
+        )
 
     async def approve_pending_consent(
         self,
