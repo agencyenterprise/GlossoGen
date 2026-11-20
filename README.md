@@ -227,7 +227,7 @@
 | src/glossogen/run\_storage/\_\_init\_\_.py                                                             |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/run\_storage/archive\_member\_filter.py                                                  |       24 |        1 |       16 |        1 |     95% |        60 |
 | src/glossogen/run\_storage/cross\_run\_replace\_manifest.py                                            |       10 |        0 |        2 |        0 |    100% |           |
-| src/glossogen/run\_storage/derivation\_manifest\_reader.py                                             |       54 |        1 |       20 |        1 |     97% |       170 |
+| src/glossogen/run\_storage/derivation\_manifest\_reader.py                                             |       54 |        0 |       20 |        0 |    100% |           |
 | src/glossogen/run\_storage/derived\_run\_start.py                                                      |       12 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/run\_storage/eval\_manifest.py                                                           |       43 |        2 |        8 |        1 |     94% |60-\>exit, 82-83 |
 | src/glossogen/run\_storage/evaluation\_score\_reader.py                                                |       47 |        1 |        6 |        1 |     96% |        93 |
@@ -576,7 +576,7 @@
 | src/glossogen/server/runs/bundle\_tar\_limits.py                                                       |       32 |        0 |       10 |        1 |     98% |   62-\>68 |
 | src/glossogen/server/runs/dashboard\_router.py                                                         |       53 |        1 |        6 |        1 |     97% |        96 |
 | src/glossogen/server/runs/dashboard\_store\_resolution.py                                              |       16 |        1 |        4 |        1 |     90% |        26 |
-| src/glossogen/server/runs/derived\_run\_references.py                                                  |       84 |        6 |       32 |        3 |     92% |59-66, 141-146, 158 |
+| src/glossogen/server/runs/derived\_run\_references.py                                                  |       95 |        6 |       32 |        3 |     93% |77-84, 213-218, 230 |
 | src/glossogen/server/runs/detail\_reader.py                                                            |      263 |       34 |      116 |       12 |     85% |269-274, 296-315, 320, 347-349, 374-393, 403, 413, 491-\>259, 514, 544, 602, 662-663 |
 | src/glossogen/server/runs/export\_selection.py                                                         |       13 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/server/runs/label\_description\_router.py                                                |       30 |        0 |        2 |        0 |    100% |           |
@@ -611,7 +611,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **30074** | **3941** | **8698** | **1165** | **84%** |           |
+| **TOTAL**                                                                                              | **30085** | **3940** | **8698** | **1164** | **84%** |           |
 
 
 ## Setup coverage badge
