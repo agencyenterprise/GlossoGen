@@ -708,6 +708,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mcp/consent-request/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe Consent Request
+         * @description Return the client name, redirect URI and scopes of a parked consent request.
+         *
+         *     404 when the request expired, was already approved, or its client is gone.
+         */
+        get: operations["describe_consent_request_mcp_consent_request__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1511,6 +1533,21 @@ export interface components {
          * @enum {string}
          */
         ClosingExchangeStatus: "answered" | "failed";
+        /**
+         * ConsentRequestResponse
+         * @description Response for ``GET /mcp/consent-request/{request_id}``.
+         *
+         *     ``client_name`` is chosen by whoever registered the client. ``redirect_uri`` is
+         *     where the authorization code goes once the request is approved.
+         */
+        ConsentRequestResponse: {
+            /** Client Name */
+            client_name: string | null;
+            /** Redirect Uri */
+            redirect_uri: string;
+            /** Scopes */
+            scopes: string[];
+        };
         /**
          * ContainerYardAttribute
          * @description One (dimension, value) pair of a container's attribute bundle.
@@ -5675,6 +5712,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhoAmIResponse"];
+                };
+            };
+        };
+    };
+    describe_consent_request_mcp_consent_request__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -16,6 +16,7 @@ from starlette.routing import Route
 from glossogen.db.pool import get_database_url
 from glossogen.server.identity.identity_provider import IdentityProvider
 from glossogen.server.mcp.browser import mount_mcp_browser
+from glossogen.server.mcp.consent_request_router import router as consent_request_router
 from glossogen.server.mcp.in_memory_oauth_storage import InMemoryOAuthStorage
 from glossogen.server.mcp.oauth_provider import GlossoGenOAuthProvider
 from glossogen.server.mcp.oauth_storage import OAuthStorage
@@ -134,6 +135,7 @@ def mount_oauth_and_mcp(
     app.state.oauth_storage = storage
     app.state.oauth_provider = oauth_provider
     app.include_router(whoami_router)
+    app.include_router(consent_request_router)
     mount_mcp_browser(
         app=app,
         runs_dir=runs_dir,

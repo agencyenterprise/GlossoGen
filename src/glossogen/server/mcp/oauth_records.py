@@ -48,3 +48,16 @@ class PendingConsentRequest(NamedTuple):
     redirect_uri_provided_explicitly: bool
     resource: str | None
     state: str | None
+
+
+class PendingConsentDescription(NamedTuple):
+    """What a consent page shows about a parked request before the user approves it.
+
+    ``client_name`` is whatever the client registered under, which anyone can choose.
+    ``redirect_uri`` is where the authorization code goes once the request is
+    approved, so it is what tells the user who will hold the tokens.
+    """
+
+    client_name: str | None
+    redirect_uri: str
+    scopes: list[str]

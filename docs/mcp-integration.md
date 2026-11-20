@@ -48,7 +48,10 @@ automatically:
 - **With an [identity provider](creating-an-identity-provider.md)** (a
   deployed, multi-tenant server), it holds the authorization request and sends
   the browser to the frontend's `/mcp-consent?request_id=...` page. The user
-  signs in there and picks which organization to authorize. The backend then
+  signs in there and picks which organization to authorize. Anyone can register a
+  client, so the page shows the client's name and the callback URL the code will
+  be sent to, read from `GET /mcp/consent-request/{request_id}`, and warns when
+  that callback is not on the user's own computer. The backend then
   issues a code bound to that group and redirects to the client's callback. The
   sign-in, and the check of the session the page posts back, come from the
   identity provider.
