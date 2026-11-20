@@ -53,6 +53,13 @@ the commit log.
   virtual clock, each `act` list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
   its tokens as before.
+- `spot_the_intersection` knobs `postmortem_mode` and
+  `postmortem_character_limit` set who posts in the discussion phase and how many
+  characters each viewer may send in one phase. `whole_team` lets every viewer
+  post. `single_author` and `rotating_author` let one viewer post. In
+  `chosen_partner` each viewer messages one teammate it picks, on a channel the
+  two share. Every shipped preset sets `whole_team` and `-1`. See its
+  [README](src/glossogen/scenarios/spot_the_intersection/README.md#discussion-phase).
 
 ### Changed
 - **Moved modules: imports in scenario and metric packages change.** The old
