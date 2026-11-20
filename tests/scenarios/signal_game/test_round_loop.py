@@ -25,7 +25,7 @@ from glossogen.scenarios.signal_game.ids import (
 from glossogen.scenarios.signal_game.word_list import WORDS
 from glossogen.testing.scenario_runtime import assert_round_loop_completed
 from glossogen.testing.scripted_agent import ScriptedTurn, ToolTurn
-from glossogen.testing.simulation_harness import SimulationResult
+from glossogen.testing.simulation_harness import RUN_ID, SimulationResult
 from tests.scenarios.signal_game.signal_game_play import (
     ONE_ROUND,
     build,
@@ -512,9 +512,11 @@ def recording_runner_settings(monkeypatch: pytest.MonkeyPatch) -> list[ModelSett
     requested: list[ModelSettings] = []
 
     def recording_settings(
-        provider: Provider, model: str, settings: AgentModelSettings
+        provider: Provider, model: str, settings: AgentModelSettings, run_id: str, agent_id: str
     ) -> ModelSettings:
-        built = agent_model_settings(provider=provider, model=model, settings=settings)
+        built = agent_model_settings(
+            provider=provider, model=model, settings=settings, run_id=run_id, agent_id=agent_id
+        )
         requested.append(built)
         return built
 
@@ -547,6 +549,33 @@ async def test_the_runner_asks_the_provider_for_one_tool_call_per_response(
         event.model_settings.parallel_tool_calls
         for event in result.of_type(event_type=AgentRegistered)
     ] == [False, False]
+
+
+async def test_the_runner_gives_each_agent_its_own_id_and_the_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """These two ids become the request headers of a self-hosted model."""
+    identities: list[tuple[str, str]] = []
+
+    def recording_settings(
+        provider: Provider, model: str, settings: AgentModelSettings, run_id: str, agent_id: str
+    ) -> ModelSettings:
+        identities.append((run_id, agent_id))
+        return agent_model_settings(
+            provider=provider, model=model, settings=settings, run_id=run_id, agent_id=agent_id
+        )
+
+    monkeypatch.setattr(
+        "glossogen.runners.pydantic_ai_runner.agent_model_settings", recording_settings
+    )
+    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    await play(scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch)
+
+    assert sorted(identities) == [(RUN_ID, PLAYER_A), (RUN_ID, PLAYER_B)]
 
 
 async def test_the_settings_a_run_starts_with_win_over_the_presets(

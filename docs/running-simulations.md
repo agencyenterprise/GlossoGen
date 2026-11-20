@@ -196,6 +196,20 @@ Deploying on Modal, and running locally with Ollama or MLX, are covered in
 [Self-hosted models](local-inference-vllm-mlx.md). Tokens under `self-hosted`
 and `ollama` are priced at zero, since their GPU time is billed elsewhere.
 
+Under `--provider self-hosted`, each request for an agent carries two headers.
+`X-GlossoGen-Run-Id` holds the run id, which has the form
+`<scenario>/<run directory name>`, for example `signal_game/1795184024`.
+`X-GlossoGen-Agent-Id` holds the agent id, for example `player_a`. The agent's
+own requests and the requests of the protocol probe metrics carry both headers.
+A value with characters outside ASCII is sent percent-encoded. Requests under
+`--provider ollama` carry neither header.
+
+A proxy can sit between GlossoGen and the server. To use one, set the model's
+entry in `SELF_HOSTED_BASE_URLS` to the proxy's URL, and have the proxy pass
+each request on to the server. The proxy can store each request under its run
+and agent. For example, a proxy in front of vLLM can add `return_token_ids` to a
+request, and vLLM then returns the token ids of the prompt and of the answer.
+
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is
