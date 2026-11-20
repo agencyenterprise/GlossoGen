@@ -12,17 +12,23 @@ import httpx2
 import pytest
 from pydantic import BaseModel
 from pydantic_ai import Agent
+from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from glossogen.llm import pydantic_ai_model_factory
 from glossogen.llm.pydantic_ai_model_factory import (
     AGENT_ID_HEADER,
+    RETURN_TOKEN_IDS_OPTION,
     RUN_ID_HEADER,
     agent_model_settings,
     build_pydantic_ai_model,
 )
-from glossogen.llm.self_hosted_chat_model import SelfHostedChatModel
+from glossogen.llm.self_hosted_chat_model import (
+    PROMPT_TOKEN_IDS_DETAIL,
+    TOKEN_IDS_DETAIL,
+    SelfHostedChatModel,
+)
 from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
     SELF_HOSTED_BASE_URLS_VAR,
@@ -227,6 +233,7 @@ async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_hea
             settings=AgentModelSettings(),
             run_id="signal_game/1795184024",
             agent_id="player_b",
+            record_token_ids=False,
         ),
     )
 
@@ -234,3 +241,59 @@ async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_hea
 
     sent = [(each[RUN_ID_HEADER], each[AGENT_ID_HEADER]) for each in server.headers]
     assert sent == [("signal_game/1795184024", "player_b")] * 2
+
+
+async def test_a_response_keeps_the_token_ids_that_the_server_returned() -> None:
+    """With the knob on, the request asks vLLM for token ids, and the response keeps them."""
+    sent: list[dict[str, object]] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        sent.append(json.loads(s=request.content))
+        return httpx2.Response(
+            status_code=200,
+            json={
+                "id": "chatcmpl-1",
+                "object": "chat.completion",
+                "created": 0,
+                "model": MODEL,
+                "prompt_token_ids": [11, 12, 13],
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "Done."},
+                        "finish_reason": "stop",
+                        "token_ids": [21, 22],
+                    }
+                ],
+            },
+        )
+
+    model = SelfHostedChatModel(
+        model_name=MODEL,
+        provider=OpenAIProvider(
+            base_url=BASE_URL,
+            api_key=API_KEY,
+            http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler=respond)),
+        ),
+    )
+    agent = Agent(
+        model=model,
+        system_prompt=SYSTEM_PROMPT,
+        model_settings=agent_model_settings(
+            provider=Provider.SELF_HOSTED,
+            model=MODEL,
+            settings=AgentModelSettings(),
+            run_id="signal_game/1795184024",
+            agent_id="player_a",
+            record_token_ids=True,
+        ),
+    )
+
+    result = await agent.run(user_prompt="Your move.")
+
+    assert sent[0][RETURN_TOKEN_IDS_OPTION] is True
+    response = result.all_messages()[-1]
+    assert isinstance(response, ModelResponse)
+    assert response.provider_details is not None
+    assert response.provider_details[PROMPT_TOKEN_IDS_DETAIL] == [11, 12, 13]
+    assert response.provider_details[TOKEN_IDS_DETAIL] == [21, 22]

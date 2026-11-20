@@ -31,6 +31,8 @@ _OPENAI_FINE_TUNE_PREFIX = "ft:"
 # self-hosted model.
 RUN_ID_HEADER = "X-GlossoGen-Run-Id"
 AGENT_ID_HEADER = "X-GlossoGen-Agent-Id"
+# The vLLM request option that ``token_id_request_settings`` sets.
+RETURN_TOKEN_IDS_OPTION = "return_token_ids"
 
 
 def resolve_self_hosted_base_url(model: str) -> str:
@@ -126,23 +128,48 @@ def agent_model_settings(
     settings: AgentModelSettings,
     run_id: str,
     agent_id: str,
+    record_token_ids: bool,
 ) -> ModelSettings:
     """Return the settings a simulation agent runs with.
 
     The provider defaults from :func:`default_pydantic_ai_settings`, then the
     ``settings`` the run was started with, of which only the ones set are sent
     and which win over the defaults. A scenario's own choices reach ``settings``
-    through its preset knobs. The last layer is
-    :func:`request_identity_settings`, which names the run and the agent in the
-    headers of a request to a self-hosted model.
+    through its preset knobs. Then :func:`request_identity_settings`, which names
+    the run and the agent in the headers of a request to a self-hosted model, and
+    :func:`token_id_request_settings`, which asks a self-hosted model's server
+    for token ids when ``record_token_ids`` is on.
     """
     return layered_model_settings(
         layers=(
             default_pydantic_ai_settings(provider=provider, model=model),
             settings.to_pydantic_ai(),
             request_identity_settings(provider=provider, run_id=run_id, agent_id=agent_id),
+            token_id_request_settings(
+                provider=provider, settings=settings, record_token_ids=record_token_ids
+            ),
         )
     )
+
+
+def token_id_request_settings(
+    provider: Provider, settings: AgentModelSettings, record_token_ids: bool
+) -> ModelSettings:
+    """Return the settings that ask a self-hosted model's server for token ids.
+
+    With ``record_token_ids`` on and a ``self-hosted`` model, the request body
+    gets vLLM's ``return_token_ids`` option, and vLLM then returns the token ids
+    of the prompt and of the answer. pydantic-ai replaces ``extra_body`` whole
+    when it merges settings, so this layer carries the run's own ``extra_body``
+    keys as well. For every other case the settings are empty.
+    """
+    if provider != Provider.SELF_HOSTED or not record_token_ids:
+        return ModelSettings()
+    extra_body: dict[str, object] = {}
+    if settings.extra_body is not None:
+        extra_body.update(settings.extra_body)
+    extra_body[RETURN_TOKEN_IDS_OPTION] = True
+    return ModelSettings(extra_body=extra_body)
 
 
 def request_identity_settings(provider: Provider, run_id: str, agent_id: str) -> ModelSettings:

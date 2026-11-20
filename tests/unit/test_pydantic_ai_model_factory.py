@@ -1,7 +1,7 @@
 """Provider mappings passed to Pydantic AI."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 from pydantic_ai.models import infer_model
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.settings import ModelSettings, ThinkingLevel
@@ -11,12 +11,14 @@ from glossogen.evaluation.metrics.protocol_probe.probe_agent import (
 )
 from glossogen.llm.pydantic_ai_model_factory import (
     AGENT_ID_HEADER,
+    RETURN_TOKEN_IDS_OPTION,
     RUN_ID_HEADER,
     agent_model_settings,
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
     request_identity_settings,
     resolve_self_hosted_base_url,
+    token_id_request_settings,
 )
 from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
@@ -186,6 +188,7 @@ def test_no_provider_is_sent_a_reasoning_effort_by_default(provider: Provider) -
         settings=AgentModelSettings(),
         run_id="run-1",
         agent_id="agent-a",
+        record_token_ids=False,
     )
 
     assert "thinking" not in settings
@@ -207,6 +210,7 @@ def test_the_agents_settings_win_over_the_provider_defaults(
         settings=AgentModelSettings(max_tokens=2048, thinking=thinking),
         run_id="run-1",
         agent_id="agent-a",
+        record_token_ids=False,
     )
 
     assert settings == {
@@ -223,6 +227,7 @@ def test_a_self_hosted_agents_settings_carry_the_run_and_agent_headers() -> None
         settings=AgentModelSettings(max_tokens=2048),
         run_id="signal_game/1795184024",
         agent_id="player_a",
+        record_token_ids=False,
     )
 
     assert settings.get("extra_headers") == {
@@ -252,6 +257,7 @@ def test_agents_of_other_providers_get_no_identity_headers(provider: Provider) -
         settings=AgentModelSettings(),
         run_id="signal_game/1795184024",
         agent_id="player_a",
+        record_token_ids=False,
     )
 
     assert "extra_headers" not in settings
@@ -272,6 +278,35 @@ def test_a_probe_of_a_self_hosted_agent_carries_the_run_and_agent_headers() -> N
     }
 
 
+def test_recording_token_ids_asks_for_them_and_keeps_the_runs_extra_body() -> None:
+    """pydantic-ai replaces ``extra_body`` whole, so the run's own keys have to be carried."""
+    template_option: dict[str, JsonValue] = {"chat_template_kwargs": {"enable_thinking": False}}
+    settings = agent_model_settings(
+        provider=Provider.SELF_HOSTED,
+        model="qwen",
+        settings=AgentModelSettings(extra_body=template_option),
+        run_id="signal_game/1795184024",
+        agent_id="player_a",
+        record_token_ids=True,
+    )
+
+    assert settings.get("extra_body") == {**template_option, RETURN_TOKEN_IDS_OPTION: True}
+
+
+@pytest.mark.parametrize(
+    ("provider", "record_token_ids"),
+    [(Provider.SELF_HOSTED, False), (Provider.OPENAI, True), (Provider.OLLAMA, True)],
+)
+def test_token_ids_are_asked_for_only_from_a_self_hosted_model_with_the_knob_on(
+    provider: Provider, record_token_ids: bool
+) -> None:
+    settings = token_id_request_settings(
+        provider=provider, settings=AgentModelSettings(), record_token_ids=record_token_ids
+    )
+
+    assert "extra_body" not in settings
+
+
 @pytest.mark.parametrize("value", ["extreme", 3])
 def test_the_thinking_level_accepts_only_what_pydantic_ai_accepts(value: object) -> None:
     with pytest.raises(ValidationError):
@@ -288,6 +323,7 @@ def test_one_tool_call_per_response_can_be_asked_for(provider: Provider) -> None
         settings=AgentModelSettings(parallel_tool_calls=False),
         run_id="run-1",
         agent_id="agent-a",
+        record_token_ids=False,
     )
 
     assert settings == {

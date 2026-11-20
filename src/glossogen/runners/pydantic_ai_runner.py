@@ -46,6 +46,7 @@ from glossogen.llm.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
 )
 from glossogen.llm.run_usage_projection import simulation_token_usage
+from glossogen.llm.self_hosted_chat_model import PROMPT_TOKEN_IDS_DETAIL, TOKEN_IDS_DETAIL
 from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
@@ -67,6 +68,7 @@ from glossogen.runners.closing_prompt import answer_closing_prompt
 from glossogen.runners.history_cleanup_processor import clean_history
 from glossogen.runners.open_model_anti_corruption_layer import open_model_capabilities
 from glossogen.runners.read_notifications_tool import RunTermination
+from glossogen.runners.token_id_log import TokenIdLog
 from glossogen.runtime.agent_run_result import AgentRunResult
 from glossogen.runtime.agent_runner import AgentRunner
 from glossogen.runtime.event_bus import EventBus
@@ -200,14 +202,25 @@ class _ThinkingAccumulator:
         )
 
 
+class _ResponseTokenIds(NamedTuple):
+    """The token ids of one response's prompt and answer, as the server returned them."""
+
+    prompt_ids: list[int]
+    token_ids: list[int]
+
+
 class _StreamingState:
     """Mutable state shared between the event handler and the outer run loop.
 
     Tracks accumulated reasoning parts and pending tool calls. Whether the
     agent should stop is ``RunTermination``'s, set by ``read_notifications``.
+    ``token_id_log`` lives as long as the agent's runner, across cycles, and
+    ``response_token_ids`` holds the ids of the response not logged yet.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, token_id_log: TokenIdLog) -> None:
+        self.token_id_log = token_id_log
+        self.response_token_ids: _ResponseTokenIds | None = None
         self.pending_tool_calls: dict[str, ToolCallRequest] = {}
         self.accumulated_thinking: list[_ThinkingAccumulator] = []
         self.accumulated_text = ""
@@ -247,8 +260,19 @@ class _StreamingState:
             tool_calls=len(self.accumulated_tool_calls),
         )
 
+    def note_token_ids(self, details: dict[str, Any] | None) -> None:
+        """Keep the token ids that a self-hosted model's response carries, if it carries them."""
+        if details is None:
+            return
+        prompt_ids = details.get(PROMPT_TOKEN_IDS_DETAIL)
+        token_ids = details.get(TOKEN_IDS_DETAIL)
+        if prompt_ids is None or token_ids is None:
+            return
+        self.response_token_ids = _ResponseTokenIds(prompt_ids=prompt_ids, token_ids=token_ids)
+
     def discard_since_attempt_start(self) -> None:
         """Drop what the current attempt accumulated and has not logged."""
+        self.response_token_ids = None
         mark = self._attempt_mark
         del self.accumulated_thinking[mark.thinking :]
         self.accumulated_text = self.accumulated_text[: mark.text]
@@ -412,6 +436,7 @@ async def _run_agent_call(
                                 state.accumulated_text += part.content
                             elif isinstance(part, ThinkingPart):
                                 state.start_thinking_part(part_index=part_index, part=part)
+                        state.note_token_ids(details=next_node.model_response.provider_details)
                     node = next_node
                     continue
                 if Agent.is_model_request_node(node) or Agent.is_call_tools_node(node):
@@ -533,6 +558,7 @@ class PydanticAIRunner(AgentRunner):
                 settings=agent_config.model_settings,
                 run_id=self._run_id,
                 agent_id=agent_id,
+                record_token_ids=agent_config.record_token_ids,
             )
             agent: Agent[None, str] = Agent(
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
@@ -575,8 +601,9 @@ class PydanticAIRunner(AgentRunner):
                     ],
                 )
 
+            token_id_log = TokenIdLog()
             while total_turns < self._max_turns:
-                state = _StreamingState()
+                state = _StreamingState(token_id_log=token_id_log)
                 captured_state = state
 
                 async def _handle_events(
@@ -1004,7 +1031,15 @@ class PydanticAIRunner(AgentRunner):
         if state.response_started_at is not None:
             event_time = state.response_started_at
         state.forget_response_start()
-        if not thinking and not thinking_parts and not text and not tool_calls:
+        response_token_ids = state.response_token_ids
+        state.response_token_ids = None
+        if (
+            not thinking
+            and not thinking_parts
+            and not text
+            and not tool_calls
+            and response_token_ids is None
+        ):
             return
         if usage is None:
             usage = TokenUsage(
@@ -1019,21 +1054,31 @@ class PydanticAIRunner(AgentRunner):
             agent_id,
             text,
         )
-        state.spawn_log_task(
-            event_logger.log(
-                LLMResponseReceived(
-                    agent_id=agent_id,
-                    thinking=thinking if thinking else None,
-                    thinking_parts=thinking_parts,
-                    text=text if text else None,
-                    tool_calls=tool_calls,
-                    stop_reason=stop_reason,
-                    usage=usage,
-                    round_number=event_round,
-                    timestamp=event_time,
-                )
-            )
+        event = LLMResponseReceived(
+            agent_id=agent_id,
+            thinking=thinking if thinking else None,
+            thinking_parts=thinking_parts,
+            text=text if text else None,
+            tool_calls=tool_calls,
+            stop_reason=stop_reason,
+            usage=usage,
+            round_number=event_round,
+            timestamp=event_time,
         )
+        if response_token_ids is not None:
+            logged = state.token_id_log.record(
+                prompt_ids=response_token_ids.prompt_ids,
+                token_ids=response_token_ids.token_ids,
+            )
+            event = event.model_copy(
+                update={
+                    "token_ids_index": logged.response_index,
+                    "prompt_prefix_tokens": logged.prompt_prefix_tokens,
+                    "prompt_tail_ids": logged.prompt_tail_ids,
+                    "token_ids": logged.token_ids,
+                }
+            )
+        state.spawn_log_task(event_logger.log(event))
         state.accumulated_thinking = []
         state.accumulated_text = ""
         state.accumulated_tool_calls = []
