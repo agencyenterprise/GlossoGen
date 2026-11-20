@@ -512,9 +512,11 @@ def recording_runner_settings(monkeypatch: pytest.MonkeyPatch) -> list[ModelSett
     requested: list[ModelSettings] = []
 
     def recording_settings(
-        provider: Provider, model: str, settings: AgentModelSettings
+        provider: Provider, model: str, settings: AgentModelSettings, run_id: str, agent_id: str
     ) -> ModelSettings:
-        built = agent_model_settings(provider=provider, model=model, settings=settings)
+        built = agent_model_settings(
+            provider=provider, model=model, settings=settings, run_id=run_id, agent_id=agent_id
+        )
         requested.append(built)
         return built
 

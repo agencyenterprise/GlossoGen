@@ -196,6 +196,12 @@ Deploying on Modal, and running locally with Ollama or MLX, are covered in
 [Self-hosted models](local-inference-vllm-mlx.md). Tokens under `self-hosted`
 and `ollama` are priced at zero, since their GPU time is billed elsewhere.
 
+Each agent's requests to a self-hosted model carry two headers:
+`X-GlossoGen-Run-Id` holds the run id and `X-GlossoGen-Agent-Id` the agent id.
+A proxy between GlossoGen and the server can use them to tell runs and agents
+apart, for example to record the token ids that the server returns for each
+request.
+
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is

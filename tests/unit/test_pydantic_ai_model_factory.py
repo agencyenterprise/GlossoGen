@@ -10,6 +10,8 @@ from glossogen.evaluation.metrics.protocol_probe.probe_agent import (
     _probe_model_settings,  # pyright: ignore[reportPrivateUsage]
 )
 from glossogen.llm.pydantic_ai_model_factory import (
+    AGENT_ID_HEADER,
+    RUN_ID_HEADER,
     agent_model_settings,
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
@@ -176,7 +178,11 @@ def test_a_probe_drops_the_agents_cap_and_keeps_its_other_settings(provider: Pro
 def test_no_provider_is_sent_a_reasoning_effort_by_default(provider: Provider) -> None:
     """An OpenAI reasoning model used to get ``high`` whatever the run asked for."""
     settings = agent_model_settings(
-        provider=provider, model="gpt-5.4", settings=AgentModelSettings()
+        provider=provider,
+        model="gpt-5.4",
+        settings=AgentModelSettings(),
+        run_id="run-1",
+        agent_id="agent-a",
     )
 
     assert "thinking" not in settings
@@ -196,6 +202,8 @@ def test_the_agents_settings_win_over_the_provider_defaults(
         provider=provider,
         model="gpt-5.4",
         settings=AgentModelSettings(max_tokens=2048, thinking=thinking),
+        run_id="run-1",
+        agent_id="agent-a",
     )
 
     assert settings == {
@@ -203,6 +211,34 @@ def test_the_agents_settings_win_over_the_provider_defaults(
         "max_tokens": 2048,
         "thinking": thinking,
     }
+
+
+def test_a_self_hosted_agent_names_its_run_and_itself_in_request_headers() -> None:
+    settings = agent_model_settings(
+        provider=Provider.SELF_HOSTED,
+        model="qwen",
+        settings=AgentModelSettings(),
+        run_id="run-1",
+        agent_id="agent-a",
+    )
+
+    assert settings.get("extra_headers") == {
+        RUN_ID_HEADER: "run-1",
+        AGENT_ID_HEADER: "agent-a",
+    }
+
+
+@pytest.mark.parametrize("provider", [p for p in Provider if p != Provider.SELF_HOSTED])
+def test_other_providers_get_no_identity_headers(provider: Provider) -> None:
+    settings = agent_model_settings(
+        provider=provider,
+        model="gpt-5.4",
+        settings=AgentModelSettings(),
+        run_id="run-1",
+        agent_id="agent-a",
+    )
+
+    assert "extra_headers" not in settings
 
 
 @pytest.mark.parametrize("value", ["extreme", 3])
@@ -216,7 +252,11 @@ def test_one_tool_call_per_response_can_be_asked_for(provider: Provider) -> None
     """pydantic-ai sends this to Anthropic as ``disable_parallel_tool_use`` and to
     OpenAI as ``parallel_tool_calls``; the other settings stay in place."""
     settings = agent_model_settings(
-        provider=provider, model="m", settings=AgentModelSettings(parallel_tool_calls=False)
+        provider=provider,
+        model="m",
+        settings=AgentModelSettings(parallel_tool_calls=False),
+        run_id="run-1",
+        agent_id="agent-a",
     )
 
     assert settings == {

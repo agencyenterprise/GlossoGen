@@ -531,6 +531,8 @@ class PydanticAIRunner(AgentRunner):
                 provider=provider,
                 model=agent_config.model,
                 settings=agent_config.model_settings,
+                run_id=self._run_id,
+                agent_id=agent_id,
             )
             agent: Agent[None, str] = Agent(
                 model=build_pydantic_ai_model(model=agent_config.model, provider=provider),

@@ -26,6 +26,8 @@ from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_ur
 from glossogen.models.agent_model_settings import AgentModelSettings
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
+RUN_ID_HEADER = "X-GlossoGen-Run-Id"
+AGENT_ID_HEADER = "X-GlossoGen-Agent-Id"
 
 
 def resolve_self_hosted_base_url(model: str) -> str:
@@ -119,20 +121,27 @@ def agent_model_settings(
     provider: Provider,
     model: str,
     settings: AgentModelSettings,
+    run_id: str,
+    agent_id: str,
 ) -> ModelSettings:
     """Return the settings a simulation agent runs with.
 
     The provider defaults from :func:`default_pydantic_ai_settings`, then the
     ``settings`` the run was started with, of which only the ones set are sent
     and which win over the defaults. A scenario's own choices reach ``settings``
-    through its preset knobs.
+    through its preset knobs. A self-hosted model's requests also carry the run
+    id and the agent id as the ``RUN_ID_HEADER`` and ``AGENT_ID_HEADER`` headers,
+    so a proxy in front of the server can tell the runs and agents apart.
     """
-    return layered_model_settings(
-        layers=(
-            default_pydantic_ai_settings(provider=provider, model=model),
-            settings.to_pydantic_ai(),
+    layers = [
+        default_pydantic_ai_settings(provider=provider, model=model),
+        settings.to_pydantic_ai(),
+    ]
+    if provider == Provider.SELF_HOSTED:
+        layers.append(
+            ModelSettings(extra_headers={RUN_ID_HEADER: run_id, AGENT_ID_HEADER: agent_id})
         )
-    )
+    return layered_model_settings(layers=layers)
 
 
 def layered_model_settings(layers: Sequence[ModelSettings]) -> ModelSettings:

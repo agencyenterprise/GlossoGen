@@ -12,6 +12,10 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Self-hosted requests name their run and agent.** Each agent's requests to a
+  `self-hosted` model carry the headers `X-GlossoGen-Run-Id` and
+  `X-GlossoGen-Agent-Id`, so a proxy in front of the server can tell runs and
+  agents apart. `agent_model_settings` takes the run id and the agent id.
 - **Scenarios register themselves and are loaded from configured sources.** A
   scenario class is decorated with `@scenario(name=...)`
   (`glossogen.scenario_contract.registration`), which sets the name `name()`
