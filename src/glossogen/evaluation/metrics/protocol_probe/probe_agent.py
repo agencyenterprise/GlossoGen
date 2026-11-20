@@ -32,6 +32,7 @@ from glossogen.llm.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
     layered_model_settings,
+    request_identity_settings,
 )
 from glossogen.llm.run_usage_projection import evaluation_token_usage
 from glossogen.model_catalog.provider_catalog import Provider
@@ -43,10 +44,15 @@ _PROBE_INTRO = "PROTOCOL PROBE:"
 
 
 def _probe_model_settings(
-    provider: Provider, model: str, model_settings: AgentModelSettings
+    provider: Provider,
+    model: str,
+    model_settings: AgentModelSettings,
+    run_id: str,
+    agent_id: str,
 ) -> ModelSettings:
     """Probe-call model settings: the provider defaults the agents ran with, then the
-    settings the agent ran with, less its output cap.
+    settings the agent ran with, less its output cap, then the run and agent headers
+    that a self-hosted model gets (``request_identity_settings``).
 
     The provider defaults are ``default_pydantic_ai_settings``, the same layer the
     runner puts under every agent: Anthropic prompt caching, which the probe needs
@@ -64,6 +70,7 @@ def _probe_model_settings(
         layers=(
             default_pydantic_ai_settings(provider=provider, model=model),
             agent_layer,
+            request_identity_settings(provider=provider, run_id=run_id, agent_id=agent_id),
         )
     )
 
@@ -79,6 +86,7 @@ class StructuredProbeResult(BaseModel, Generic[ProbeOutputT]):
 
 
 async def run_structured_probe(
+    run_id: str,
     agent_id: str,
     role_name: str,
     full_system_prompt: str,
@@ -104,7 +112,11 @@ async def run_structured_probe(
         system_prompt=full_system_prompt,
         output_type=output_type,
         model_settings=_probe_model_settings(
-            provider=provider, model=model, model_settings=model_settings
+            provider=provider,
+            model=model,
+            model_settings=model_settings,
+            run_id=run_id,
+            agent_id=agent_id,
         ),
     )
     logger.info(
@@ -128,6 +140,7 @@ async def run_structured_probe(
 
 
 async def run_protocol_probe(
+    run_id: str,
     agent_id: str,
     role_name: str,
     full_system_prompt: str,
@@ -144,6 +157,7 @@ async def run_protocol_probe(
     asks for a ``ProtocolProbeOutput`` (reasoning + message).
     """
     return await run_structured_probe(
+        run_id=run_id,
         agent_id=agent_id,
         role_name=role_name,
         full_system_prompt=full_system_prompt,

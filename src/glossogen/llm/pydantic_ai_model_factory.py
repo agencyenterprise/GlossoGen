@@ -7,6 +7,7 @@ provider defaults, and all but a HuggingFace judge build their models here.
 
 import os
 from collections.abc import Sequence
+from urllib.parse import quote
 
 from pydantic_ai.models import ModelRequestParameters, infer_model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
@@ -26,6 +27,8 @@ from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_ur
 from glossogen.models.agent_model_settings import AgentModelSettings
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
+# The headers that ``request_identity_settings`` puts on each request to a
+# self-hosted model.
 RUN_ID_HEADER = "X-GlossoGen-Run-Id"
 AGENT_ID_HEADER = "X-GlossoGen-Agent-Id"
 
@@ -129,19 +132,35 @@ def agent_model_settings(
     The provider defaults from :func:`default_pydantic_ai_settings`, then the
     ``settings`` the run was started with, of which only the ones set are sent
     and which win over the defaults. A scenario's own choices reach ``settings``
-    through its preset knobs. A self-hosted model's requests also carry the run
-    id and the agent id as the ``RUN_ID_HEADER`` and ``AGENT_ID_HEADER`` headers,
-    so a proxy in front of the server can tell the runs and agents apart.
+    through its preset knobs. The last layer is
+    :func:`request_identity_settings`, which names the run and the agent in the
+    headers of a request to a self-hosted model.
     """
-    layers = [
-        default_pydantic_ai_settings(provider=provider, model=model),
-        settings.to_pydantic_ai(),
-    ]
-    if provider == Provider.SELF_HOSTED:
-        layers.append(
-            ModelSettings(extra_headers={RUN_ID_HEADER: run_id, AGENT_ID_HEADER: agent_id})
+    return layered_model_settings(
+        layers=(
+            default_pydantic_ai_settings(provider=provider, model=model),
+            settings.to_pydantic_ai(),
+            request_identity_settings(provider=provider, run_id=run_id, agent_id=agent_id),
         )
-    return layered_model_settings(layers=layers)
+    )
+
+
+def request_identity_settings(provider: Provider, run_id: str, agent_id: str) -> ModelSettings:
+    """Return the settings that put the run id and the agent id in a request's headers.
+
+    Only a ``self-hosted`` model gets the ``RUN_ID_HEADER`` and ``AGENT_ID_HEADER``
+    headers. For every other provider the settings are empty. Each value is
+    percent-encoded, with ``/`` kept, because an HTTP header value must be ASCII:
+    ``signal_game/1795184024`` and ``player_a`` are sent as they are.
+    """
+    if provider != Provider.SELF_HOSTED:
+        return ModelSettings()
+    return ModelSettings(
+        extra_headers={
+            RUN_ID_HEADER: quote(string=run_id, safe="/"),
+            AGENT_ID_HEADER: quote(string=agent_id, safe="/"),
+        }
+    )
 
 
 def layered_model_settings(layers: Sequence[ModelSettings]) -> ModelSettings:

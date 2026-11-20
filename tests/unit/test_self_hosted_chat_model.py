@@ -16,13 +16,19 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from glossogen.llm import pydantic_ai_model_factory
-from glossogen.llm.pydantic_ai_model_factory import build_pydantic_ai_model
+from glossogen.llm.pydantic_ai_model_factory import (
+    AGENT_ID_HEADER,
+    RUN_ID_HEADER,
+    agent_model_settings,
+    build_pydantic_ai_model,
+)
 from glossogen.llm.self_hosted_chat_model import SelfHostedChatModel
 from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
     SELF_HOSTED_BASE_URLS_VAR,
     Provider,
 )
+from glossogen.models.agent_model_settings import AgentModelSettings
 
 MODEL = "qwen-under-test"
 BASE_URL = "http://vllm.test/v1"
@@ -60,9 +66,11 @@ class ScriptedChatServer:
         self.replies = replies
         self.requests: list[SentRequest] = []
         self.bodies: list[str] = []
+        self.headers: list[httpx2.Headers] = []
 
     def respond(self, request: httpx2.Request) -> httpx2.Response:
         """Keep the request and answer with the next reply."""
+        self.headers.append(request.headers)
         self.bodies.append(request.content.decode())
         self.requests.append(SentRequest.model_validate_json(json_data=request.content))
         reply = self.replies[len(self.requests) - 1]
@@ -198,3 +206,31 @@ async def test_a_run_without_an_empty_response_sends_what_openai_chat_model_send
     assert [json.loads(s=body) for body in servers[1].bodies] == [
         json.loads(s=body) for body in servers[0].bodies
     ]
+
+
+async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The headers come from the agent's settings and reach the server on every request."""
+    replies: list[str | ToolCallReply] = [
+        ToolCallReply(tool_name="move", arguments='{"direction": "down"}'),
+        "Done.",
+    ]
+    server = serve_self_hosted_model(replies=replies, monkeypatch=monkeypatch)
+    agent = Agent(
+        model=build_pydantic_ai_model(model=MODEL, provider=Provider.SELF_HOSTED),
+        system_prompt=SYSTEM_PROMPT,
+        tools=[move],
+        model_settings=agent_model_settings(
+            provider=Provider.SELF_HOSTED,
+            model=MODEL,
+            settings=AgentModelSettings(),
+            run_id="signal_game/1795184024",
+            agent_id="player_b",
+        ),
+    )
+
+    await agent.run(user_prompt="Your move.")
+
+    sent = [(each[RUN_ID_HEADER], each[AGENT_ID_HEADER]) for each in server.headers]
+    assert sent == [("signal_game/1795184024", "player_b")] * 2

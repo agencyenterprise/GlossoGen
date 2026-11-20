@@ -15,9 +15,10 @@ from glossogen.llm.pydantic_ai_model_factory import (
     agent_model_settings,
     build_pydantic_ai_model,
     default_pydantic_ai_settings,
+    request_identity_settings,
     resolve_self_hosted_base_url,
 )
-from glossogen.model_catalog.provider_catalog import Provider
+from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS, Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.scenario_contract.base_knobs import BaseKnobs
 
@@ -168,6 +169,8 @@ def test_a_probe_drops_the_agents_cap_and_keeps_its_other_settings(provider: Pro
         provider=provider,
         model="gpt-5.4",
         model_settings=AgentModelSettings(max_tokens=2048, thinking="low"),
+        run_id="signal_game/1795184024",
+        agent_id="player_a",
     )
 
     assert "max_tokens" not in settings
@@ -213,32 +216,60 @@ def test_the_agents_settings_win_over_the_provider_defaults(
     }
 
 
-def test_a_self_hosted_agent_names_its_run_and_itself_in_request_headers() -> None:
+def test_a_self_hosted_agents_settings_carry_the_run_and_agent_headers() -> None:
     settings = agent_model_settings(
         provider=Provider.SELF_HOSTED,
         model="qwen",
-        settings=AgentModelSettings(),
-        run_id="run-1",
-        agent_id="agent-a",
+        settings=AgentModelSettings(max_tokens=2048),
+        run_id="signal_game/1795184024",
+        agent_id="player_a",
     )
 
     assert settings.get("extra_headers") == {
-        RUN_ID_HEADER: "run-1",
-        AGENT_ID_HEADER: "agent-a",
+        RUN_ID_HEADER: "signal_game/1795184024",
+        AGENT_ID_HEADER: "player_a",
+    }
+    assert settings.get("max_tokens") == 2048
+
+
+def test_a_non_ascii_id_is_sent_percent_encoded() -> None:
+    """httpx refuses a header value that is not ASCII, which would fail every request."""
+    settings = request_identity_settings(
+        provider=Provider.SELF_HOSTED, run_id="jogo/1", agent_id="jogador_ã"
+    )
+
+    assert settings.get("extra_headers") == {
+        RUN_ID_HEADER: "jogo/1",
+        AGENT_ID_HEADER: "jogador_%C3%A3",
     }
 
 
-@pytest.mark.parametrize("provider", [p for p in Provider if p != Provider.SELF_HOSTED])
-def test_other_providers_get_no_identity_headers(provider: Provider) -> None:
+@pytest.mark.parametrize("provider", [p for p in SIMULATION_PROVIDERS if p != Provider.SELF_HOSTED])
+def test_agents_of_other_providers_get_no_identity_headers(provider: Provider) -> None:
     settings = agent_model_settings(
         provider=provider,
         model="gpt-5.4",
         settings=AgentModelSettings(),
-        run_id="run-1",
-        agent_id="agent-a",
+        run_id="signal_game/1795184024",
+        agent_id="player_a",
     )
 
     assert "extra_headers" not in settings
+
+
+def test_a_probe_of_a_self_hosted_agent_carries_the_run_and_agent_headers() -> None:
+    settings = _probe_model_settings(
+        provider=Provider.SELF_HOSTED,
+        model="qwen",
+        model_settings=AgentModelSettings(),
+        run_id="signal_game/1795184024",
+        agent_id="player_b",
+    )
+
+    assert settings.get("extra_headers") == {
+        RUN_ID_HEADER: "signal_game/1795184024",
+        AGENT_ID_HEADER: "player_b",
+    }
 
 
 @pytest.mark.parametrize("value", ["extreme", 3])
