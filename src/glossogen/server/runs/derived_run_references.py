@@ -18,9 +18,27 @@ from pydantic import ValidationError
 
 from glossogen.db.pool import DbPool
 from glossogen.db.queries import list_children_of_run
-from glossogen.run_storage.derivation_manifest_reader import read_derivation_fields
-from glossogen.run_storage.run_discovery import build_summary, discover_runs
-from glossogen.run_storage.run_summary_models import EvaluationScore, RunSummary
+from glossogen.run_storage.derivation_manifest_reader import (
+    read_cross_run_replace_agent_source,
+    read_derivation_fields,
+    read_fork_at_round_source,
+    read_fork_source,
+    read_replace_agent_source,
+)
+from glossogen.run_storage.run_discovery import (
+    RunDescriptor,
+    build_summary,
+    discover_run_descriptors,
+)
+from glossogen.run_storage.run_identity import compose_run_id
+from glossogen.run_storage.run_summary_models import (
+    CrossRunReplaceAgentSource,
+    EvaluationScore,
+    ForkAtRoundSource,
+    ForkSource,
+    ReplaceAgentSource,
+    RunSummary,
+)
 from glossogen.scenario_contract.loader import find_scenario_class
 from glossogen.server.runs.models import DerivedRunReference
 
@@ -89,38 +107,92 @@ async def _find_children_on_disk(
     parent_scenario: str,
     parent_run_dir_name: str,
 ) -> list[_ChildRunId]:
-    """Scan every run dir and return those whose derivation source is the parent.
+    """Return the runs on disk whose timeline parent is the given run, newest first.
 
-    Reuses ``discover_runs`` enrichment, which already reads each run's
-    manifest into the summary's source fields, so no manifest is re-parsed here.
+    Reads only each run's derivation manifests, in a worker thread. Building a
+    summary per run to get at the same sources would also read its labels, note,
+    evaluation manifest and report, for every run on disk on every run-detail
+    request. The children found here are enriched afterwards by
+    :func:`_build_reference`, which drops a run whose summary cannot be built.
     """
-    parent_run_id = f"{parent_scenario}/{parent_run_dir_name}"
-    summaries = await discover_runs(runs_dir=runs_dir)
-    children: list[_ChildRunId] = []
-    for summary in summaries:
-        if timeline_parent_run_id(summary=summary) != parent_run_id:
+    return await asyncio.to_thread(
+        _find_children_on_disk_sync,
+        runs_dir,
+        compose_run_id(scenario_name=parent_scenario, run_dir_name=parent_run_dir_name),
+    )
+
+
+def _find_children_on_disk_sync(runs_dir: Path, parent_run_id: str) -> list[_ChildRunId]:
+    """Blocking core of :func:`_find_children_on_disk`.
+
+    Orders ties within one second by scenario and run directory name, ascending,
+    the same order :func:`~glossogen.run_storage.run_discovery.discover_runs`
+    gives. A run whose manifests cannot be read is logged and left out rather
+    than failing the parent's page.
+    """
+    children: list[RunDescriptor] = []
+    for descriptor in discover_run_descriptors(runs_dir=runs_dir):
+        run_dir = runs_dir / descriptor.scenario_name / descriptor.run_dir_name
+        try:
+            parent = _timeline_parent_on_disk(run_dir=run_dir)
+        except Exception:
+            logger.exception("Could not read the derivation manifests at %s", run_dir)
             continue
-        scenario, run_dir_name = summary.run_id.split("/", 1)
-        children.append(_ChildRunId(scenario=scenario, run_dir_name=run_dir_name))
-    return children
+        if parent == parent_run_id:
+            children.append(descriptor)
+    children.sort(key=lambda descriptor: (descriptor.scenario_name, descriptor.run_dir_name))
+    children.sort(key=lambda descriptor: descriptor.timestamp, reverse=True)
+    return [
+        _ChildRunId(scenario=descriptor.scenario_name, run_dir_name=descriptor.run_dir_name)
+        for descriptor in children
+    ]
+
+
+def _timeline_parent_on_disk(run_dir: Path) -> str | None:
+    """Return the timeline parent's run id read off a run's manifests, else ``None``.
+
+    Reads the same manifests, through the same readers, that fill a summary's
+    source fields, and applies :func:`_timeline_parent_of_sources` to them.
+    """
+    return _timeline_parent_of_sources(
+        fork_source=read_fork_source(run_dir=run_dir),
+        replace_agent_source=read_replace_agent_source(run_dir=run_dir),
+        fork_at_round_source=read_fork_at_round_source(run_dir=run_dir),
+        cross_run_replace_agent_source=read_cross_run_replace_agent_source(run_dir=run_dir),
+    )
 
 
 def timeline_parent_run_id(summary: RunSummary) -> str | None:
-    """Return the timeline parent's run id for a derived run, else ``None``.
+    """Return the timeline parent's run id for a derived run's summary, else ``None``."""
+    return _timeline_parent_of_sources(
+        fork_source=summary.fork_source,
+        replace_agent_source=summary.replace_agent_source,
+        fork_at_round_source=summary.fork_at_round_source,
+        cross_run_replace_agent_source=summary.cross_run_replace_agent_source,
+    )
+
+
+def _timeline_parent_of_sources(
+    fork_source: ForkSource | None,
+    replace_agent_source: ReplaceAgentSource | None,
+    fork_at_round_source: ForkAtRoundSource | None,
+    cross_run_replace_agent_source: CrossRunReplaceAgentSource | None,
+) -> str | None:
+    """Return the timeline parent's run id given a run's derivation sources, else ``None``.
 
     Normalizes the multiply-defined provenance: fork, replace-agent, and
     fork-at-round each store the parent under ``source_run_id``; cross-run
     derivations use ``source_a_run_id`` (the timeline parent), matching the
     convention in the runs-index registration path.
     """
-    if summary.fork_source is not None:
-        return summary.fork_source.source_run_id
-    if summary.replace_agent_source is not None:
-        return summary.replace_agent_source.source_run_id
-    if summary.fork_at_round_source is not None:
-        return summary.fork_at_round_source.source_run_id
-    if summary.cross_run_replace_agent_source is not None:
-        return summary.cross_run_replace_agent_source.source_a_run_id
+    if fork_source is not None:
+        return fork_source.source_run_id
+    if replace_agent_source is not None:
+        return replace_agent_source.source_run_id
+    if fork_at_round_source is not None:
+        return fork_at_round_source.source_run_id
+    if cross_run_replace_agent_source is not None:
+        return cross_run_replace_agent_source.source_a_run_id
     return None
 
 
