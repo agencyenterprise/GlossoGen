@@ -1907,6 +1907,18 @@ bearer token shared across them. In the <code>.env</code>:</p>
 <p>Deploying on Modal, and running locally with Ollama or MLX, are covered in
 <a href="../local-inference-vllm-mlx/">Self-hosted models</a>. Tokens under <code>self-hosted</code>
 and <code>ollama</code> are priced at zero, since their GPU time is billed elsewhere.</p>
+<p>Under <code>--provider self-hosted</code>, each request for an agent carries two headers.
+<code>X-GlossoGen-Run-Id</code> holds the run id, which has the form
+<code>&lt;scenario&gt;/&lt;run directory name&gt;</code>, for example <code>signal_game/1795184024</code>.
+<code>X-GlossoGen-Agent-Id</code> holds the agent id, for example <code>player_a</code>. The agent's
+own requests and the requests of the protocol probe metrics carry both headers.
+A value with characters outside ASCII is sent percent-encoded. Requests under
+<code>--provider ollama</code> carry neither header.</p>
+<p>A proxy can sit between GlossoGen and the server. To use one, set the model's
+entry in <code>SELF_HOSTED_BASE_URLS</code> to the proxy's URL, and have the proxy pass
+each request on to the server. The proxy can store each request under its run
+and agent. For example, a proxy in front of vLLM can add <code>return_token_ids</code> to a
+request, and vLLM then returns the token ids of the prompt and of the answer.</p>
 <p><strong>Watch the context budget.</strong> Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is

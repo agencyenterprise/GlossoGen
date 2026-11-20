@@ -2031,6 +2031,13 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Requests to self-hosted models carry the run id and the agent id.</strong> Under
+  <code>--provider self-hosted</code>, an agent's requests and the protocol probe metrics'
+  requests carry the headers <code>X-GlossoGen-Run-Id</code> and <code>X-GlossoGen-Agent-Id</code>,
+  so a proxy in front of the server can store each request under its run and
+  agent. <code>glossogen.llm.pydantic_ai_model_factory.agent_model_settings</code> takes
+  the run id and the agent id, <code>run_structured_probe</code> and <code>run_protocol_probe</code>
+  take the run id, and <code>request_identity_settings</code> builds the headers.</li>
 <li><strong>Scenarios register themselves and are loaded from configured sources.</strong> A
   scenario class is decorated with <code>@scenario(name=...)</code>
   (<code>glossogen.scenario_contract.registration</code>), which sets the name <code>name()</code>
