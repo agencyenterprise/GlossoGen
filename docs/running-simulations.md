@@ -210,6 +210,23 @@ each request on to the server. The proxy can store each request under its run
 and agent. For example, a proxy in front of vLLM can add `return_token_ids` to a
 request, and vLLM then returns the token ids of the prompt and of the answer.
 
+`record_token_ids=true` records those token ids in the run's own event log, with
+no proxy. Each request of a self-hosted agent then asks the server for
+`return_token_ids`, and each `llm_response_received` event holds the ids that the
+server returned. The knob has no effect on agents under other providers, and the
+server has to support the option, as vLLM does.
+
+```bash
+glossogen run signal_game --provider self-hosted ... record_token_ids=true
+```
+
+An event stores the answer's ids in `token_ids`. It stores the prompt as the length
+of the prefix that it shares with the agent's previous recorded prompt and answer,
+`prompt_prefix_tokens`, and the rest of its ids, `prompt_tail_ids`. So a prompt that
+repeats the previous request adds only its new tokens to the log.
+`glossogen.run_storage.recorded_token_ids` rebuilds the full prompts of one agent.
+Without the knob, the events hold none of these fields.
+
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is

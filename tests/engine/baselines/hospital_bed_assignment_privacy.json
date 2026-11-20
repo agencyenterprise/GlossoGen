@@ -30,6 +30,7 @@
      "token_threshold": 50000
     },
     "wait_reasoning": false,
+    "record_token_ids": false,
     "seed": 42,
     "round_time_budget_seconds": null,
     "patient_pool_size": 6,

@@ -24,6 +24,7 @@ from glossogen.runners.pydantic_ai_runner import (
 from glossogen.runners.pydantic_ai_runner import (
     PydanticAIRunner,
 )
+from glossogen.runners.token_id_log import TokenIdLog
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
@@ -140,7 +141,7 @@ async def test_stream_logging_records_compaction_identifiers_and_details(tmp_pat
     )
     await event_logger.open()
     await event_logger.log(event=_started())
-    state = _StreamingState()
+    state = _StreamingState(token_id_log=TokenIdLog())
     for event in [
         PartStartEvent(
             index=0,
@@ -189,7 +190,7 @@ async def test_compaction_is_logged_after_the_response_that_preceded_it(
     )
     await event_logger.open()
     await event_logger.log(event=_started())
-    state = _StreamingState()
+    state = _StreamingState(token_id_log=TokenIdLog())
     state.accumulated_tool_calls.append(
         ToolCallRequest(call_id="call-1", tool_name="read_channel", arguments={})
     )

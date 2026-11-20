@@ -12,6 +12,13 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **A run can record a self-hosted model's token ids in its event log.** With
+  the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
+  server for `return_token_ids`, and each `llm_response_received` event holds
+  the token ids of the answer (`token_ids`) and of the prompt, stored as a
+  shared prefix (`prompt_prefix_tokens`) and the rest (`prompt_tail_ids`).
+  `glossogen.run_storage.recorded_token_ids` rebuilds an agent's full prompts.
+  `agent_model_settings` takes `record_token_ids`.
 - **Requests to self-hosted models carry the run id and the agent id.** Under
   `--provider self-hosted`, an agent's requests and the protocol probe metrics'
   requests carry the headers `X-GlossoGen-Run-Id` and `X-GlossoGen-Agent-Id`,
