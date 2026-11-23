@@ -13,7 +13,7 @@ resumed run that rebuilds the seat from its own log alone forgets the source
 entirely. So the assertions are about what the seat's model is sent.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -29,9 +29,6 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import (
     AgentInfo,
-    BuiltinToolCallsReturns,
-    DeltaThinkingCalls,
-    DeltaToolCalls,
     FunctionModel,
 )
 
@@ -55,7 +52,7 @@ from glossogen.run_storage.history_transfer_manifest import read_history_transfe
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
 from glossogen.testing import simulation_harness
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn, observe_requests
 from glossogen.testing.simulation_harness import never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
@@ -132,32 +129,11 @@ def user_prompts(*, message: ModelMessage) -> list[str]:
     return [str(part.content) for part in message.parts if isinstance(part, UserPromptPart)]
 
 
-class FirstRequestRecorder:
-    """Wraps a scripted model and records the messages of every request it is sent."""
-
-    def __init__(self, scripted: FunctionModel) -> None:
-        self._scripted = scripted
-        self.requests: list[list[ModelMessage]] = []
-
-    def model(self) -> FunctionModel:
-        """Return the wrapping model."""
-
-        async def stream(
-            messages: list[ModelMessage], info: AgentInfo
-        ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
-            self.requests.append(list(messages))
-            assert self._scripted.stream_function is not None
-            async for chunk in self._scripted.stream_function(messages, info):
-                yield chunk
-
-        return FunctionModel(stream_function=stream)
-
-
 class RecordedScript(NamedTuple):
-    """One scripted agent's opening turn and the recorder wrapping its model."""
+    """One scripted agent's opening turn and the messages of every request it was sent."""
 
     first_turn: ScriptedTurn
-    recorder: FirstRequestRecorder
+    requests: list[list[ModelMessage]]
 
 
 def record_every_script(*, monkeypatch: pytest.MonkeyPatch) -> list[RecordedScript]:
@@ -167,10 +143,17 @@ def record_every_script(*, monkeypatch: pytest.MonkeyPatch) -> list[RecordedScri
     def build_recorded(
         *, turns: Sequence[ScriptedTurn], when_exhausted: Sequence[ScriptedTurn] | None
     ) -> FunctionModel:
-        scripted = BUILD_SCRIPTED_MODEL(turns=turns, when_exhausted=when_exhausted)
-        recorder = FirstRequestRecorder(scripted=scripted)
-        recorded.append(RecordedScript(first_turn=turns[0], recorder=recorder))
-        return recorder.model()
+        requests: list[list[ModelMessage]] = []
+        recorded.append(RecordedScript(first_turn=turns[0], requests=requests))
+
+        def keep(messages: list[ModelMessage], info: AgentInfo) -> None:
+            _ = info
+            requests.append(list(messages))
+
+        return observe_requests(
+            model=BUILD_SCRIPTED_MODEL(turns=turns, when_exhausted=when_exhausted),
+            observer=keep,
+        )
 
     monkeypatch.setattr(simulation_harness, "build_scripted_model", build_recorded)
     return recorded
@@ -180,9 +163,9 @@ def first_request_of(
     *, recorded: list[RecordedScript], first_turn: ScriptedTurn
 ) -> list[ModelMessage]:
     """The first request sent to the one agent whose script opens with ``first_turn``."""
-    matches = [entry.recorder for entry in recorded if entry.first_turn == first_turn]
+    matches = [entry.requests for entry in recorded if entry.first_turn == first_turn]
     assert len(matches) == 1
-    return matches[0].requests[0]
+    return matches[0][0]
 
 
 async def test_a_seat_starts_with_its_source_agents_turns_up_to_the_cut_then_the_new_runs_prompts(

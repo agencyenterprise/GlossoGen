@@ -27,11 +27,7 @@ from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runtime.agent_runner import CLOSING_PROMPT_TIMEOUT_SECONDS, AgentRunner
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
-from glossogen.runtime.agent_tool_specs import (
-    ToolDefinitionLister,
-    offered_tool_names,
-    select_tool_definitions,
-)
+from glossogen.runtime.agent_tool_specs import ToolDefinitionLister
 from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
@@ -57,10 +53,12 @@ class _RunSpend(NamedTuple):
 class AutonomousSupervisor:
     """Launches the game clock and the agent runners for a simulation.
 
-    The entry point supplies the agent framework: ``runner_factory`` builds one
-    ``AgentRunner`` per agent, and ``list_tool_definitions`` gives the tool
-    definitions that framework sends the model, which ``AgentRegistered``
-    records. The runtime imports no runner implementation.
+    The entry point passes two arguments from the agent framework.
+    ``runner_factory`` builds one ``AgentRunner`` per agent.
+    ``list_offered_tool_definitions`` lists the tool definitions that the
+    framework sends each agent's model, in the order that it sends them. The
+    supervisor records that list on ``AgentRegistered``. The runtime imports no
+    runner implementation.
     """
 
     def __init__(
@@ -71,7 +69,7 @@ class AutonomousSupervisor:
         idle_round_may_end: IdleRoundEndCheck,
         phase_timed_out: PhaseTimeoutCheck,
         runner_factory: Callable[[], AgentRunner],
-        list_tool_definitions: ToolDefinitionLister,
+        list_offered_tool_definitions: ToolDefinitionLister,
         resume_state: RewindState | None,
         run_id: str,
         provider: str,
@@ -84,7 +82,7 @@ class AutonomousSupervisor:
         self._idle_round_may_end = idle_round_may_end
         self._phase_timed_out = phase_timed_out
         self._runner_factory = runner_factory
-        self._list_tool_definitions = list_tool_definitions
+        self._list_offered_tool_definitions = list_offered_tool_definitions
         self._resume_state = resume_state
         self._run_id = run_id
         self._provider = provider
@@ -433,24 +431,22 @@ class AutonomousSupervisor:
                     timestamp=simulation_start_time,
                 )
             )
-        tool_definitions = self._list_tool_definitions(runtime=runtime)
         for config in self._agent_configs:
-            offered_names = offered_tool_names(runtime=runtime, agent_id=config.agent_id)
+            tool_definitions = self._list_offered_tool_definitions(
+                runtime=runtime, agent_id=config.agent_id
+            )
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,
                     role_name=config.role_name,
                     system_prompt=config.system_prompt,
                     channel_ids=config.channel_ids,
-                    tool_names=offered_names,
+                    tool_names=[definition.name for definition in tool_definitions],
                     model=config.model,
                     provider=config.provider,
                     model_settings=config.model_settings,
                     runner_prompts=self._scenario.runner_prompts(agent_id=config.agent_id),
-                    tool_definitions=select_tool_definitions(
-                        definitions=tool_definitions,
-                        tool_names=offered_names,
-                    ),
+                    tool_definitions=tool_definitions,
                     round_number=0,
                 )
             )

@@ -1,17 +1,11 @@
 """A scenario can replace the runner prompts, and the run records what it used."""
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelRequest, SystemPromptPart, UserPromptPart
-from pydantic_ai.models.function import (
-    AgentInfo,
-    BuiltinToolCallsReturns,
-    DeltaThinkingCalls,
-    DeltaToolCalls,
-    FunctionModel,
-)
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from glossogen.models.event import AgentRegistered
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -21,7 +15,7 @@ from glossogen.scenario_contract.platform_runner_prompts import (
     runner_prompts_from_events,
 )
 from glossogen.testing import simulation_harness
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, observe_requests
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
@@ -53,15 +47,11 @@ class RequestRecorder:
         self.first_request: dict[str, list[ModelMessage]] = {}
 
     def wrap(self, agent_key: str, scripted: FunctionModel) -> FunctionModel:
-        async def stream(
-            messages: list[ModelMessage], info: AgentInfo
-        ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
+        def record(messages: list[ModelMessage], info: AgentInfo) -> None:
+            _ = info
             self.first_request.setdefault(agent_key, list(messages))
-            assert scripted.stream_function is not None
-            async for chunk in scripted.stream_function(messages, info):
-                yield chunk
 
-        return FunctionModel(stream_function=stream)
+        return observe_requests(model=scripted, observer=record)
 
 
 async def run_recorded(
