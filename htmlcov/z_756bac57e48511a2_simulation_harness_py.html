@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_756bac57e48511a2_smoke_scenario_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.3">coverage.py v7.17.3</a>,
-            created at 2026-11-23 16:04 +0000
+            created at 2026-11-23 17:12 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -118,7 +118,7 @@
     <p class="run"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_storage</span><span class="op">.</span><span class="nam">derived_run_start</span> <span class="key">import</span> <span class="nam">derived_run_started_at</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_storage</span><span class="op">.</span><span class="nam">event_log_reader</span> <span class="key">import</span> <span class="nam">load_events</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">run_storage</span><span class="op">.</span><span class="nam">run_file_paths</span> <span class="key">import</span> <span class="nam">event_log_path</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runners</span><span class="op">.</span><span class="nam">agent_tools</span> <span class="key">import</span> <span class="nam">list_tool_definitions</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runners</span><span class="op">.</span><span class="nam">agent_tools</span> <span class="key">import</span> <span class="nam">list_offered_tool_definitions</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t38" href="#t38">38</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runners</span><span class="op">.</span><span class="nam">pydantic_ai_runner</span> <span class="key">import</span> <span class="nam">PydanticAIRunner</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t39" href="#t39">39</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">autonomous_supervisor</span> <span class="key">import</span> <span class="nam">AutonomousSupervisor</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t40" href="#t40">40</a></span><span class="t"><span class="key">from</span> <span class="nam">glossogen</span><span class="op">.</span><span class="nam">runtime</span><span class="op">.</span><span class="nam">event_bus</span> <span class="key">import</span> <span class="nam">EventBus</span>&nbsp;</span><span class="r"></span></p>
@@ -577,7 +577,7 @@
     <p class="run run2"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">        <span class="nam">idle_round_may_end</span><span class="op">=</span><span class="nam">idle_round_may_end</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t494" href="#t494">494</a></span><span class="t">        <span class="nam">phase_timed_out</span><span class="op">=</span><span class="nam">phase_timed_out</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t495" href="#t495">495</a></span><span class="t">        <span class="nam">runner_factory</span><span class="op">=</span><span class="nam">make_runner</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="nam">list_tool_definitions</span><span class="op">=</span><span class="nam">list_tool_definitions</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="nam">list_offered_tool_definitions</span><span class="op">=</span><span class="nam">list_offered_tool_definitions</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t">        <span class="nam">resume_state</span><span class="op">=</span><span class="nam">resume_state</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t498" href="#t498">498</a></span><span class="t">        <span class="nam">run_id</span><span class="op">=</span><span class="nam">RUN_ID</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t">        <span class="nam">provider</span><span class="op">=</span><span class="str">&quot;anthropic&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
@@ -625,7 +625,7 @@
             <a class="nav" href="z_756bac57e48511a2_smoke_scenario_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.17.3">coverage.py v7.17.3</a>,
-            created at 2026-11-23 16:04 +0000
+            created at 2026-11-23 17:12 +0000
         </p>
     </div>
 </footer>
