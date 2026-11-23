@@ -34,7 +34,7 @@ from glossogen.run_replay.resume_state_loader import load_resume_state
 from glossogen.run_storage.derived_run_start import derived_run_started_at
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
-from glossogen.runners.agent_tools import list_tool_definitions
+from glossogen.runners.agent_tools import list_offered_tool_definitions
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
 from glossogen.runtime.event_bus import EventBus
@@ -493,7 +493,7 @@ async def _run_supervised(
         idle_round_may_end=idle_round_may_end,
         phase_timed_out=phase_timed_out,
         runner_factory=make_runner,
-        list_tool_definitions=list_tool_definitions,
+        list_offered_tool_definitions=list_offered_tool_definitions,
         resume_state=resume_state,
         run_id=RUN_ID,
         provider="anthropic",

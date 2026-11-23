@@ -7,25 +7,19 @@ A request that fails every retry is not re-sent: the next cycle restarts from th
 last completed one.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelRequest, ToolReturnPart
-from pydantic_ai.models.function import (
-    AgentInfo,
-    BuiltinToolCallsReturns,
-    DeltaThinkingCalls,
-    DeltaToolCalls,
-    FunctionModel,
-)
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from glossogen.models.event import AgentRunCycleFailed, LLMResponseReceived
 from glossogen.models.event_base import TokenUsage
 from glossogen.runners import pydantic_ai_runner
 from glossogen.testing import simulation_harness
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, ToolTurn, observe_requests
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
@@ -62,18 +56,13 @@ class FlakyModelRecorder:
 
     def model(self) -> FunctionModel:
         """Return the wrapping model."""
+        return observe_requests(model=self._scripted, observer=self._record)
 
-        async def stream(
-            messages: list[ModelMessage], info: AgentInfo
-        ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
-            self.requests.append(list(messages))
-            if len(self.requests) in self._failing:
-                raise ProviderUnavailable("provider unavailable")
-            assert self._scripted.stream_function is not None
-            async for chunk in self._scripted.stream_function(messages, info):
-                yield chunk
-
-        return FunctionModel(stream_function=stream)
+    def _record(self, messages: list[ModelMessage], info: AgentInfo) -> None:
+        _ = info
+        self.requests.append(list(messages))
+        if len(self.requests) in self._failing:
+            raise ProviderUnavailable("provider unavailable")
 
 
 def tool_returns_named(messages: Sequence[ModelMessage], tool_name: str) -> list[ToolReturnPart]:

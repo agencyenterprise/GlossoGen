@@ -12,6 +12,8 @@ the commit log.
 ## Unreleased
 
 ### Added
+- `glossogen.testing.scripted_agent.observe_requests` wraps a scripted model.
+  It passes each request to a function before the model answers it.
 - **A run can record a self-hosted model's token ids in its event log.** With
   the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
   server for `return_token_ids`, and each `llm_response_received` event holds
@@ -69,6 +71,12 @@ the commit log.
   its tokens as before.
 
 ### Changed
+- `AutonomousSupervisor` takes `list_offered_tool_definitions` in place of
+  `list_tool_definitions`. The argument's type is `ToolDefinitionLister`, in
+  `glossogen.runtime.agent_tool_specs`. A `ToolDefinitionLister` takes
+  `runtime` and `agent_id`, and returns that agent's tool definitions in the
+  order that the runner sends them. The pydantic-ai runner's lister is
+  `glossogen.runners.agent_tools.list_offered_tool_definitions`.
 - **Moved modules: imports in scenario and metric packages change.** The old
   paths are gone, with no aliases left behind. For scenario and metric authors:
 
@@ -405,12 +413,19 @@ the commit log.
 
 ### Fixed
 - The `tool_names` and `tool_definitions` of `agent_registered` list an
-  agent's tools in the order that the model receives them. Until this change,
-  they listed the tools in alphabetical order. A script that rebuilt a prompt
-  from the event log therefore put the tools in a different order from the one
-  that the model received. ATIF trajectories listed the tools in alphabetical
-  order too. Event logs written before this change keep the alphabetical
-  order.
+  agent's tools in the order that the model receives them. From v0.1.14 to
+  v0.31.18, they listed the tools in alphabetical order. A script that rebuilt
+  a prompt from the event log could therefore put the tools in a different
+  order from the one that the model received. The two orders differ for 110 of
+  the 150 agents in the built-in presets, counting an agent once for each
+  preset. The count compares each agent's tools, in the order that the model
+  receives them, with the same tools sorted. ATIF trajectories listed the tools
+  in alphabetical order too. Event logs written by v0.1.14 to v0.31.18 keep the
+  alphabetical order. Event logs written before v0.1.14 keep their own order:
+  the base tools, then the tools that the agent's config listed. An ATIF
+  trajectory takes a seat's tools from the seat's first `agent_registered`
+  event. After a resume, a fork-at-round or a replace-agent run, an older
+  version can have logged that event.
 - `glossogen new-scenario` counts the built-in scenarios package when it checks
   that the new folder is loaded, so `--target-dir src/glossogen/scenarios` in a
   checkout no longer asks for a `[tool.glossogen] scenarios` entry. Its next
