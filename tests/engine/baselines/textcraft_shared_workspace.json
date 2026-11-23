@@ -62,10 +62,10 @@
     "workspace"
    ],
    "tool_names": [
+    "send_message",
     "act",
     "observe",
-    "read_notifications",
-    "send_message"
+    "read_notifications"
    ],
    "model": "scripted::crafter_1",
    "provider": "anthropic",
@@ -73,6 +73,36 @@
     "max_tokens": 32768
    },
    "tool_definitions": [
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    },
     {
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
@@ -129,36 +159,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "text": {
-        "type": "string"
-       },
-       "to": {
-        "anyOf": [
-         {
-          "items": {
-           "type": "string"
-          },
-          "type": "array"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null
-       }
-      },
-      "required": [
-       "text"
-      ],
       "type": "object"
      }
     }
@@ -180,10 +180,10 @@
     "workspace"
    ],
    "tool_names": [
+    "send_message",
     "act",
     "observe",
-    "read_notifications",
-    "send_message"
+    "read_notifications"
    ],
    "model": "scripted::crafter_2",
    "provider": "anthropic",
@@ -191,6 +191,36 @@
     "max_tokens": 32768
    },
    "tool_definitions": [
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    },
     {
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
@@ -247,36 +277,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "text": {
-        "type": "string"
-       },
-       "to": {
-        "anyOf": [
-         {
-          "items": {
-           "type": "string"
-          },
-          "type": "array"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null
-       }
-      },
-      "required": [
-       "text"
-      ],
       "type": "object"
      }
     }
@@ -298,10 +298,10 @@
     "workspace"
    ],
    "tool_names": [
+    "send_message",
     "act",
     "observe",
-    "read_notifications",
-    "send_message"
+    "read_notifications"
    ],
    "model": "scripted::crafter_3",
    "provider": "anthropic",
@@ -309,6 +309,36 @@
     "max_tokens": 32768
    },
    "tool_definitions": [
+    {
+     "name": "send_message",
+     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     }
+    },
     {
      "name": "act",
      "description": "Apply one exact crafting command to the shared depot. Costs one action; resources are finite; no get/deposit/withdraw. Results include current quantities, ordered deltas and unseen public messages. 'uncraft <exact crafting command>' reverses one earlier craft of that recipe: its output leaves the depot and its inputs return.",
@@ -365,36 +395,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send text to the team. Omit 'to' to broadcast, or set 'to' to a list of teammate IDs to address only them. Charged to the shared character budget. Stored at once; nothing is held back because someone else spoke. Queued does not mean read or agreed. The receipt includes your current workspace observation and any messages you have not seen.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "text": {
-        "type": "string"
-       },
-       "to": {
-        "anyOf": [
-         {
-          "items": {
-           "type": "string"
-          },
-          "type": "array"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null
-       }
-      },
-      "required": [
-       "text"
-      ],
       "type": "object"
      }
     }

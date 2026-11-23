@@ -78,12 +78,12 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_a_1",
    "provider": "anthropic",
@@ -91,31 +91,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -133,40 +108,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -190,6 +131,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -227,6 +193,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -243,12 +243,12 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_a_2",
    "provider": "anthropic",
@@ -256,31 +256,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -298,40 +273,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -355,6 +296,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -392,6 +358,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -408,12 +408,12 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_a_3",
    "provider": "anthropic",
@@ -421,31 +421,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -463,40 +438,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -520,6 +461,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -557,6 +523,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -573,12 +573,12 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_a_4",
    "provider": "anthropic",
@@ -586,31 +586,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -628,40 +603,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -685,6 +626,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -722,6 +688,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -738,12 +738,12 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_b_1",
    "provider": "anthropic",
@@ -751,31 +751,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -793,40 +768,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -850,6 +791,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -887,6 +853,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -903,12 +903,12 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_b_2",
    "provider": "anthropic",
@@ -916,31 +916,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -958,40 +933,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -1015,6 +956,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -1052,6 +1018,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -1068,12 +1068,12 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_b_3",
    "provider": "anthropic",
@@ -1081,31 +1081,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -1123,40 +1098,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -1180,6 +1121,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -1217,6 +1183,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }
@@ -1233,12 +1233,12 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_object"
+    "list_channels",
+    "get_channel_members",
+    "submit_object",
+    "read_notifications"
    ],
    "model": "scripted::viewer_b_4",
    "provider": "anthropic",
@@ -1246,31 +1246,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -1288,40 +1263,6 @@
        "channel_id",
        "last_n"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_notifications",
-     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "wait_for": {
-        "default": "any",
-        "enum": [
-         "any",
-         "message",
-         "next_round"
-        ],
-        "title": "Wait For",
-        "type": "string"
-       },
-       "timeout_s": {
-        "anyOf": [
-         {
-          "minimum": 0,
-          "type": "number"
-         },
-         {
-          "type": "null"
-         }
-        ],
-        "default": null,
-        "title": "Timeout S"
-       }
-      },
-      "title": "read_notificationsArguments",
       "type": "object"
      }
     },
@@ -1345,6 +1286,31 @@
        "channel_id",
        "text",
        "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -1382,6 +1348,40 @@
        "color",
        "cell"
       ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "read_notifications",
+     "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "wait_for": {
+        "default": "any",
+        "enum": [
+         "any",
+         "message",
+         "next_round"
+        ],
+        "title": "Wait For",
+        "type": "string"
+       },
+       "timeout_s": {
+        "anyOf": [
+         {
+          "minimum": 0,
+          "type": "number"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "default": null,
+        "title": "Timeout S"
+       }
+      },
+      "title": "read_notificationsArguments",
       "type": "object"
      }
     }

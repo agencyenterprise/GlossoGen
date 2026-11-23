@@ -13,7 +13,6 @@ from typing import Any, NamedTuple
 
 from glossogen.db.run_registry import update_run_status_standalone
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.event import (
     AgentConnected,
     AgentRegistered,
@@ -28,7 +27,11 @@ from glossogen.run_replay.message_rewind import RewindState
 from glossogen.runtime.agent_runner import CLOSING_PROMPT_TIMEOUT_SECONDS, AgentRunner
 from glossogen.runtime.agent_session import AgentSession
 from glossogen.runtime.agent_swap import AgentSwapResources, execute_agent_swap
-from glossogen.runtime.agent_tool_specs import ToolDefinitionLister, select_tool_definitions
+from glossogen.runtime.agent_tool_specs import (
+    ToolDefinitionLister,
+    offered_tool_names,
+    select_tool_definitions,
+)
 from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
@@ -432,28 +435,21 @@ class AutonomousSupervisor:
             )
         tool_definitions = self._list_tool_definitions(runtime=runtime)
         for config in self._agent_configs:
-            # Sorted because BASE_TOOL_NAMES is a frozenset: unpacking it wrote a
-            # different order on every run, so two identical runs logged
-            # different tool lists. Deduplicated because a scenario naming a base
-            # tool in its own list, as veyru does with send_message, logged it
-            # twice. Neither affected the authorization guard, which rebuilds its
-            # allowlist as a set.
-            hidden = self._scenario.hidden_base_tools(agent_id=config.agent_id)
-            all_tool_names = sorted((BASE_TOOL_NAMES | set(config.tool_names)) - hidden)
+            offered_names = offered_tool_names(runtime=runtime, agent_id=config.agent_id)
             await self._event_logger.log(
                 event=AgentRegistered(
                     agent_id=config.agent_id,
                     role_name=config.role_name,
                     system_prompt=config.system_prompt,
                     channel_ids=config.channel_ids,
-                    tool_names=all_tool_names,
+                    tool_names=offered_names,
                     model=config.model,
                     provider=config.provider,
                     model_settings=config.model_settings,
                     runner_prompts=self._scenario.runner_prompts(agent_id=config.agent_id),
                     tool_definitions=select_tool_definitions(
                         definitions=tool_definitions,
-                        tool_names=all_tool_names,
+                        tool_names=offered_names,
                     ),
                     round_number=0,
                 )

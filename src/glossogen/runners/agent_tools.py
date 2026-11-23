@@ -25,14 +25,18 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic_ai import ModelRetry, Tool
 
-from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.read_notifications_schema import read_notifications_tool_definition
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.read_notifications_tool import (
     RunTermination,
     build_read_notifications_tool,
 )
-from glossogen.runtime.agent_tool_specs import Executor, ToolSpec, tool_specs
+from glossogen.runtime.agent_tool_specs import (
+    Executor,
+    ToolSpec,
+    offered_tool_specs,
+    tool_specs,
+)
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -55,14 +59,10 @@ def build_agent_tools(
     A base tool the scenario withholds through ``hidden_base_tools`` is left out,
     and a scenario tool is included only when the agent's ``tool_names`` list it.
     """
-    tools: list[Tool[None]] = []
-    for spec in tool_specs(runtime=runtime):
-        if spec.name in BASE_TOOL_NAMES:
-            if runtime.is_base_tool_hidden(agent_id=agent_id, tool_name=spec.name):
-                continue
-        elif not runtime.is_tool_allowed(agent_id=agent_id, tool_name=spec.name):
-            continue
-        tools.append(_bind(spec=spec, runtime=runtime, agent_id=agent_id))
+    tools = [
+        _bind(spec=spec, runtime=runtime, agent_id=agent_id)
+        for spec in offered_tool_specs(runtime=runtime, agent_id=agent_id)
+    ]
     tools.append(
         build_read_notifications_tool(runtime=runtime, agent_id=agent_id, termination=termination)
     )
