@@ -27,6 +27,7 @@
      "token_threshold": 96000
     },
     "wait_reasoning": false,
+    "record_token_ids": false,
     "crafter_count": 4,
     "steps_per_agent": 2,
     "quantity_scale": 2,

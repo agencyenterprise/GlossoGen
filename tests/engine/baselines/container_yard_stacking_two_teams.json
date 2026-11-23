@@ -34,6 +34,7 @@
      "token_threshold": 50000
     },
     "wait_reasoning": false,
+    "record_token_ids": false,
     "round_time_budget_seconds": 140,
     "seed": 42,
     "easy_round_numbers": [],
