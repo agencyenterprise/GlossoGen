@@ -36,6 +36,11 @@ from glossogen.models.tool_definition import RecordedToolDefinition, ToolCallReq
 from glossogen.models.wait_for import WaitFor
 
 
+def _is_unset(value: object) -> bool:
+    """Whether an optional field is left out of the JSON: an unset one was not recorded."""
+    return value is None
+
+
 class SimulationStarted(EventBase):
     """Emitted once when a simulation begins, recording the scenario, channels, and config."""
 
@@ -52,8 +57,20 @@ class AgentRegistered(EventBase):
     """Emitted when an agent joins the simulation, capturing its
     role, prompt, channels, and tools.
 
-    ``tool_definitions`` holds the schema of every tool in ``tool_names``. It
+    ``tool_names`` lists the agent's tools, and ``tool_definitions`` holds the
+    schema of every tool in ``tool_names``, in the same order. ``tool_definitions``
     defaults to empty so that logs recorded before schemas were logged still parse.
+
+    The order of ``tool_names`` depends on the glossogen version that wrote the line:
+
+    - v0.31.19 or later: the order in which the model receives the tools.
+    - v0.1.14 to v0.31.18: alphabetical order.
+    - before v0.1.14: the base tools, then the tools that the agent's config
+      listed. A base tool that the config also listed appears twice. From
+      31 Mar 2026, the base tools came in an order that varied from one process
+      to the next.
+
+    Nothing in a line says which version wrote it.
 
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
@@ -127,6 +144,16 @@ class LLMResponseReceived(EventBase):
     ``thinking_parts`` holds the same reasoning part by part with each part's
     provider identifiers, which is what a reconstructed history sends back.
     It defaults to empty so logs recorded before parts were logged still parse.
+
+    The four token id fields are set when the run's ``record_token_ids`` knob is
+    on and the agent's model is self-hosted, and are left out of the JSON
+    otherwise. ``token_ids`` are the ids of the tokens that the model wrote, as
+    the server returned them. ``token_ids_index`` counts the agent's recorded
+    responses from 0, and starts again at 0 when the agent's runner starts again,
+    after a resume or a swap. The request's prompt is the first
+    ``prompt_prefix_tokens`` ids of the agent's previous recorded prompt and
+    answer, followed by ``prompt_tail_ids``; at index 0 the prefix is empty.
+    ``glossogen.run_storage.recorded_token_ids`` rebuilds the full prompts.
     """
 
     event_type: Literal["llm_response_received"] = "llm_response_received"
@@ -137,6 +164,10 @@ class LLMResponseReceived(EventBase):
     tool_calls: list[ToolCallRequest]
     stop_reason: StopReason
     usage: TokenUsage
+    token_ids_index: int | None = Field(default=None, exclude_if=_is_unset)
+    prompt_prefix_tokens: int | None = Field(default=None, exclude_if=_is_unset)
+    prompt_tail_ids: list[int] | None = Field(default=None, exclude_if=_is_unset)
+    token_ids: list[int] | None = Field(default=None, exclude_if=_is_unset)
 
 
 class ToolCallInvoked(EventBase):

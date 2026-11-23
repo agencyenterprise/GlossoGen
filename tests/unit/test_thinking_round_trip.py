@@ -41,6 +41,7 @@ from glossogen.runners.pydantic_ai_runner import (
 from glossogen.runners.pydantic_ai_runner import (
     PydanticAIRunner,
 )
+from glossogen.runners.token_id_log import TokenIdLog
 from glossogen.runtime.event_bus import EventBus
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
@@ -191,7 +192,7 @@ async def test_stream_records_each_part_with_the_identifiers_it_receives(tmp_pat
             provider="openai",
         )
     )
-    state = _StreamingState()
+    state = _StreamingState(token_id_log=TokenIdLog())
     stream = [
         PartStartEvent(index=0, part=ThinkingPart(content="", id="rs_1", provider_name="openai")),
         PartDeltaEvent(index=0, delta=ThinkingPartDelta(content_delta="plan ")),
@@ -238,7 +239,7 @@ async def test_stream_records_each_part_with_the_identifiers_it_receives(tmp_pat
 
 
 def test_a_failed_attempts_parts_are_discarded_and_a_delta_extends_the_newest_part() -> None:
-    state = _StreamingState()
+    state = _StreamingState(token_id_log=TokenIdLog())
     state.start_thinking_part(
         part_index=0, part=ThinkingPart(content="kept", id="rs_1", provider_name="openai")
     )

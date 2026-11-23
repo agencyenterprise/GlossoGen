@@ -5,11 +5,13 @@ read channels, send messages, and loop until done. The platform's prompt text
 lives in Jinja2 templates under ``runner_prompts/`` beside this module. A
 scenario can replace the runner prompts with its own through
 ``ScenarioBase.runner_prompts``; the registration records the replacement, so a
-reconstruction renders what the run used.
+reconstruction renders what the run used. The message that opens a run for an
+agent carrying another run's history is a platform template too.
 """
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 from glossogen.models.event import AgentRegistered, SimulationEvent
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -62,6 +64,24 @@ def registered_runner_prompts(registration: AgentRegistered) -> RunnerPrompts:
     )
 
 
+class RegisteredPrompts(NamedTuple):
+    """The full system prompt and the runner prompts an agent ran with."""
+
+    full_system_prompt: str
+    runner_prompts: RunnerPrompts
+
+
+def registered_prompts(registration: AgentRegistered) -> RegisteredPrompts:
+    """The full system prompt and runner prompts of the agent behind ``registration``."""
+    runner_prompts = registered_runner_prompts(registration=registration)
+    return RegisteredPrompts(
+        full_system_prompt=build_full_system_prompt(
+            base_prompt=registration.system_prompt, prompts=runner_prompts
+        ),
+        runner_prompts=runner_prompts,
+    )
+
+
 def runner_prompts_from_events(
     events: Sequence[SimulationEvent], agent_id: str, role_name: str
 ) -> RunnerPrompts:
@@ -76,3 +96,18 @@ def runner_prompts_from_events(
 def build_full_system_prompt(base_prompt: str, prompts: RunnerPrompts) -> str:
     """Combine an agent's base system prompt with the runner's protocol instructions."""
     return base_prompt + "\n\n" + prompts.system_suffix
+
+
+def history_transfer_prompt(full_system_prompt: str, prompts: RunnerPrompts) -> str:
+    """The message that opens a run for an agent carrying another run's history.
+
+    The model keeps the source run's system prompt, so this message hands it the
+    new run's full system prompt and initial prompt.
+    """
+    return _renderer.render(
+        template_name="history_transfer_prompt.jinja",
+        template_variables={
+            "system_prompt": full_system_prompt,
+            "initial_prompt": prompts.initial,
+        },
+    )

@@ -95,6 +95,11 @@ class BaseKnobs(BaseModel):
     the tool's schema is exactly what it is without the knob, so runs with it
     off stay comparable with runs recorded before it existed.
 
+    ``record_token_ids`` asks a self-hosted model's server for the token ids of
+    each request and answer, with vLLM's ``return_token_ids`` request option,
+    and logs them on each ``LLMResponseReceived``. It has no effect on agents
+    under other providers. Off by default, so a run's log does not grow.
+
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and
     ``noise_replacement_mode`` decides what a corrupted character becomes.
@@ -122,6 +127,7 @@ class BaseKnobs(BaseModel):
     agent_model_settings: AgentModelSettings = AgentModelSettings()
     compaction: CompactionConfig = CompactionConfig()
     wait_reasoning: bool = False
+    record_token_ids: bool = False
 
     @model_validator(mode="before")
     @classmethod

@@ -7,14 +7,16 @@ provider defaults, and all but a HuggingFace judge build their models here.
 
 import os
 from collections.abc import Sequence
+from urllib.parse import quote
 
 from pydantic_ai.models import ModelRequestParameters, infer_model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings, ThinkingLevel, merge_model_settings
 
+from glossogen.llm.self_hosted_chat_model import SelfHostedChatModel
 from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
     SELF_HOSTED_BASE_URLS_VAR,
@@ -25,6 +27,12 @@ from glossogen.model_catalog.self_hosted_config import parse_self_hosted_base_ur
 from glossogen.models.agent_model_settings import AgentModelSettings
 
 _OPENAI_FINE_TUNE_PREFIX = "ft:"
+# The headers that ``request_identity_settings`` puts on each request to a
+# self-hosted model.
+RUN_ID_HEADER = "X-GlossoGen-Run-Id"
+AGENT_ID_HEADER = "X-GlossoGen-Agent-Id"
+# The vLLM request option that ``token_id_request_settings`` sets.
+RETURN_TOKEN_IDS_OPTION = "return_token_ids"
 
 
 def resolve_self_hosted_base_url(model: str) -> str:
@@ -44,11 +52,11 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
-def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatModel:
+def build_pydantic_ai_model(model: str, provider: Provider) -> str | SelfHostedChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
     For ``self-hosted`` providers the function returns a fully-constructed
-    ``OpenAIChatModel`` pointing at the OpenAI-compatible base URL. For all
+    ``SelfHostedChatModel`` pointing at the OpenAI-compatible base URL. For all
     other providers it returns the ``"<prefix>:<model>"`` string literal that
     pydantic-ai uses to look up the right backend, with the prefix from the
     provider's row in ``PROVIDER_SPECS``.
@@ -62,7 +70,7 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | OpenAIChatM
             base_url=base_url,
             api_key=os.environ[SELF_HOSTED_API_KEY_VAR],
         )
-        return OpenAIChatModel(model, provider=oai_provider)
+        return SelfHostedChatModel(model_name=model, provider=oai_provider)
     return f"{spec.pydantic_ai_prefix}:{model}"
 
 
@@ -118,19 +126,67 @@ def agent_model_settings(
     provider: Provider,
     model: str,
     settings: AgentModelSettings,
+    run_id: str,
+    agent_id: str,
+    record_token_ids: bool,
 ) -> ModelSettings:
     """Return the settings a simulation agent runs with.
 
     The provider defaults from :func:`default_pydantic_ai_settings`, then the
     ``settings`` the run was started with, of which only the ones set are sent
     and which win over the defaults. A scenario's own choices reach ``settings``
-    through its preset knobs.
+    through its preset knobs. Then :func:`request_identity_settings`, which names
+    the run and the agent in the headers of a request to a self-hosted model, and
+    :func:`token_id_request_settings`, which asks a self-hosted model's server
+    for token ids when ``record_token_ids`` is on.
     """
     return layered_model_settings(
         layers=(
             default_pydantic_ai_settings(provider=provider, model=model),
             settings.to_pydantic_ai(),
+            request_identity_settings(provider=provider, run_id=run_id, agent_id=agent_id),
+            token_id_request_settings(
+                provider=provider, settings=settings, record_token_ids=record_token_ids
+            ),
         )
+    )
+
+
+def token_id_request_settings(
+    provider: Provider, settings: AgentModelSettings, record_token_ids: bool
+) -> ModelSettings:
+    """Return the settings that ask a self-hosted model's server for token ids.
+
+    With ``record_token_ids`` on and a ``self-hosted`` model, the request body
+    gets vLLM's ``return_token_ids`` option, and vLLM then returns the token ids
+    of the prompt and of the answer. pydantic-ai replaces ``extra_body`` whole
+    when it merges settings, so this layer carries the run's own ``extra_body``
+    keys as well. For every other case the settings are empty.
+    """
+    if provider != Provider.SELF_HOSTED or not record_token_ids:
+        return ModelSettings()
+    extra_body: dict[str, object] = {}
+    if settings.extra_body is not None:
+        extra_body.update(settings.extra_body)
+    extra_body[RETURN_TOKEN_IDS_OPTION] = True
+    return ModelSettings(extra_body=extra_body)
+
+
+def request_identity_settings(provider: Provider, run_id: str, agent_id: str) -> ModelSettings:
+    """Return the settings that put the run id and the agent id in a request's headers.
+
+    Only a ``self-hosted`` model gets the ``RUN_ID_HEADER`` and ``AGENT_ID_HEADER``
+    headers. For every other provider the settings are empty. Each value is
+    percent-encoded, with ``/`` kept, because an HTTP header value must be ASCII:
+    ``signal_game/1795184024`` and ``player_a`` are sent as they are.
+    """
+    if provider != Provider.SELF_HOSTED:
+        return ModelSettings()
+    return ModelSettings(
+        extra_headers={
+            RUN_ID_HEADER: quote(string=run_id, safe="/"),
+            AGENT_ID_HEADER: quote(string=agent_id, safe="/"),
+        }
     )
 
 

@@ -72,7 +72,7 @@ class Floor(NamedTuple):
 
 async def briefed_round(overrides: dict[str, Any], tmp_path: Path) -> Floor:
     """Round 1 started, every operator briefed and its model request issued in round 1."""
-    scenario = build(preset_name="knobs_default", overrides=overrides)
+    scenario = build(preset_name="knobs_unshifted", overrides=overrides)
     agents = scenario.get_agents(default_model="scripted-model", default_provider="anthropic")
     sessions = {agent.agent_id: AgentSession(agent_id=agent.agent_id) for agent in agents}
     logger = HeldLogger(log_path=tmp_path / "events.jsonl")

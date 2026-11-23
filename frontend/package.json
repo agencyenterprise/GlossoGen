@@ -20,35 +20,35 @@
     "prepare": ":"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-query": "^5.108.1",
     "@tanstack/react-virtual": "^3.14.26",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.72.0",
+    "lucide-react": "^1.76.0",
     "next": "^16.4.6",
     "openapi-fetch": "^0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-markdown": "^10.1.0",
-    "recharts": "^3.10.1",
+    "recharts": "^3.11.0",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^26",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@typescript-eslint/parser": "^8.72.2",
-    "eslint": "^10.14.0",
+    "@typescript-eslint/parser": "^8.73.0",
+    "eslint": "^10.15.0",
     "eslint-config-next": "^16.4.6",
     "eslint-config-prettier": "^10.1.8",
-    "jsdom": "^31.0.0",
+    "jsdom": "^31.0.1",
     "openapi-typescript": "^7.10.1",
     "prettier": "^3.10.1",
     "stylelint": "^18.0.0",
     "stylelint-config-standard": "^41.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }

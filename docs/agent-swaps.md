@@ -2,7 +2,9 @@
 
 These commands fork a finished run into a new one, replaying its remaining
 rounds under a controlled change: a different agent in one seat, an agent
-imported from another run, or the same team under different knobs.
+imported from another run, or the same team under different knobs. One more
+flow starts a new run in which chosen agents begin with histories from an earlier
+run. The earlier run can be a run of another scenario.
 
 Every fork cuts at the *end* of a round: `--after-round N` keeps rounds 1..N
 complete, verdict and postmortem included, and the new run plays round N+1
@@ -14,9 +16,11 @@ onward.
 | [`cross-run-replace-agent`](#import-an-agent-from-another-run) | Same, but the seat is filled by an agent carrying its full history from a *different* run |
 | [`fork-at-round`](#fork-at-a-round-no-replacement) | Fork after round N with no agent replaced, under merged knob overrides |
 | [`scheduled_events`](#in-run-swaps) | Swap agents at round boundaries inside one live run |
+| [`run --history-from-run`](#start-a-run-with-agents-from-another-run) | Start a new run in which chosen agents begin with histories from an earlier run, which can be of another scenario |
 
-All four keep every non-replaced agent on its exact original model and full
-reconstructed history. To carry on inside an existing run instead of forking it
+`replace-agent`, `cross-run-replace-agent`, `fork-at-round` and
+`scheduled_events` keep every non-replaced agent on its exact original model and
+full reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 [Continuing a run](running-simulations.md#continuing-a-run).
 
@@ -138,6 +142,148 @@ Label cross-run runs `cross_team` plus the range of rounds played after the
 swap, such as `15-25`, as soon as the run directory exists. Analysis groups them
 by those labels to compare `round_success_after_resume` per imported model and
 boundary round against both sources over the same rounds.
+
+## Start a run with agents from another run
+
+`glossogen run --history-from-run` gives chosen agents of a new run a copy of the
+history that an agent built in an earlier run. This section uses these terms:
+
+- The *source run* is the earlier run whose agent's history is copied. It can be
+  a run of another scenario. In the fork sections of this page, "the source"
+  means something else: the run that a fork copies.
+- The *source agent* is the agent of the source run whose history is copied.
+- A *transferred seat* is an agent of the new run that begins with that copy.
+  A transferred seat and its source agent can have different agent ids,
+  whether or not the two runs share a scenario.
+- The *opening message* is a user message that tells a transferred seat about
+  the new run.
+- The *transferred history* is what a transferred seat begins with: the source
+  agent's history, followed by the opening message.
+- A *history-transfer run* is a run with at least one transferred seat.
+
+Use a history-transfer run to test whether an agent reuses, extends or drops a
+protocol that it built in another scenario.
+
+The flow is a set of flags on `glossogen run`. The other `run` flags and the
+`key=value` overrides work as in any run. The one exception is `--resume`:
+`glossogen run` refuses `--resume` together with `--history-from-run`, because
+`--history-from-run` starts a new run. To continue a crashed history-transfer
+run, pass `--resume` without the `--history-*` flags, as the list of files
+below describes.
+
+```bash
+glossogen run spot_the_difference \
+  --model gpt-6.1-sol --provider openai \
+  --runs-dir ./runs --config knobs_single_team \
+  --history-from-run ./runs/veyru/<timestamp> \
+  --history-seat viewer_left=field_observer \
+  --history-seat viewer_right=stabilization_engineer \
+  [--history-through-round N]
+```
+
+- `--history-from-run` names the source run's directory. The command takes the
+  source run's scenario from the name of the directory that holds the source
+  run's directory, because `glossogen run` stores each run at
+  `<runs-dir>/<scenario>/<timestamp>`. If the
+  source run was moved out of that layout, the command fails with "source run
+  log not found".
+- `--history-seat SEAT=SOURCE_AGENT` makes the agent `SEAT` a transferred seat
+  with the history of `SOURCE_AGENT`. Repeat the flag for each transferred
+  seat, and name at least one. An agent that no flag names starts with an
+  empty history, as in any run. The command refuses a source agent that has no
+  model response in the rounds that the history keeps.
+- `--history-through-round N` keeps rounds 1 to N of the source run. The source
+  run must have completed round N, by the same check that `fork-at-round`
+  applies to its boundary. Without the flag, N is the source run's last round,
+  and the source run must have ended with `scenario_complete`. A run that was
+  killed, that failed, or that is still running has not completed its last
+  round.
+
+The history ends where round N + 1 started. A tool call that the source agent
+made in round N and whose result came back after that point is left out with
+its result, because that result belongs to round N + 1. When N is the source
+run's last round, the history runs to the end of the source log.
+
+On a transferred seat's first turn, the runner sends the seat's model its
+transferred history:
+
+1. The source agent's history up to the end of round N. It holds the source
+   scenario's system prompt for that agent, the agent's text and thinking, and
+   its tool calls with their results.
+2. The opening message. It starts with "The session above has ended. A new
+   session starts now. Its instructions follow, and they replace the earlier
+   ones." It then gives the new scenario's system prompt and initial prompt for
+   that seat. Its template is `history_transfer_prompt.jinja`, beside the
+   platform's other prompt templates in `scenario_contract/runner_prompts/`.
+
+The system prompt of every request stays the source scenario's system prompt.
+pydantic-ai adds an agent's system prompt only when the history is empty, so the
+new scenario's system prompt reaches the model only inside the opening message.
+
+When the source run is of another scenario, some tool calls in the history
+name the source scenario's own tools, which the new run does not offer. Calls
+to the platform's communication tools, such as `send_message` and
+`read_channel`, name tools that the new run also offers, unless the new
+scenario hides those tools. A provider's API could refuse a history with calls
+to tools that the request does not offer. Self-hosted models have not been
+tried with such a history.
+
+A transferred seat uses the model that the new run's config sets for it, which
+can differ from the source agent's model. When the model or the provider
+differs, the transferred history leaves out the source agent's thinking,
+because a provider takes back only the thinking that its own model wrote. The
+text and the tool calls stay.
+
+The transferred history counts toward the seat's context window on every
+request. A scenario that limits the tokens its agents read also counts it.
+
+A history-transfer run directory holds these files besides those of any run.
+In the file names, `<agent_id>` is the transferred seat's agent id.
+
+- `history_transfer_manifest.json` names the source run and the value of N.
+  For each transferred seat, it names the source agent and the model and
+  provider that the source agent ran on.
+- `transferred_history_<agent_id>.json` holds the seat's transferred history in
+  pydantic-ai's JSON message format. To continue a crashed history-transfer
+  run, run `glossogen run` with `--resume <run dir>` and without the
+  `--history-*` flags. `--resume` reads this file and appends the seat's own
+  turns from the new run's log. It reads nothing from the source run, so the
+  source run can be moved or deleted after the launch.
+- `resume_context_<agent_id>.json` holds the history that the seat started
+  with at the latest launch, in the shorter form that
+  [Verifying the reconstructed history](#verifying-the-reconstructed-history)
+  describes, for reading by eye. After the first launch, it holds the
+  transferred history. After a `--resume`, it holds the transferred history and
+  the seat's turns up to the crash.
+
+The `protocol_probe` and `protocol_explanation` metrics put a seat's
+transferred history in front of its turns in the run, as `--resume` does. The
+ATIF export and the thread export do not: they show only the seat's turns in
+the new run. If an in-run swap gives a transferred seat to another agent, a
+`--resume` and the probes rebuild that seat without the transferred history,
+because the agent swapped in did not start with it.
+
+Some commands refuse a history-transfer run or its agents:
+
+- `replace-agent`, `fork-at-round` and `cross-run-replace-agent` refuse a
+  history-transfer run as the run to fork. They rebuild each agent from the
+  log of the run to fork, and that log does not hold the transferred histories.
+- For the same reason, a transferred seat cannot be the source agent of a
+  later history transfer. It also cannot be the imported agent of
+  `cross-run-replace-agent`. In a history-transfer run, an agent that started
+  with an empty history can be the source agent of a later history transfer,
+  and it can be the imported agent of `cross-run-replace-agent`.
+- `glossogen run` refuses a source agent if an in-run swap
+  (`scheduled_events`) replaced it before the end of round N. It also refuses a
+  source agent if the source run was made by `replace-agent` or
+  `cross-run-replace-agent` and that agent is the one which `replace-agent` or
+  `cross-run-replace-agent` put in. In
+  both cases, the source log holds the turns of two different agents under
+  that agent id.
+
+The runs index, the run page and the CSV export's `lineage.*` columns do not
+link the new run to its source run. Inside the new run's directory, only
+`history_transfer_manifest.json` names the source run.
 
 ## Fork at a round (no replacement)
 

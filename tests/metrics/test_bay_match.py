@@ -53,7 +53,7 @@ async def measure(
 async def test_bay_match_scores_one_for_a_round_on_the_same_bay(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()]
         for agent_id in (OPERATOR_A, OPERATOR_B)
@@ -73,7 +73,7 @@ async def test_bay_match_separates_delivering_from_agreeing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Both deliver and neither agrees: the score is 0 while both delivery rates are 1."""
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()],
         OPERATOR_B: [
@@ -98,7 +98,7 @@ async def test_bay_match_scores_each_target_of_a_round_that_holds_several(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A missed first target and a matched second score the round 0.5; both still delivered."""
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     opening = first_depot(scenario=scenario).first_target
     first = {
         OPERATOR_A: bay_cell(target=opening, agent_id=OPERATOR_A, shared=False),
@@ -125,7 +125,7 @@ async def test_bay_match_scores_each_target_of_a_round_that_holds_several(
 
 
 async def test_bay_match_skips_a_run_with_no_rounds(tmp_path: Path) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     assert (
         await measure(metric=BayMatchMetric(), scenario=scenario, events=[], tmp_path=tmp_path)
         == []

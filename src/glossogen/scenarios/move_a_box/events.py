@@ -28,6 +28,19 @@ class MoveABoxBay(BaseModel):
     cell: tuple[int, int]
 
 
+class MoveABoxFloorView(BaseModel):
+    """Where one operator's floor sat in the yard: its corner's offset and its mirror.
+
+    A floor square ``(row, col)`` stands on yard square ``(row + row_offset,
+    col + col_offset)``, after ``col`` is turned to ``grid_size + 1 - col`` on a
+    mirrored floor.
+    """
+
+    row_offset: int
+    col_offset: int
+    mirrored: bool
+
+
 class MoveABoxRoundStarted(EventBase):
     """Each operator's bays, start square, pallets and assigned bays for one round.
 
@@ -39,7 +52,9 @@ class MoveABoxRoundStarted(EventBase):
     markings the readout shows, fixed for the run. ``crates_each`` says how many
     crates each operator works, which is how a crate id's slot is read back.
     ``virtual_time_s`` is the virtual second of the run the round started at
-    under ``virtual_clock``, and None otherwise.
+    under ``virtual_clock``, and None otherwise. ``floor_views`` places each
+    floor in the yard on landmark floors and under ``view_shift``; it is empty
+    otherwise and in runs logged before floors could shift.
     """
 
     event_type: Literal["move_a_box_round_started"] = "move_a_box_round_started"
@@ -60,6 +75,7 @@ class MoveABoxRoundStarted(EventBase):
     crate_ids: dict[str, str]
     crate_masses: dict[str, int]
     virtual_time_s: float | None = None
+    floor_views: dict[str, MoveABoxFloorView] = {}
 
     @model_validator(mode="before")
     @classmethod

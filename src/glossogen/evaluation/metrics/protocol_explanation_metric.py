@@ -45,7 +45,9 @@ from glossogen.models.channel_visibility import (
 )
 from glossogen.models.event import SimulationEvent
 from glossogen.run_replay.message_history_builder import build_message_history
+from glossogen.run_replay.transferred_history import with_transferred_history
 from glossogen.run_storage.replace_manifest import ReplaceManifest, read_replace_manifest
+from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.scenario_contract.measurement import AgentObservation, Measurement
 from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.metric_run_options import MetricRunOptions
@@ -132,6 +134,7 @@ class ProtocolExplanationMetric(Metric):
             return []
 
         manifest = read_replace_manifest(run_dir=run_dir)
+        run_id = compose_run_id(scenario_name=scenario.name(), run_dir_name=run_dir.name)
         target_timestamp = _last_event_timestamp(events=events)
         latest_per_agent = _dedupe_latest_registration(
             agent_configs=apply_mid_run_swaps(agent_configs=agent_configs, events=events)
@@ -171,6 +174,12 @@ class ProtocolExplanationMetric(Metric):
                 filter_below_round=None,
                 split_parallel_tool_calls=agent.provider == Provider.SELF_HOSTED,
             )
+            history = await with_transferred_history(
+                run_dir=run_dir,
+                events=events,
+                agent_id=agent.agent_id,
+                own_history=history,
+            )
             if not history:
                 logger.info(
                     "%s: skipping %s — empty reconstructed history",
@@ -185,6 +194,7 @@ class ProtocolExplanationMetric(Metric):
             )
             try:
                 probe = await run_structured_probe(
+                    run_id=run_id,
                     agent_id=agent.agent_id,
                     role_name=agent.role_name,
                     full_system_prompt=full_system_prompt,

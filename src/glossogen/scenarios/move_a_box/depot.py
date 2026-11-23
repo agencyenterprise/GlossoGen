@@ -5,13 +5,21 @@ assigns its own bays, and every target after the first is drawn around where
 the crates stand once the one before it is done.
 
 A bay number means the same thing on every floor of a target, and scoring
-compares bay numbers. Under ``BayIdentity.SQUARE`` every floor holds every bay
-on the same square, and the square is how an operator names it. Under
+compares bay numbers. Under ``BayIdentity.SQUARE`` a bay is named by its square,
+and every floor holds every bay on the same square unless ``view_shift`` makes
+each floor a window on a larger yard, as for landmarks below. Under
 ``BayIdentity.SYMBOL`` and ``BayIdentity.LETTER`` a floor holds only the bays
 its operator was assigned, on squares no other floor's bays stand on, and the
 bay's symbol or letter is how an operator names it. Either way the depot
 assigns each operator a set, and with ``bays_differ`` exactly one bay is on
 both lists. Neither operator is told the other's list.
+
+Under ``BayIdentity.LANDMARK`` every floor is a window on one yard of
+landmarks and bays. The windows can sit at different places in the yard, and
+the second operator's can be drawn mirrored left to right. Each floor holds
+only its operator's bays, so scoring compares bay numbers as it does for marked
+bays, and every square, start and landmark of a floor is in that floor's own
+drawing, which is the square its operator's actions move through.
 
 Pallets are separate from that. They never close a bay, they only force a crate
 to go around, and ``pallet_density`` decides how many a floor holds. A layout is
@@ -28,6 +36,9 @@ from glossogen.scenarios.move_a_box.ids import (
     BAY_LETTERS,
     BAY_SYMBOLS,
     CORNER_CELL,
+    LANDMARK_BAY_MARK,
+    LANDMARK_CELL_WIDTH,
+    LANDMARK_KINDS,
     SQUARE_BAY_MARK,
     BayIdentity,
     CrateStart,
@@ -76,6 +87,61 @@ class Bay(NamedTuple):
     cell: Cell
 
 
+class Landmark(NamedTuple):
+    """A landmark on one operator's floor: the square it blocks and the word the drawing shows."""
+
+    cell: Cell
+    kind: str
+
+
+class FloorView(NamedTuple):
+    """Where one operator's floor sits in the yard, and whether it is drawn mirrored.
+
+    A floor is the ``grid_size`` square of the yard whose top left corner is
+    ``row_offset`` rows down and ``col_offset`` columns right of the yard's,
+    drawn mirrored left to right when ``mirrored`` is set. Without
+    ``view_shift``, a square floor is the whole yard as drawn, and so is every
+    marked floor.
+    """
+
+    row_offset: int
+    col_offset: int
+    mirrored: bool
+
+    def from_yard(self, cell: Cell, grid_size: int) -> Cell | None:
+        """The square of this floor over yard square ``cell``, or None when the floor misses it."""
+        row = cell.row - self.row_offset
+        col = cell.col - self.col_offset
+        if not (1 <= row <= grid_size and 1 <= col <= grid_size):
+            return None
+        if self.mirrored:
+            col = grid_size + 1 - col
+        return Cell(row=row, col=col)
+
+
+WHOLE_YARD_VIEW = FloorView(row_offset=0, col_offset=0, mirrored=False)
+"""The view of a floor that shows the whole yard, as drawn."""
+
+
+class YardSetup(NamedTuple):
+    """How a round lays its floors over one yard.
+
+    ``landmark_count`` landmarks stand in a landmark yard, each on one floor or
+    more. ``mirrored`` draws the second operator's landmark floor mirrored left
+    to right. ``view_shift`` makes the yard that many squares wider and taller
+    than a floor, and puts each floor's top left corner up to that many squares
+    down and right of the yard's, drawn for each operator and each round; it
+    applies to square and landmark floors. ``private_bays_outside_overlap``
+    puts each operator's private bays where no other floor reaches, so the only
+    assigned bay two shifted floors both show is the shared one.
+    """
+
+    landmark_count: int
+    mirrored: bool
+    view_shift: int
+    private_bays_outside_overlap: bool
+
+
 class TargetLayout(NamedTuple):
     """The bays one target of a round puts on each floor, and which of them each operator may use.
 
@@ -95,17 +161,24 @@ class TargetLayout(NamedTuple):
                 return bay.number
         return None
 
-    def bay_name(self, number: int) -> str:
-        """What every operator calls bay ``number``: its square, its symbol or its letter."""
+    def bay_name(self, number: int, agent_id: str) -> str:
+        """What ``agent_id`` calls bay ``number``: its square on that floor, its symbol or letter.
+
+        A square bay is named by the square ``agent_id``'s floor shows it on,
+        which differs between floors when the floors are shifted over a yard. A
+        landmark bay has no name an operator reads, so the log names it by its
+        number and no prompt shows it.
+        """
         if self.bay_identity is BayIdentity.SYMBOL:
             return BAY_SYMBOLS[number - 1].name
         if self.bay_identity is BayIdentity.LETTER:
             return BAY_LETTERS[number - 1]
-        for bays in self.bays.values():
-            for bay in bays:
-                if bay.number == number:
-                    return bay.cell.label()
-        raise ValueError(f"Bay {number} stands on no floor of this target.")
+        if self.bay_identity is BayIdentity.LANDMARK:
+            return str(number)
+        for bay in self.bays[agent_id]:
+            if bay.number == number:
+                return bay.cell.label()
+        raise ValueError(f"Bay {number} is not on {agent_id}'s floor.")
 
     def bay_mark(self, number: int) -> str:
         """How the floor drawing marks bay ``number``."""
@@ -113,6 +186,8 @@ class TargetLayout(NamedTuple):
             return BAY_SYMBOLS[number - 1].glyph
         if self.bay_identity is BayIdentity.LETTER:
             return BAY_LETTERS[number - 1]
+        if self.bay_identity is BayIdentity.LANDMARK:
+            return LANDMARK_BAY_MARK
         return SQUARE_BAY_MARK
 
 
@@ -121,13 +196,18 @@ class RoundDepot(NamedTuple):
 
     ``starts[agent_id]`` is where that operator's crate is placed and
     ``pallets[agent_id]`` the squares its crate cannot cross, for every target of
-    the round. Later targets are drawn by ``draw_next_target`` once the crates
-    have moved.
+    the round. Under ``BayIdentity.LANDMARK`` those squares are the landmarks
+    and ``landmarks[agent_id]`` names what stands on each; every other identity
+    leaves ``landmarks`` empty. ``views[agent_id]`` places the floor in the yard,
+    and is ``WHOLE_YARD_VIEW`` unless the floor is a landmark or shifted one.
+    Later targets are drawn by ``draw_next_target`` once the crates have moved.
     """
 
     round_number: int
     starts: dict[str, Cell]
     pallets: dict[str, frozenset[Cell]]
+    landmarks: dict[str, tuple[Landmark, ...]]
+    views: dict[str, FloorView]
     first_target: TargetLayout
 
 
@@ -211,7 +291,9 @@ def floor_rows(
     this operator may use it: which bays it may use is stated in the briefing,
     not in the drawing. Under a marked identity it is the operator's own bays,
     each drawn as its symbol or letter. ``crate`` is the square the crate stands
-    on as the target begins, drawn ``C``, or ``@`` on a floor of letters.
+    on, drawn ``C``, or ``@`` on a floor of letters. The crate is drawn over a
+    bay it stands on, which only a round's result shows: a target never starts
+    with a crate on a bay.
     """
     bays = {bay.cell: target.bay_mark(number=bay.number) for bay in target.bays[agent_id]}
     rows: list[str] = []
@@ -219,15 +301,39 @@ def floor_rows(
         marks: list[str] = []
         for col in range(1, grid_size + 1):
             cell = Cell(row=row, col=col)
-            if cell in bays:
-                marks.append(bays[cell])
-            elif cell == crate:
+            if cell == crate:
                 marks.append(target.bay_identity.crate_mark())
+            elif cell in bays:
+                marks.append(bays[cell])
             elif cell in pallets:
                 marks.append("#")
             else:
                 marks.append(".")
         rows.append(" ".join(mark.ljust(2) for mark in marks).rstrip())
+    return rows
+
+
+def landmark_floor_rows(
+    landmarks: tuple[Landmark, ...],
+    bays: tuple[Bay, ...],
+    crates: dict[Cell, str],
+    grid_size: int,
+) -> list[str]:
+    """One landmark floor, one word per square: each landmark by its kind, each bay, the crates.
+
+    Every square is ``LANDMARK_CELL_WIDTH`` characters wide, so a square holding a
+    word stands in the same column as the dots above and below it. No row or
+    column is numbered. ``crates`` maps each square a crate is drawn on to the
+    word it is drawn as, which covers a bay standing on the same square.
+    """
+    marks = {landmark.cell: landmark.kind for landmark in landmarks}
+    for bay in bays:
+        marks[bay.cell] = LANDMARK_BAY_MARK
+    marks.update(crates)
+    rows: list[str] = []
+    for row in range(1, grid_size + 1):
+        words = [marks.get(Cell(row=row, col=col), ".") for col in range(1, grid_size + 1)]
+        rows.append("".join(word.ljust(LANDMARK_CELL_WIDTH) for word in words).rstrip())
     return rows
 
 
@@ -383,14 +489,16 @@ def _draw_starts(
     agent_ids: tuple[str, ...],
     grid_size: int,
     bays: frozenset[Cell],
+    blocked: frozenset[Cell],
     crate_start: CrateStart,
 ) -> dict[str, Cell]:
     """Where each operator's crate is placed, as ``crate_start`` describes it.
 
     A drawn square stands at least ``MIN_START_SEPARATION`` from every bay on
-    every floor, the same floor the corner square keeps. ``SHARED_RANDOM`` draws one and gives it
-    to both operators; ``SEPARATE_RANDOM`` draws one each, so the bay nearest one
-    operator's crate is not the bay nearest the other's.
+    every floor, the same floor the corner square keeps, and off ``blocked``.
+    ``SHARED_RANDOM`` draws one and gives it to both operators;
+    ``SEPARATE_RANDOM`` draws one each, so the bay nearest one operator's crate
+    is not the bay nearest the other's.
     """
     if crate_start is CrateStart.CORNER:
         return dict.fromkeys(agent_ids, Cell(row=CORNER_CELL[0], col=CORNER_CELL[1]))
@@ -398,7 +506,8 @@ def _draw_starts(
         Cell(row=row, col=col)
         for row in range(1, grid_size + 1)
         for col in range(1, grid_size + 1)
-        if all(
+        if Cell(row=row, col=col) not in blocked
+        and all(
             manhattan(first=Cell(row=row, col=col), second=bay) >= MIN_START_SEPARATION
             for bay in bays
         )
@@ -447,6 +556,7 @@ def generate_depots(
     bays_differ: bool,
     crate_start: CrateStart,
     pallet_density: float,
+    yard_setup: YardSetup,
 ) -> list[RoundDepot]:
     """Every round's bays, start squares, assigned bays and pallets, drawn from ``seed``.
 
@@ -475,16 +585,43 @@ def generate_depots(
             bay_identity=bay_identity,
             crate_start=crate_start,
             pallet_density=pallet_density,
+            yard_setup=yard_setup,
         )
         if depot is None:
             raise ValueError(
                 f"No move_a_box layout for round {round_number} after {LAYOUT_ATTEMPTS} draws: "
-                f"grid_size={grid_size} holds no {bay_count} bays far enough apart under "
-                f"bay_identity={bay_identity.value}, or "
-                f"pallet_density={pallet_density} closes one off every time."
+                + _no_layout_reason(
+                    grid_size=grid_size,
+                    bay_count=bay_count,
+                    bay_identity=bay_identity,
+                    pallet_density=pallet_density,
+                    yard_setup=yard_setup,
+                )
             )
         depots.append(depot)
     return depots
+
+
+def _no_layout_reason(
+    grid_size: int,
+    bay_count: int,
+    bay_identity: BayIdentity,
+    pallet_density: float,
+    yard_setup: YardSetup,
+) -> str:
+    """The knobs that can leave a round with no layout, for the error that names them."""
+    if bay_identity.is_landmark():
+        return (
+            f"landmark_count={yard_setup.landmark_count} on a {grid_size}x{grid_size} floor "
+            f"with view_shift={yard_setup.view_shift} leaves no {bay_count} bays far enough "
+            "apart beside the landmarks, or the landmarks close a bay off from a start every "
+            "time."
+        )
+    return (
+        f"grid_size={grid_size} holds no {bay_count} bays far enough apart under "
+        f"bay_identity={bay_identity.value}, pallet_density={pallet_density} closes one off "
+        f"every time, or no layout fits {yard_setup}."
+    )
 
 
 def _draw_depot(
@@ -500,12 +637,28 @@ def _draw_depot(
     bay_identity: BayIdentity,
     crate_start: CrateStart,
     pallet_density: float,
+    yard_setup: YardSetup,
 ) -> RoundDepot | None:
     """One round's layout, or None when ``LAYOUT_ATTEMPTS`` draws all failed.
 
     A draw fails when the bays do not fit on the floor, or when a pallet closes a
     bay off.
     """
+    if bay_identity.is_landmark() or (bay_identity is BayIdentity.SQUARE and yard_setup.view_shift):
+        return _draw_yard_depot(
+            rng=rng,
+            agent_ids=agent_ids,
+            round_number=round_number,
+            corner=corner,
+            grid_size=grid_size,
+            bay_count=bay_count,
+            bays_allowed_each=bays_allowed_each,
+            bays_differ=bays_differ,
+            bay_identity=bay_identity,
+            crate_start=crate_start,
+            pallet_density=pallet_density,
+            setup=yard_setup,
+        )
     whole_floor = dict.fromkeys(agent_ids, _every_square(grid_size=grid_size))
     for _ in range(LAYOUT_ATTEMPTS):
         squares = _draw_bay_squares(
@@ -526,6 +679,7 @@ def _draw_depot(
             agent_ids=agent_ids,
             grid_size=grid_size,
             bays=every_bay,
+            blocked=frozenset(),
             crate_start=crate_start,
         )
         allowed = _draw_allowed_sets(
@@ -555,6 +709,8 @@ def _draw_depot(
             round_number=round_number,
             starts=starts,
             pallets=pallets,
+            landmarks=dict.fromkeys(agent_ids, ()),
+            views=dict.fromkeys(agent_ids, WHOLE_YARD_VIEW),
             first_target=TargetLayout(
                 bay_identity=bay_identity,
                 bays=bays,
@@ -562,6 +718,430 @@ def _draw_depot(
             ),
         )
     return None
+
+
+class _YardContents(NamedTuple):
+    """What one draw puts in a yard.
+
+    ``bay_cells[n - 1]`` is where bay ``n`` stands, in reading order of the
+    yard. ``blocked`` holds the squares a crate cannot cross: the landmarks'
+    squares in a landmark yard, the pallets in a square one.
+    """
+
+    landmarks: tuple[Landmark, ...]
+    bay_cells: list[Cell]
+    blocked: frozenset[Cell]
+
+
+class _YardFloor(NamedTuple):
+    """One operator's floor of a yard, in that floor's own squares."""
+
+    start: Cell
+    bays: tuple[Bay, ...]
+    landmarks: tuple[Landmark, ...]
+    blocked: frozenset[Cell]
+
+
+def _draw_yard_depot(
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    round_number: int,
+    corner: Cell,
+    grid_size: int,
+    bay_count: int,
+    bays_allowed_each: int,
+    bays_differ: bool,
+    bay_identity: BayIdentity,
+    crate_start: CrateStart,
+    pallet_density: float,
+    setup: YardSetup,
+) -> RoundDepot | None:
+    """One round's yard and the floors over it, or None when ``LAYOUT_ATTEMPTS`` draws all failed.
+
+    Each draw places the floors in the yard first, then what the yard holds on
+    squares some floor shows, so where two floors overlap they show the same
+    landmarks, bays and pallets. A draw fails when the bays do not fit, when an
+    assigned bay or a start is off its operator's floor, when a landmark bay on
+    every list has no landmark beside it that every floor shows, or when the
+    obstacles close a bay off from its floor's start.
+    """
+    yard_size = grid_size + setup.view_shift
+    for _ in range(LAYOUT_ATTEMPTS):
+        views = _draw_views(rng=rng, agent_ids=agent_ids, setup=setup)
+        windows = {
+            agent_id: _window(view=views[agent_id], grid_size=grid_size) for agent_id in agent_ids
+        }
+        shown = frozenset[Cell]().union(*windows.values())
+        contents = _draw_yard_contents(
+            rng=rng,
+            shown=shown,
+            corner=corner,
+            yard_size=yard_size,
+            bay_count=bay_count,
+            bay_identity=bay_identity,
+            pallet_density=pallet_density,
+            landmark_count=setup.landmark_count,
+        )
+        if contents is None:
+            continue
+        starts = _draw_window_starts(
+            rng=rng,
+            agent_ids=agent_ids,
+            windows=windows,
+            yard_size=yard_size,
+            bays=frozenset(contents.bay_cells),
+            blocked=contents.blocked,
+            crate_start=crate_start,
+        )
+        allowed = _draw_window_allowed_sets(
+            rng=rng,
+            agent_ids=agent_ids,
+            bay_count=bay_count,
+            bays_allowed_each=bays_allowed_each,
+            bays_differ=bays_differ,
+            bay_cells=contents.bay_cells,
+            windows=windows,
+            setup=setup,
+        )
+        if starts is None or allowed is None:
+            continue
+        if bay_identity.is_landmark() and not _shared_bays_beside_a_shown_landmark(
+            views=views,
+            landmarks=contents.landmarks,
+            bay_cells=contents.bay_cells,
+            allowed=allowed,
+            grid_size=grid_size,
+        ):
+            continue
+        depot = _yard_depot(
+            round_number=round_number,
+            grid_size=grid_size,
+            bay_identity=bay_identity,
+            views=views,
+            contents=contents,
+            starts=starts,
+            allowed=allowed,
+        )
+        if depot is not None and _every_floor_bay_reachable(depot=depot, grid_size=grid_size):
+            return depot
+    return None
+
+
+def _draw_yard_contents(
+    rng: random.Random,
+    shown: frozenset[Cell],
+    corner: Cell,
+    yard_size: int,
+    bay_count: int,
+    bay_identity: BayIdentity,
+    pallet_density: float,
+    landmark_count: int,
+) -> _YardContents | None:
+    """The landmarks, bays and pallets of one yard, on ``shown`` squares; None when bays do not fit.
+
+    A landmark yard draws ``landmark_count`` landmarks off ``corner``, then
+    every bay beside one and away from ``corner``, which ``CrateStart.CORNER``
+    can start on. A square yard draws its bays, then a pallet on each other
+    shown square with probability ``pallet_density``.
+    """
+    if bay_identity.is_landmark():
+        landmarks = tuple(
+            sorted(
+                Landmark(cell=cell, kind=rng.choice(LANDMARK_KINDS))
+                for cell in rng.sample(sorted(shown - {corner}), landmark_count)
+            )
+        )
+        blocked = frozenset(landmark.cell for landmark in landmarks)
+        drawn = _draw_bays(
+            rng=rng,
+            grid_size=yard_size,
+            bay_count=bay_count,
+            away_from=frozenset({corner}),
+            open_squares=(_beside(cells=blocked, grid_size=yard_size) - blocked) & shown,
+        )
+        if drawn is None:
+            return None
+        return _YardContents(landmarks=landmarks, bay_cells=sorted(drawn), blocked=blocked)
+    drawn = _draw_bays(
+        rng=rng, grid_size=yard_size, bay_count=bay_count, away_from=frozenset(), open_squares=shown
+    )
+    if drawn is None:
+        return None
+    pallets = frozenset(
+        cell for cell in sorted(shown - set(drawn)) if rng.random() < pallet_density
+    )
+    return _YardContents(landmarks=(), bay_cells=sorted(drawn), blocked=pallets)
+
+
+def _draw_window_allowed_sets(
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    bay_count: int,
+    bays_allowed_each: int,
+    bays_differ: bool,
+    bay_cells: list[Cell],
+    windows: dict[str, frozenset[Cell]],
+    setup: YardSetup,
+) -> dict[str, frozenset[int]] | None:
+    """Which bays each operator of a yard may use; None when the bays cannot be placed apart.
+
+    Without ``setup.private_bays_outside_overlap`` the lists are drawn as on any
+    floor. With it, the shared bay is drawn from the bays every floor shows and
+    each operator's private bays from the bays only its own floor shows.
+    ``bay_cells[n - 1]`` is where bay ``n`` stands in the yard.
+    """
+    if not setup.private_bays_outside_overlap:
+        return _draw_allowed_sets(
+            rng=rng,
+            agent_ids=agent_ids,
+            bay_count=bay_count,
+            bays_allowed_each=bays_allowed_each,
+            crates_each=1,
+            bays_differ=bays_differ,
+        )
+    everywhere = frozenset[Cell].intersection(*windows.values())
+    shared_candidates = [
+        number for number, cell in enumerate(bay_cells, start=1) if cell in everywhere
+    ]
+    if not shared_candidates:
+        return None
+    shared = rng.choice(shared_candidates)
+    allowed: dict[str, frozenset[int]] = {}
+    for agent_id in agent_ids:
+        elsewhere = frozenset[Cell]().union(
+            *(window for other, window in windows.items() if other != agent_id)
+        )
+        own_only = [
+            number
+            for number, cell in enumerate(bay_cells, start=1)
+            if cell in windows[agent_id] and cell not in elsewhere
+        ]
+        if len(own_only) < bays_allowed_each - 1:
+            return None
+        allowed[agent_id] = frozenset({shared, *rng.sample(own_only, bays_allowed_each - 1)})
+    return allowed
+
+
+def _draw_views(
+    rng: random.Random, agent_ids: tuple[str, ...], setup: YardSetup
+) -> dict[str, FloorView]:
+    """Where each floor sits in the yard this round; with no shift, every floor is the yard.
+
+    With ``setup.view_shift`` above 0 each floor's corner is drawn on its own,
+    so how the floors overlap can change from one round to the next, and two
+    rounds in a row can draw the same overlap. A draw that puts every corner
+    on one square is drawn again: two floors never sit on the same part of
+    the yard.
+    """
+    while True:
+        views = {
+            agent_id: _draw_view(rng=rng, setup=setup, mirrored=setup.mirrored and index % 2 == 1)
+            for index, agent_id in enumerate(agent_ids)
+        }
+        corners = {(view.row_offset, view.col_offset) for view in views.values()}
+        if not setup.view_shift or len(corners) > 1:
+            return views
+
+
+def _draw_view(rng: random.Random, setup: YardSetup, mirrored: bool) -> FloorView:
+    """One floor's corner in the yard, drawn up to ``setup.view_shift`` down and right."""
+    if not setup.view_shift:
+        return FloorView(row_offset=0, col_offset=0, mirrored=mirrored)
+    return FloorView(
+        row_offset=rng.randint(0, setup.view_shift),
+        col_offset=rng.randint(0, setup.view_shift),
+        mirrored=mirrored,
+    )
+
+
+def _window(view: FloorView, grid_size: int) -> frozenset[Cell]:
+    """The yard squares the floor at ``view`` shows."""
+    return frozenset(
+        Cell(row=view.row_offset + row, col=view.col_offset + col)
+        for row in range(1, grid_size + 1)
+        for col in range(1, grid_size + 1)
+    )
+
+
+def _draw_window_starts(
+    rng: random.Random,
+    agent_ids: tuple[str, ...],
+    windows: dict[str, frozenset[Cell]],
+    yard_size: int,
+    bays: frozenset[Cell],
+    blocked: frozenset[Cell],
+    crate_start: CrateStart,
+) -> dict[str, Cell] | None:
+    """Each crate's start, as a yard square on its operator's floor, or None when one has none.
+
+    ``SEPARATE_RANDOM`` draws each operator's square from its own floor, off the
+    landmarks and at least ``MIN_START_SEPARATION`` from every bay. The other
+    starts need every floor to be the whole yard, and are drawn as on any floor.
+    """
+    if crate_start is not CrateStart.SEPARATE_RANDOM:
+        return _draw_starts(
+            rng=rng,
+            agent_ids=agent_ids,
+            grid_size=yard_size,
+            bays=bays,
+            blocked=blocked,
+            crate_start=crate_start,
+        )
+    starts: dict[str, Cell] = {}
+    for agent_id in agent_ids:
+        candidates = [
+            cell
+            for cell in sorted(windows[agent_id])
+            if cell not in blocked
+            and all(manhattan(first=cell, second=bay) >= MIN_START_SEPARATION for bay in bays)
+        ]
+        if not candidates:
+            return None
+        starts[agent_id] = rng.choice(candidates)
+    return starts
+
+
+def _shared_bays_beside_a_shown_landmark(
+    views: dict[str, FloorView],
+    landmarks: tuple[Landmark, ...],
+    bay_cells: list[Cell],
+    allowed: dict[str, frozenset[int]],
+    grid_size: int,
+) -> bool:
+    """Whether every bay on every list has a landmark beside it that every floor shows."""
+    lists = list(allowed.values())
+    shared = lists[0].intersection(*lists[1:])
+    for number in shared:
+        beside = [
+            landmark
+            for landmark in landmarks
+            if manhattan(first=landmark.cell, second=bay_cells[number - 1]) == 1
+            and all(
+                view.from_yard(cell=landmark.cell, grid_size=grid_size) is not None
+                for view in views.values()
+            )
+        ]
+        if not beside:
+            return False
+    return True
+
+
+def _beside(cells: frozenset[Cell], grid_size: int) -> frozenset[Cell]:
+    """Every square next to a square of ``cells``, up, down, left or right."""
+    return frozenset(
+        neighbour
+        for cell in cells
+        for direction in Direction
+        if (neighbour := step(cell=cell, direction=direction, grid_size=grid_size)) is not None
+    )
+
+
+def _every_floor_bay_reachable(depot: RoundDepot, grid_size: int) -> bool:
+    """Whether every crate can reach every bay on its floor around that floor's obstacles."""
+    for agent_id, start in depot.starts.items():
+        reached = distances_from(start=start, blocked=depot.pallets[agent_id], grid_size=grid_size)
+        if any(bay.cell not in reached for bay in depot.first_target.bays[agent_id]):
+            return False
+    return True
+
+
+def _yard_depot(
+    round_number: int,
+    grid_size: int,
+    bay_identity: BayIdentity,
+    views: dict[str, FloorView],
+    contents: _YardContents,
+    starts: dict[str, Cell],
+    allowed: dict[str, frozenset[int]],
+) -> RoundDepot | None:
+    """Each operator's floor of one yard, or None when one of them does not fit.
+
+    ``starts`` are yard squares. None when ``_yard_floor`` refuses a floor.
+    """
+    floors: dict[str, _YardFloor] = {}
+    for agent_id, view in views.items():
+        floor = _yard_floor(
+            view=view,
+            grid_size=grid_size,
+            bay_identity=bay_identity,
+            contents=contents,
+            start=starts[agent_id],
+            allowed=allowed[agent_id],
+        )
+        if floor is None:
+            return None
+        floors[agent_id] = floor
+    return RoundDepot(
+        round_number=round_number,
+        starts={agent_id: floor.start for agent_id, floor in floors.items()},
+        pallets={agent_id: floor.blocked for agent_id, floor in floors.items()},
+        landmarks={agent_id: floor.landmarks for agent_id, floor in floors.items()},
+        views=views,
+        first_target=TargetLayout(
+            bay_identity=bay_identity,
+            bays={agent_id: floor.bays for agent_id, floor in floors.items()},
+            allowed_bays={
+                agent_id: tuple(sorted(numbers)) for agent_id, numbers in allowed.items()
+            },
+        ),
+    )
+
+
+def _yard_floor(
+    view: FloorView,
+    grid_size: int,
+    bay_identity: BayIdentity,
+    contents: _YardContents,
+    start: Cell,
+    allowed: frozenset[int],
+) -> _YardFloor | None:
+    """The floor at ``view``: what its window covers, in its own squares; None when it does not fit.
+
+    A square floor draws every bay its window covers, and a landmark floor only
+    the ``allowed`` ones. None when the start or an ``allowed`` bay is off the
+    floor, or when a landmark floor's bay has no landmark beside it there.
+    """
+    numbers = range(1, len(contents.bay_cells) + 1)
+    if bay_identity.is_landmark():
+        numbers = sorted(allowed)
+    bays = tuple(
+        sorted(
+            (
+                Bay(number=number, cell=cell)
+                for number in numbers
+                if (
+                    cell := view.from_yard(cell=contents.bay_cells[number - 1], grid_size=grid_size)
+                )
+                is not None
+            ),
+            key=lambda bay: bay.cell,
+        )
+    )
+    landmarks = tuple(
+        sorted(
+            Landmark(cell=cell, kind=landmark.kind)
+            for landmark in contents.landmarks
+            if (cell := view.from_yard(cell=landmark.cell, grid_size=grid_size)) is not None
+        )
+    )
+    floor_start = view.from_yard(cell=start, grid_size=grid_size)
+    if floor_start is None or not allowed <= {bay.number for bay in bays}:
+        return None
+    if bay_identity.is_landmark() and not all(
+        any(manhattan(first=bay.cell, second=landmark.cell) == 1 for landmark in landmarks)
+        for bay in bays
+    ):
+        return None
+    return _YardFloor(
+        start=floor_start,
+        bays=bays,
+        landmarks=landmarks,
+        blocked=frozenset(
+            cell
+            for blocked in contents.blocked
+            if (cell := view.from_yard(cell=blocked, grid_size=grid_size)) is not None
+        ),
+    )
 
 
 def draw_next_target(

@@ -125,6 +125,7 @@ async def execute_agent_swap(
         compaction=old_config.compaction,
         initial_message_history=seed_history_config.history,
         model_settings=old_config.model_settings,
+        record_token_ids=old_config.record_token_ids,
     )
     runtime.update_agent_config(agent_id=agent_id, config=new_config)
 

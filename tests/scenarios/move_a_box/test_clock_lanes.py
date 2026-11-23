@@ -71,7 +71,7 @@ def assert_lane_is_unbroken(lane: MoveABoxClockLane) -> None:
 async def test_a_run_with_the_clock_off_has_no_lanes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         agent_id: [read(), *to_shared_bay(method="cart"), finish(), wait_for_next_round()]
         for agent_id in (OPERATOR_A, OPERATOR_B)

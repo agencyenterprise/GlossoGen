@@ -34,6 +34,7 @@
      "token_threshold": 50000
     },
     "wait_reasoning": false,
+    "record_token_ids": false,
     "round_time_budget_seconds": 140,
     "seed": 42,
     "easy_round_numbers": [],
@@ -69,11 +70,11 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
-    "send_message"
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "read_notifications"
    ],
    "model": "scripted::yard_operator_a",
    "provider": "anthropic",
@@ -81,31 +82,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -122,6 +98,55 @@
       "required": [
        "channel_id",
        "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -157,30 +182,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
       "type": "object"
      }
     }
@@ -197,11 +198,11 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
-    "send_message"
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "read_notifications"
    ],
    "model": "scripted::logistics_planner_a",
    "provider": "anthropic",
@@ -209,31 +210,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -250,6 +226,55 @@
       "required": [
        "channel_id",
        "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -285,30 +310,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
       "type": "object"
      }
     }
@@ -325,12 +326,12 @@
     "postmortem_a"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
-    "move_container",
     "read_channel",
-    "read_notifications",
-    "send_message"
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "move_container",
+    "read_notifications"
    ],
    "model": "scripted::crane_operator_a",
    "provider": "anthropic",
@@ -338,6 +339,59 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
+    {
+     "name": "read_channel",
+     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "last_n": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "channel_id",
+       "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
     {
      "name": "get_channel_members",
      "description": "See who is in a channel.",
@@ -351,15 +405,6 @@
       "required": [
        "channel_id"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
       "type": "object"
      }
     },
@@ -379,26 +424,6 @@
       "required": [
        "from_slot",
        "to_slot"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_channel",
-     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "last_n": {
-        "type": "integer"
-       }
-      },
-      "required": [
-       "channel_id",
-       "last_n"
       ],
       "type": "object"
      }
@@ -434,30 +459,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
       "type": "object"
      }
     }
@@ -474,11 +475,11 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
-    "send_message"
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "read_notifications"
    ],
    "model": "scripted::yard_operator_b",
    "provider": "anthropic",
@@ -486,31 +487,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -527,6 +503,55 @@
       "required": [
        "channel_id",
        "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -562,30 +587,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
       "type": "object"
      }
     }
@@ -602,11 +603,11 @@
     "postmortem_b"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
-    "send_message"
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "read_notifications"
    ],
    "model": "scripted::logistics_planner_b",
    "provider": "anthropic",
@@ -614,31 +615,6 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
-    {
-     "name": "get_channel_members",
-     "description": "See who is in a channel.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "channel_id"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
     {
      "name": "read_channel",
      "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
@@ -655,6 +631,55 @@
       "required": [
        "channel_id",
        "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
+    {
+     "name": "get_channel_members",
+     "description": "See who is in a channel.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "channel_id"
       ],
       "type": "object"
      }
@@ -692,6 +717,52 @@
       "title": "read_notificationsArguments",
       "type": "object"
      }
+    }
+   ]
+  },
+  {
+   "round_number": 0,
+   "event_type": "agent_registered",
+   "agent_id": "crane_operator_b",
+   "role_name": "Crane Operator B",
+   "system_prompt": "You are the crane operator at a container yard, working from the cab. You can see which slots are occupied and which are empty, and you can move a container from any occupied slot to any empty slot \u2014 but you cannot read container attributes from the cab, so you cannot tell the containers apart by sight.\n\nYou work on the link channel with two teammates: the yard spotter, who reports each inbound container's attributes and the slot it is in, and the logistics planner, who reports each container's target bay.\n\nFor each container, match the spotter's report (which container is in which slot) to the planner's report (which container goes to which bay) to work out a move, then call move_container(from_slot, to_slot). If you are unsure, check with your teammates before moving \u2014 a wrong move fails the round.\nCRITICAL RULE \u2014 INSPECTION DEADLINE COSTS TIME:\nEvery inbound container must reach its target bay within a fixed inspection window \u2014 customs inspectors are waiting at the bays and the inspection report can only be filed if every container is in place before the window expires. Every character sent on the link channel costs one second of the round's remaining inspection window. If the total communication time (from ALL messages by all three of you) exceeds the round's window, the inspection slot is missed and the round fails \u2014 the container is not placed and no inspection happens.\n\nCRANE ACTION:\n- move_container(from_slot, to_slot) \u2014 pick up the container at from_slot and set it down at to_slot. Slots are numbered from 1 upward.\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (Team B)\" (channel_id: link_b)\n- \"team discussion (Team B)\" (channel_id: postmortem_b)",
+   "channel_ids": [
+    "link_b",
+    "postmortem_b"
+   ],
+   "tool_names": [
+    "read_channel",
+    "send_message",
+    "list_channels",
+    "get_channel_members",
+    "move_container",
+    "read_notifications"
+   ],
+   "model": "scripted::crane_operator_b",
+   "provider": "anthropic",
+   "model_settings": {
+    "max_tokens": 16384
+   },
+   "tool_definitions": [
+    {
+     "name": "read_channel",
+     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "last_n": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "channel_id",
+       "last_n"
+      ],
+      "type": "object"
+     }
     },
     {
      "name": "send_message",
@@ -716,33 +787,16 @@
       ],
       "type": "object"
      }
-    }
-   ]
-  },
-  {
-   "round_number": 0,
-   "event_type": "agent_registered",
-   "agent_id": "crane_operator_b",
-   "role_name": "Crane Operator B",
-   "system_prompt": "You are the crane operator at a container yard, working from the cab. You can see which slots are occupied and which are empty, and you can move a container from any occupied slot to any empty slot \u2014 but you cannot read container attributes from the cab, so you cannot tell the containers apart by sight.\n\nYou work on the link channel with two teammates: the yard spotter, who reports each inbound container's attributes and the slot it is in, and the logistics planner, who reports each container's target bay.\n\nFor each container, match the spotter's report (which container is in which slot) to the planner's report (which container goes to which bay) to work out a move, then call move_container(from_slot, to_slot). If you are unsure, check with your teammates before moving \u2014 a wrong move fails the round.\nCRITICAL RULE \u2014 INSPECTION DEADLINE COSTS TIME:\nEvery inbound container must reach its target bay within a fixed inspection window \u2014 customs inspectors are waiting at the bays and the inspection report can only be filed if every container is in place before the window expires. Every character sent on the link channel costs one second of the round's remaining inspection window. If the total communication time (from ALL messages by all three of you) exceeds the round's window, the inspection slot is missed and the round fails \u2014 the container is not placed and no inspection happens.\n\nCRANE ACTION:\n- move_container(from_slot, to_slot) \u2014 pick up the container at from_slot and set it down at to_slot. Slots are numbered from 1 upward.\n\nDISCUSSION PHASE:\nAfter each round, there is a discussion phase where you and both teammates can talk in the \"team discussion\" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate protocol conventions for future rounds. Messages in the discussion channel do NOT cost time.\n\nYou have access to the following communication channels. Use the exact channel_id when sending messages:\n- \"link (Team B)\" (channel_id: link_b)\n- \"team discussion (Team B)\" (channel_id: postmortem_b)",
-   "channel_ids": [
-    "link_b",
-    "postmortem_b"
-   ],
-   "tool_names": [
-    "get_channel_members",
-    "list_channels",
-    "move_container",
-    "read_channel",
-    "read_notifications",
-    "send_message"
-   ],
-   "model": "scripted::crane_operator_b",
-   "provider": "anthropic",
-   "model_settings": {
-    "max_tokens": 16384
-   },
-   "tool_definitions": [
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
     {
      "name": "get_channel_members",
      "description": "See who is in a channel.",
@@ -756,15 +810,6 @@
       "required": [
        "channel_id"
       ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
       "type": "object"
      }
     },
@@ -789,26 +834,6 @@
      }
     },
     {
-     "name": "read_channel",
-     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "last_n": {
-        "type": "integer"
-       }
-      },
-      "required": [
-       "channel_id",
-       "last_n"
-      ],
-      "type": "object"
-     }
-    },
-    {
      "name": "read_notifications",
      "description": "Wait for activity, then return it: new messages, events, or status. wait_for='any' (the default) returns the next notification, or no_activity after a timeout. wait_for='message' suspends you until a teammate's message arrives or the next round's briefing does. wait_for='next_round' declares you finished with this round and suspends you until the next briefing. timeout_s wakes you after that many seconds. Must be called on its own, not alongside another tool call: issue any other tool calls first, see their results, then call read_notifications. The response includes a pending_count field indicating how many additional notifications are still queued. If pending_count > 0, call read_notifications again after handling the current one to drain the queue.",
      "input_schema": {
@@ -839,30 +864,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
       "type": "object"
      }
     }
@@ -2251,22 +2252,6 @@
     "round_number": 2
    }
   ],
-  "yard_operator_b": [
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting",
-    "round_number": 1
-   },
-   {
-    "channel_id": "link_b",
-    "sender_agent_id": "yard_operator_b",
-    "sender_display_name": "Yard Scanner B",
-    "text": "yard_operator_b reporting",
-    "round_number": 2
-   }
-  ],
   "logistics_planner_a": [
    {
     "channel_id": "link_a",
@@ -2283,19 +2268,19 @@
     "round_number": 2
    }
   ],
-  "logistics_planner_b": [
+  "yard_operator_b": [
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting",
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting",
     "round_number": 1
    },
    {
     "channel_id": "link_b",
-    "sender_agent_id": "logistics_planner_b",
-    "sender_display_name": "Logistics Planner B",
-    "text": "logistics_planner_b reporting",
+    "sender_agent_id": "yard_operator_b",
+    "sender_display_name": "Yard Scanner B",
+    "text": "yard_operator_b reporting",
     "round_number": 2
    }
   ],
@@ -2312,6 +2297,22 @@
     "sender_agent_id": "crane_operator_a",
     "sender_display_name": "Crane Operator A",
     "text": "crane_operator_a reporting",
+    "round_number": 2
+   }
+  ],
+  "logistics_planner_b": [
+   {
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting",
+    "round_number": 1
+   },
+   {
+    "channel_id": "link_b",
+    "sender_agent_id": "logistics_planner_b",
+    "sender_display_name": "Logistics Planner B",
+    "text": "logistics_planner_b reporting",
     "round_number": 2
    }
   ],

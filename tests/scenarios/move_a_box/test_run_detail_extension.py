@@ -35,7 +35,7 @@ pytestmark = pytest.mark.xdist_group("move_a_box")
 
 
 async def played(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimulationResult:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     scripts: dict[str, list[ScriptedTurn]] = {
         OPERATOR_A: [
             read(),
@@ -197,7 +197,7 @@ async def test_a_round_of_two_targets_reaches_the_panel_as_two_floors_each(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Target 2 starts each crate where target 1 left it, with target 2's own bays and steps."""
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     opening = first_depot(scenario=scenario).first_target
     first = {
         OPERATOR_A: bay_cell(target=opening, agent_id=OPERATOR_A, shared=False),

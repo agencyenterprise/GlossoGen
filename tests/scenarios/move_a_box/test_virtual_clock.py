@@ -94,7 +94,7 @@ def test_the_clock_needs_lockstep_off_and_step_time_needs_the_clock() -> None:
     with pytest.raises(ValueError, match="virtual_clock needs lockstep off"):
         build(preset_name="knobs_virtual_clock", overrides={"lockstep": True})
     with pytest.raises(ValueError, match="step_duration_s applies only with virtual_clock"):
-        build(preset_name="knobs_default", overrides={"step_duration_s": 5.0})
+        build(preset_name="knobs_unshifted", overrides={"step_duration_s": 5.0})
 
 
 def test_a_fixed_list_cost_needs_the_clock_and_act_lists() -> None:
@@ -672,7 +672,7 @@ async def test_a_finish_sent_with_a_haul_lands_after_it(
 
 def test_on_the_clock_the_prompts_describe_the_time_and_the_timed_wait() -> None:
     clocked = build(preset_name="knobs_virtual_clock", overrides={})
-    plain = build(preset_name="knobs_default", overrides={})
+    plain = build(preset_name="knobs_unshifted", overrides={})
     for scenario, shown in ((clocked, True), (plain, False)):
         system = scenario.get_agents(default_model="m", default_provider="openai")[0].system_prompt
         prompts = scenario.runner_prompts(agent_id=OPERATOR_A)

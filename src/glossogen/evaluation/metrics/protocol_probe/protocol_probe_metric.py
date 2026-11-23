@@ -37,6 +37,8 @@ from glossogen.run_replay.message_history_builder import (
     build_message_history,
     resolve_history_timestamp,
 )
+from glossogen.run_replay.transferred_history import with_transferred_history
+from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.scenario_contract.measurement import Measurement
 from glossogen.scenario_contract.metric_protocol import Metric
 from glossogen.scenario_contract.metric_run_options import MetricRunOptions
@@ -107,6 +109,7 @@ class ProtocolProbeMetric(Metric):
         # this it would be probed under its predecessor's model.
         swapped_configs = apply_mid_run_swaps(agent_configs=agent_configs, events=events)
         responses_path = run_dir / _RESPONSES_FILE_NAME
+        run_id = compose_run_id(scenario_name=scenario.name(), run_dir_name=run_dir.name)
         target_timestamp = resolve_history_timestamp(events=events)
 
         rows_written = 0
@@ -159,6 +162,12 @@ class ProtocolProbeMetric(Metric):
                         filter_below_round=None,
                         split_parallel_tool_calls=agent_config.provider == Provider.SELF_HOSTED,
                     )
+                    history = await with_transferred_history(
+                        run_dir=run_dir,
+                        events=events,
+                        agent_id=agent_config.agent_id,
+                        own_history=history,
+                    )
                     if not history:
                         logger.warning(
                             "Skipping question %s for agent %s: empty reconstructed history",
@@ -167,6 +176,7 @@ class ProtocolProbeMetric(Metric):
                         )
                         continue
                     rows_written += await self._run_replicas_for_agent(
+                        run_id=run_id,
                         agent_config=agent_config,
                         full_system_prompt=full_system_prompt,
                         history=history,
@@ -201,6 +211,7 @@ class ProtocolProbeMetric(Metric):
 
     async def _run_replicas_for_agent(
         self,
+        run_id: str,
         agent_config: AgentConfig,
         full_system_prompt: str,
         history: list[ModelMessage],
@@ -216,6 +227,7 @@ class ProtocolProbeMetric(Metric):
         for replica_index in range(1, probe_replicas + 1):
             try:
                 call_result = await run_protocol_probe(
+                    run_id=run_id,
                     agent_id=agent_config.agent_id,
                     role_name=agent_config.role_name,
                     full_system_prompt=full_system_prompt,

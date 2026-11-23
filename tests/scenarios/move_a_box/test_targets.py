@@ -58,7 +58,7 @@ def reads_of(result: SimulationResult, agent_id: str) -> list[str]:
 async def test_two_matched_targets_score_twice_and_match_the_round(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     first = {
         agent_id: bay_cell(
             target=first_depot(scenario=scenario).first_target, agent_id=agent_id, shared=True
@@ -99,7 +99,7 @@ async def test_two_matched_targets_score_twice_and_match_the_round(
 async def test_a_missed_target_still_hands_out_the_next_and_the_round_does_not_match(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     opening = first_depot(scenario=scenario).first_target
     first = {
         OPERATOR_A: bay_cell(target=opening, agent_id=OPERATOR_A, shared=False),
@@ -128,7 +128,7 @@ async def test_acting_on_a_new_target_before_reading_its_briefing_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """operator_b leaves its crate at once, so operator_a's finish opens target 2."""
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     first = bay_cell(
         target=first_depot(scenario=scenario).first_target, agent_id=OPERATOR_A, shared=True
     )
@@ -170,7 +170,7 @@ async def test_every_readout_of_a_multi_target_round_restates_the_target_s_bays(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An operator whose history lost a briefing finds its bays again on its next action."""
-    scenario = build(preset_name="knobs_default", overrides=TWO_TARGETS)
+    scenario = build(preset_name="knobs_unshifted", overrides=TWO_TARGETS)
     opening = first_depot(scenario=scenario).first_target
     first = {
         agent_id: bay_cell(target=opening, agent_id=agent_id, shared=True) for agent_id in OPERATORS
@@ -202,7 +202,7 @@ async def test_every_readout_of_a_multi_target_round_restates_the_target_s_bays(
 async def test_a_one_target_readout_lists_no_bays(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = build(preset_name="knobs_default", overrides=ONE_ROUND)
+    scenario = build(preset_name="knobs_unshifted", overrides=ONE_ROUND)
     cell = bay_cell(
         target=first_depot(scenario=scenario).first_target, agent_id=OPERATOR_A, shared=True
     )

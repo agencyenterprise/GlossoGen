@@ -9,10 +9,13 @@ words; any other exception is logged here and reaches the model as
 ``Error executing tool <name>``.
 
 The tools themselves are the runtime's ``ToolSpec`` list
-(:mod:`glossogen.runtime.agent_tool_specs`). ``list_tool_definitions`` describes
-them without binding an agent, with the schema pydantic-ai sends the model; the
-entry point hands it to the supervisor for the ``agent_registered`` event, and
-the ATIF export calls it directly.
+(:mod:`glossogen.runtime.agent_tool_specs`). ``list_offered_tool_definitions``
+and ``list_tool_definitions`` describe them with the schema that pydantic-ai
+sends the model. ``list_offered_tool_definitions`` lists one agent's tools in the
+order that ``build_agent_tools`` builds them. The entry point hands it to the
+supervisor for the ``agent_registered`` event. ``list_tool_definitions`` lists
+every tool that any agent of the scenario can be offered, and the ATIF export
+calls it.
 """
 
 import asyncio
@@ -25,14 +28,18 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic_ai import ModelRetry, Tool
 
-from glossogen.models.communication_tool_names import BASE_TOOL_NAMES
 from glossogen.models.read_notifications_schema import read_notifications_tool_definition
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runners.read_notifications_tool import (
     RunTermination,
     build_read_notifications_tool,
 )
-from glossogen.runtime.agent_tool_specs import Executor, ToolSpec, tool_specs
+from glossogen.runtime.agent_tool_specs import (
+    Executor,
+    ToolSpec,
+    offered_tool_specs,
+    tool_specs,
+)
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 logger = logging.getLogger(__name__)
@@ -50,46 +57,42 @@ AGENT_ID_PARAMETER = "agent_id"
 def build_agent_tools(
     runtime: SimulationRuntime, agent_id: str, termination: RunTermination
 ) -> list[Tool[None]]:
-    """The tools ``agent_id`` is offered: its base tools, its scenario tools, and the wait.
+    """The tools that ``agent_id`` is offered, in the order that the model receives them.
 
-    A base tool the scenario withholds through ``hidden_base_tools`` is left out,
-    and a scenario tool is included only when the agent's ``tool_names`` list it.
+    They are the specs that ``offered_tool_specs`` keeps, then ``read_notifications``.
     """
-    tools: list[Tool[None]] = []
-    for spec in tool_specs(runtime=runtime):
-        if spec.name in BASE_TOOL_NAMES:
-            if runtime.is_base_tool_hidden(agent_id=agent_id, tool_name=spec.name):
-                continue
-        elif not runtime.is_tool_allowed(agent_id=agent_id, tool_name=spec.name):
-            continue
-        tools.append(_bind(spec=spec, runtime=runtime, agent_id=agent_id))
+    tools = [
+        _bind(spec=spec, runtime=runtime, agent_id=agent_id)
+        for spec in offered_tool_specs(runtime=runtime, agent_id=agent_id)
+    ]
     tools.append(
         build_read_notifications_tool(runtime=runtime, agent_id=agent_id, termination=termination)
     )
     return tools
 
 
+def list_offered_tool_definitions(
+    runtime: SimulationRuntime, agent_id: str
+) -> list[RecordedToolDefinition]:
+    """The definitions of the tools that ``build_agent_tools`` builds for ``agent_id``.
+
+    They are in the same order as the tools.
+    """
+    return _definitions_then_read_notifications(
+        runtime=runtime, specs=offered_tool_specs(runtime=runtime, agent_id=agent_id)
+    )
+
+
 def list_tool_definitions(runtime: SimulationRuntime) -> list[RecordedToolDefinition]:
-    """Every tool an agent can be offered, with the schema the model would see."""
-    definitions: list[RecordedToolDefinition] = []
-    for spec in tool_specs(runtime=runtime):
+    """Every tool that an agent can be offered, with the schema that the model would see."""
+    return _definitions_then_read_notifications(runtime=runtime, specs=tool_specs(runtime=runtime))
 
-        async def describe(**arguments: Any) -> Any:
-            raise NotImplementedError("a tool definition is never called")
 
-        tool = Tool(
-            _with_schema_of(function=describe, spec=spec),
-            takes_ctx=False,
-            name=spec.name,
-            description=spec.description,
-        )
-        definitions.append(
-            RecordedToolDefinition(
-                name=spec.name,
-                description=spec.description,
-                input_schema=tool.tool_def.parameters_json_schema,
-            )
-        )
+def _definitions_then_read_notifications(
+    runtime: SimulationRuntime, specs: list[ToolSpec]
+) -> list[RecordedToolDefinition]:
+    """The definitions of ``specs`` in their order, followed by ``read_notifications``."""
+    definitions = [_definition_of(spec=spec) for spec in specs]
     definitions.append(
         read_notifications_tool_definition(
             scenario_description=runtime.scenario.read_notifications_description(),
@@ -97,6 +100,25 @@ def list_tool_definitions(runtime: SimulationRuntime) -> list[RecordedToolDefini
         )
     )
     return definitions
+
+
+def _definition_of(spec: ToolSpec) -> RecordedToolDefinition:
+    """``spec`` with the input schema that pydantic-ai builds for it."""
+
+    async def describe(**arguments: Any) -> Any:
+        raise NotImplementedError("a tool definition is never called")
+
+    tool = Tool(
+        _with_schema_of(function=describe, spec=spec),
+        takes_ctx=False,
+        name=spec.name,
+        description=spec.description,
+    )
+    return RecordedToolDefinition(
+        name=spec.name,
+        description=spec.description,
+        input_schema=tool.tool_def.parameters_json_schema,
+    )
 
 
 def _bind(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> Tool[None]:

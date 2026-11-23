@@ -36,6 +36,9 @@ class AgentConfig(BaseModel):
     Scenarios leave it unset: the supervisor fills it with the agent's own
     ``model_overrides`` settings, else the run's ``agent_model_settings``, before
     registering the agent.
+
+    ``record_token_ids`` is the run's ``record_token_ids`` knob. Scenarios leave
+    it unset, and the supervisor fills it in the same way.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -50,3 +53,4 @@ class AgentConfig(BaseModel):
     compaction: CompactionConfig
     initial_message_history: list[ModelMessage] | None = None
     model_settings: AgentModelSettings = AgentModelSettings()
+    record_token_ids: bool = False
