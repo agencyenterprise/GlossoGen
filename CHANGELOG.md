@@ -404,6 +404,13 @@ the commit log.
   unchanged, as are the commands and their flags.
 
 ### Fixed
+- The `tool_names` and `tool_definitions` of `agent_registered` list an
+  agent's tools in the order that the model receives them. Until this change,
+  they listed the tools in alphabetical order. A script that rebuilt a prompt
+  from the event log therefore put the tools in a different order from the one
+  that the model received. ATIF trajectories listed the tools in alphabetical
+  order too. Event logs written before this change keep the alphabetical
+  order.
 - `glossogen new-scenario` counts the built-in scenarios package when it checks
   that the new folder is loaded, so `--target-dir src/glossogen/scenarios` in a
   checkout no longer asks for a `[tool.glossogen] scenarios` entry. Its next
