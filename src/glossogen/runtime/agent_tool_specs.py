@@ -1,19 +1,22 @@
 """The tools the runtime offers an agent, independent of the agent framework.
 
 A runner binds these specs to its framework's tool type; the supervisor records
-the definitions a runner derives from them on ``AgentRegistered``. Each executor
-takes ``agent_id`` first and refuses a call by raising ``ValueError``.
+the definitions a runner derives from them on ``AgentRegistered``, in the order
+that the runner sends them. Each executor takes ``agent_id`` first and refuses a call
+by raising ``ValueError``.
 """
 
 from collections.abc import Awaitable, Callable
 from typing import Any, NamedTuple, Protocol
 
 from glossogen.models.communication_tool_names import (
+    BASE_TOOL_NAMES,
     GET_CHANNEL_MEMBERS_TOOL_NAME,
     LIST_CHANNELS_TOOL_NAME,
     READ_CHANNEL_TOOL_NAME,
     SEND_MESSAGE_TOOL_NAME,
 )
+from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runtime.communication_tools import (
     GET_CHANNEL_MEMBERS_DESCRIPTION,
@@ -76,6 +79,32 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
             )
         )
     return specs
+
+
+def offered_tool_specs(runtime: SimulationRuntime, agent_id: str) -> list[ToolSpec]:
+    """The specs ``agent_id`` is offered, in listing order, without ``read_notifications``.
+
+    A base tool the scenario hides from the agent is left out, and a scenario
+    tool is kept only when the agent's ``tool_names`` list it.
+    """
+    offered: list[ToolSpec] = []
+    for spec in tool_specs(runtime=runtime):
+        if spec.name in BASE_TOOL_NAMES:
+            if runtime.is_base_tool_hidden(agent_id=agent_id, tool_name=spec.name):
+                continue
+        elif not runtime.is_tool_allowed(agent_id=agent_id, tool_name=spec.name):
+            continue
+        offered.append(spec)
+    return offered
+
+
+def offered_tool_names(runtime: SimulationRuntime, agent_id: str) -> list[str]:
+    """The names of the tools ``agent_id`` is offered, in the order that the model receives them.
+
+    The runner sends the offered specs in listing order and ``read_notifications`` last.
+    """
+    names = [spec.name for spec in offered_tool_specs(runtime=runtime, agent_id=agent_id)]
+    return [*names, READ_NOTIFICATIONS_TOOL_NAME]
 
 
 class ToolDefinitionLister(Protocol):

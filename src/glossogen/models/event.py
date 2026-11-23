@@ -57,8 +57,10 @@ class AgentRegistered(EventBase):
     """Emitted when an agent joins the simulation, capturing its
     role, prompt, channels, and tools.
 
-    ``tool_definitions`` holds the schema of every tool in ``tool_names``. It
-    defaults to empty so that logs recorded before schemas were logged still parse.
+    ``tool_names`` lists the agent's tools in the order that the model receives them,
+    and ``tool_definitions`` holds the schema of every tool in ``tool_names``, in
+    the same order. ``tool_definitions`` defaults to empty so that logs recorded
+    before schemas were logged still parse.
 
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON

@@ -45,12 +45,12 @@
     "link"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_decision"
+    "list_channels",
+    "get_channel_members",
+    "submit_decision",
+    "read_notifications"
    ],
    "model": "scripted::player_a",
    "provider": "anthropic",
@@ -58,6 +58,59 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
+    {
+     "name": "read_channel",
+     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "last_n": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "channel_id",
+       "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
     {
      "name": "get_channel_members",
      "description": "See who is in a channel.",
@@ -75,30 +128,21 @@
      }
     },
     {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_channel",
-     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "name": "submit_decision",
+     "description": "Lock in your move for this round: 'cooperate' or 'defect'. Once both players have called this, the round resolves immediately and the outcome is announced on the link channel. You may only call this once per round.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
-       "channel_id": {
+       "decision": {
+        "enum": [
+         "cooperate",
+         "defect"
+        ],
         "type": "string"
-       },
-       "last_n": {
-        "type": "integer"
        }
       },
       "required": [
-       "channel_id",
-       "last_n"
+       "decision"
       ],
       "type": "object"
      }
@@ -134,50 +178,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "submit_decision",
-     "description": "Lock in your move for this round: 'cooperate' or 'defect'. Once both players have called this, the round resolves immediately and the outcome is announced on the link channel. You may only call this once per round.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "decision": {
-        "enum": [
-         "cooperate",
-         "defect"
-        ],
-        "type": "string"
-       }
-      },
-      "required": [
-       "decision"
-      ],
       "type": "object"
      }
     }
@@ -193,12 +193,12 @@
     "link"
    ],
    "tool_names": [
-    "get_channel_members",
-    "list_channels",
     "read_channel",
-    "read_notifications",
     "send_message",
-    "submit_decision"
+    "list_channels",
+    "get_channel_members",
+    "submit_decision",
+    "read_notifications"
    ],
    "model": "scripted::player_b",
    "provider": "anthropic",
@@ -206,6 +206,59 @@
     "max_tokens": 16384
    },
    "tool_definitions": [
+    {
+     "name": "read_channel",
+     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "last_n": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "channel_id",
+       "last_n"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "send_message",
+     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+       "channel_id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "force": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "channel_id",
+       "text",
+       "force"
+      ],
+      "type": "object"
+     }
+    },
+    {
+     "name": "list_channels",
+     "description": "See which channels you have access to.",
+     "input_schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+     }
+    },
     {
      "name": "get_channel_members",
      "description": "See who is in a channel.",
@@ -223,30 +276,21 @@
      }
     },
     {
-     "name": "list_channels",
-     "description": "See which channels you have access to.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "object"
-     }
-    },
-    {
-     "name": "read_channel",
-     "description": "Read the last N messages from a channel. Each message includes the name of the agent who sent it, so you can always tell who said what without them identifying themselves, and an elapsed_seconds value giving the time it was sent as seconds since the simulation began.",
+     "name": "submit_decision",
+     "description": "Lock in your move for this round: 'cooperate' or 'defect'. Once both players have called this, the round resolves immediately and the outcome is announced on the link channel. You may only call this once per round.",
      "input_schema": {
       "additionalProperties": false,
       "properties": {
-       "channel_id": {
+       "decision": {
+        "enum": [
+         "cooperate",
+         "defect"
+        ],
         "type": "string"
-       },
-       "last_n": {
-        "type": "integer"
        }
       },
       "required": [
-       "channel_id",
-       "last_n"
+       "decision"
       ],
       "type": "object"
      }
@@ -282,50 +326,6 @@
        }
       },
       "title": "read_notificationsArguments",
-      "type": "object"
-     }
-    },
-    {
-     "name": "send_message",
-     "description": "Send a message to a channel. Every member of the channel sees it attributed to you by name, so you do not need to sign your messages or state who you are. If new messages arrived since your last read_channel call, the send is held and the new messages are returned so you can decide what to do. Set force=true to send regardless of new messages.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "channel_id": {
-        "type": "string"
-       },
-       "text": {
-        "type": "string"
-       },
-       "force": {
-        "type": "boolean"
-       }
-      },
-      "required": [
-       "channel_id",
-       "text",
-       "force"
-      ],
-      "type": "object"
-     }
-    },
-    {
-     "name": "submit_decision",
-     "description": "Lock in your move for this round: 'cooperate' or 'defect'. Once both players have called this, the round resolves immediately and the outcome is announced on the link channel. You may only call this once per round.",
-     "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-       "decision": {
-        "enum": [
-         "cooperate",
-         "defect"
-        ],
-        "type": "string"
-       }
-      },
-      "required": [
-       "decision"
-      ],
       "type": "object"
      }
     }
