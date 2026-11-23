@@ -20,18 +20,18 @@ from typing import Any, NamedTuple
 import orjson
 
 from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS
-from glossogen.models.event import RoundAdvanced, SimulationEvent, SimulationStarted
 from glossogen.run_config.config_overrides import model_overrides_config_value
 from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_derivation.replace_agent import (
     build_model_overrides,
     collect_source_agents,
+    opening_simulation_started,
     read_replacement_settings,
     read_user_model_overrides,
     refuse_boundary_with_swapped_seats,
-    refuse_source_b_with_mixed_seat,
-    refuse_source_b_with_swapped_seat,
+    refuse_seat_swapped_before_cutoff,
+    refuse_seat_with_mixed_history,
     refuse_unforkable_source,
     resolve_fork_boundary,
     resolve_knob_round_count,
@@ -43,7 +43,7 @@ from glossogen.run_derivation.run_jsonl_rewriter import (
     rewrite_run_jsonl,
 )
 from glossogen.run_derivation.run_launching import PreparedForkRun, launch_prepared_run
-from glossogen.run_replay.message_rewind import find_event_timestamp
+from glossogen.run_replay.message_rewind import resolve_round_end_cutoff
 from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     IMPORTED_HISTORY_SOURCE_FILENAME,
@@ -102,36 +102,6 @@ class CrossRunReplaceAgentResult(NamedTuple):
     new_run_dir: Path
 
 
-def _resolve_source_b_cutoff_event_id(
-    source_b_events: list[SimulationEvent],
-    source_b_round_end: int,
-) -> str:
-    """Locate Sim B's ``RoundAdvanced(source_b_round_end + 1)`` event id.
-
-    Returns the event_id of that ``RoundAdvanced`` when present, or the
-    empty string when Sim B never advanced past ``source_b_round_end``
-    (in which case the resume code path falls back to Sim B's last
-    event timestamp). ``imported_cutoff_round`` is always
-    ``source_b_round_end + 1`` regardless.
-
-    Raises ``ValueError`` if Sim B did not even reach ``source_b_round_end``.
-    """
-    max_round = 0
-    cutoff_event_id = ""
-    for event in source_b_events:
-        if isinstance(event, RoundAdvanced):
-            if event.round_number > max_round:
-                max_round = event.round_number
-            if event.round_number == source_b_round_end + 1 and not cutoff_event_id:
-                cutoff_event_id = event.event_id
-    if max_round < source_b_round_end:
-        raise ValueError(
-            f"Source B did not reach round {source_b_round_end} "
-            f"(max observed round: {max_round})"
-        )
-    return cutoff_event_id
-
-
 def _compute_blocked_tool_call_channels(
     scenario_cls: type[SimulationScenario],
     sim_a_imported_agent_channels: list[str],
@@ -169,9 +139,9 @@ async def prepare_cross_run_replace_agent_run(
         source_run_dir=request.source_a_run_dir,
         replaced_agent_id=request.replaced_agent_id,
     )
-    refuse_source_b_with_mixed_seat(
-        source_b_run_dir=request.source_b_run_dir,
-        imported_agent_id=request.replaced_agent_id,
+    refuse_seat_with_mixed_history(
+        source_run_dir=request.source_b_run_dir,
+        agent_id=request.replaced_agent_id,
     )
 
     source_a_log_path = event_log_path(
@@ -188,12 +158,8 @@ async def prepare_cross_run_replace_agent_run(
     source_a_events = await load_events(log_path=source_a_log_path)
     source_b_events = await load_events(log_path=source_b_log_path)
 
-    source_a_first_event = source_a_events[0]
-    if not isinstance(source_a_first_event, SimulationStarted):
-        raise ValueError("First event in source A JSONL is not SimulationStarted")
-    source_b_first_event = source_b_events[0]
-    if not isinstance(source_b_first_event, SimulationStarted):
-        raise ValueError("First event in source B JSONL is not SimulationStarted")
+    source_a_first_event = opening_simulation_started(events=source_a_events, run_label="source A")
+    source_b_first_event = opening_simulation_started(events=source_b_events, run_label="source B")
     if source_a_first_event.scenario_name != source_b_first_event.scenario_name:
         raise ValueError(
             f"Scenario mismatch: source A is {source_a_first_event.scenario_name!r}, "
@@ -205,36 +171,30 @@ async def prepare_cross_run_replace_agent_run(
             f"source runs are {source_a_first_event.scenario_name!r}"
         )
 
-    if request.source_b_round_end < 1:
-        raise ValueError(f"source_b_round_end must be >= 1 (got {request.source_b_round_end})")
-
     boundary = resolve_fork_boundary(
         events=source_a_events,
         after_round=request.after_round,
     )
     target_event_id = boundary.target_event_id
     entry_round = request.after_round + 1
-    source_b_cutoff_event_id = _resolve_source_b_cutoff_event_id(
-        source_b_events=source_b_events,
-        source_b_round_end=request.source_b_round_end,
-    )
-    source_a_boundary_timestamp = boundary.boundary_timestamp
-    if source_b_cutoff_event_id:
-        source_b_boundary_timestamp = find_event_timestamp(
-            events=source_b_events,
-            target_event_id=source_b_cutoff_event_id,
+    try:
+        source_b_cutoff = resolve_round_end_cutoff(
+            events=source_b_events, round_end=request.source_b_round_end
         )
-    else:
-        source_b_boundary_timestamp = source_b_events[-1].timestamp
+    except ValueError as exc:
+        raise ValueError(f"Source B: {exc}") from exc
+    source_b_cutoff_event_id = source_b_cutoff.event_id
+    source_a_boundary_timestamp = boundary.boundary_timestamp
+    source_b_boundary_timestamp = source_b_cutoff.timestamp
     refuse_boundary_with_swapped_seats(
         events=source_a_events,
         boundary_timestamp=source_a_boundary_timestamp,
         replaced_agent_id=request.replaced_agent_id,
     )
-    refuse_source_b_with_swapped_seat(
-        source_b_events=source_b_events,
-        boundary_timestamp=source_b_boundary_timestamp,
-        imported_agent_id=request.replaced_agent_id,
+    refuse_seat_swapped_before_cutoff(
+        source_events=source_b_events,
+        cutoff_timestamp=source_b_boundary_timestamp,
+        agent_id=request.replaced_agent_id,
     )
     source_a_agents = collect_source_agents(
         events=source_a_events,

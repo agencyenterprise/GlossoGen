@@ -6,8 +6,11 @@ run always (the imported seat's real history lives in a sidecar the clone does
 not carry), a replace-agent run unless the same seat is being replaced again,
 and a boundary behind an already-fired in-run swap, whose filters and
 swapped-in model live only in its config and ``AgentSwappedMidRun`` event.
-Source B of a cross-run import is judged per seat: only the seat being
-imported must have a clean single-agent history in B's log.
+Source B of a cross-run import, and the source of a history transfer, is judged
+per seat: only the seat whose history is taken must have a clean single-agent
+history in the source's log. A history-transfer run is refused as a fork source,
+and its transferred seats are refused as history sources, because the history
+those seats started with lives in a sidecar, not in the log.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -18,14 +21,19 @@ import pytest
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.run_derivation.replace_agent import (
     refuse_boundary_with_swapped_seats,
-    refuse_source_b_with_mixed_seat,
-    refuse_source_b_with_swapped_seat,
+    refuse_seat_swapped_before_cutoff,
+    refuse_seat_with_mixed_history,
     refuse_unforkable_source,
 )
 from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     IMPORTED_HISTORY_SOURCE_FILENAME,
     CrossRunReplaceManifest,
+)
+from glossogen.run_storage.history_transfer_manifest import (
+    HistoryTransferManifest,
+    TransferredSeat,
+    write_history_transfer_manifest,
 )
 from tests.fakes.replace_manifests import write_replace_manifest
 
@@ -70,6 +78,27 @@ def _write_cross_run_manifest(run_dir: Path, replaced_agent_id: str) -> None:
     (run_dir / CROSS_RUN_REPLACE_MANIFEST_FILENAME).write_text(manifest.model_dump_json())
 
 
+def _write_history_transfer_manifest(run_dir: Path, transferred_agent_id: str) -> None:
+    """Mark ``run_dir`` as a history-transfer run seating ``transferred_agent_id``."""
+    write_history_transfer_manifest(
+        run_dir=run_dir,
+        manifest=HistoryTransferManifest(
+            source_run_id="other_scenario/1",
+            source_run_dir="runs/other_scenario/1",
+            source_round_end=4,
+            seats=[
+                TransferredSeat(
+                    agent_id=transferred_agent_id,
+                    source_agent_id="speaker",
+                    source_model="claude-sonnet-4-6",
+                    source_provider="anthropic",
+                    history_file=f"transferred_history_{transferred_agent_id}.json",
+                )
+            ],
+        ),
+    )
+
+
 def _write_replace_manifest(run_dir: Path, replaced_agent_id: str | None) -> None:
     """Mark ``run_dir`` as a replace-agent (or fork-at-round) run."""
     write_replace_manifest(
@@ -96,6 +125,14 @@ def test_a_cross_run_source_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"is a cross-run replace-agent"):
         refuse_unforkable_source(source_run_dir=tmp_path, replaced_agent_id="observer")
+
+
+def test_a_history_transfer_source_is_refused(tmp_path: Path) -> None:
+    """A fork rebuilds from the log, which lacks the history the transferred seat started with."""
+    _write_history_transfer_manifest(run_dir=tmp_path, transferred_agent_id="observer")
+
+    with pytest.raises(ValueError, match=r"is a history-transfer run"):
+        refuse_unforkable_source(source_run_dir=tmp_path, replaced_agent_id=None)
 
 
 def test_a_replace_agent_source_cannot_be_forked(tmp_path: Path) -> None:
@@ -133,7 +170,7 @@ def test_source_b_refuses_importing_its_own_replaced_seat(tmp_path: Path) -> Non
     _write_replace_manifest(run_dir=tmp_path, replaced_agent_id="observer")
 
     with pytest.raises(ValueError, match=r"whose own boundary replaced 'observer'"):
-        refuse_source_b_with_mixed_seat(source_b_run_dir=tmp_path, imported_agent_id="observer")
+        refuse_seat_with_mixed_history(source_run_dir=tmp_path, agent_id="observer")
 
 
 def test_source_b_refuses_importing_a_seat_it_imported_itself(tmp_path: Path) -> None:
@@ -141,14 +178,31 @@ def test_source_b_refuses_importing_a_seat_it_imported_itself(tmp_path: Path) ->
     _write_cross_run_manifest(run_dir=tmp_path, replaced_agent_id="observer")
 
     with pytest.raises(ValueError, match=r"whose own boundary replaced 'observer'"):
-        refuse_source_b_with_mixed_seat(source_b_run_dir=tmp_path, imported_agent_id="observer")
+        refuse_seat_with_mixed_history(source_run_dir=tmp_path, agent_id="observer")
 
 
 def test_source_b_accepts_importing_an_untouched_seat(tmp_path: Path) -> None:
     """A seat B never replaced has all of its own turns in B's log."""
     _write_replace_manifest(run_dir=tmp_path, replaced_agent_id="observer")
 
-    refuse_source_b_with_mixed_seat(source_b_run_dir=tmp_path, imported_agent_id="engineer")
+    refuse_seat_with_mixed_history(source_run_dir=tmp_path, agent_id="engineer")
+
+
+def test_a_source_refuses_taking_a_seat_it_seated_with_a_transferred_history(
+    tmp_path: Path,
+) -> None:
+    """The seat's earlier history lives in the transfer sidecar, not in the log."""
+    _write_history_transfer_manifest(run_dir=tmp_path, transferred_agent_id="observer")
+
+    with pytest.raises(ValueError, match=r"history-transfer run whose seat 'observer'"):
+        refuse_seat_with_mixed_history(source_run_dir=tmp_path, agent_id="observer")
+
+
+def test_a_history_transfer_source_accepts_a_seat_that_started_fresh(tmp_path: Path) -> None:
+    """A seat the transfer left alone has all of its own turns in the log."""
+    _write_history_transfer_manifest(run_dir=tmp_path, transferred_agent_id="observer")
+
+    refuse_seat_with_mixed_history(source_run_dir=tmp_path, agent_id="engineer")
 
 
 def test_a_boundary_behind_an_in_run_swap_is_refused() -> None:
@@ -189,11 +243,11 @@ def test_source_b_refuses_importing_a_seat_it_swapped_in_run() -> None:
     """B's log for that seat mixes the predecessor's and the swapped-in agent's turns."""
     events: list[SimulationEvent] = [_swap(agent_id="observer", before_boundary=True)]
 
-    with pytest.raises(ValueError, match=r"source B swapped seat 'observer'"):
-        refuse_source_b_with_swapped_seat(
-            source_b_events=events,
-            boundary_timestamp=_BOUNDARY,
-            imported_agent_id="observer",
+    with pytest.raises(ValueError, match=r"the source run swapped seat 'observer'"):
+        refuse_seat_swapped_before_cutoff(
+            source_events=events,
+            cutoff_timestamp=_BOUNDARY,
+            agent_id="observer",
         )
 
 
@@ -201,8 +255,8 @@ def test_source_b_accepts_a_swap_of_a_different_seat() -> None:
     """A swap elsewhere leaves the imported seat's log clean."""
     events: list[SimulationEvent] = [_swap(agent_id="engineer", before_boundary=True)]
 
-    refuse_source_b_with_swapped_seat(
-        source_b_events=events,
-        boundary_timestamp=_BOUNDARY,
-        imported_agent_id="observer",
+    refuse_seat_swapped_before_cutoff(
+        source_events=events,
+        cutoff_timestamp=_BOUNDARY,
+        agent_id="observer",
     )

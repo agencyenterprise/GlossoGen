@@ -3,7 +3,9 @@
 One entry point, :func:`load_resume_state`, covers the resumed shapes: a
 cross-run replace-agent run (an imported agent carries another run's history), a
 replace-agent or fork-at-round run (anchored at a fork boundary by its
-manifest), and a plain ``--resume`` of an interrupted run (no manifest at all).
+manifest), and a plain ``--resume`` of an interrupted run (no fork manifest). A
+history-transfer run resumes the plain way, with each transferred seat's saved
+history put back in front of its turns.
 
 A fork whose boundary was the source's final round has no ``RoundAdvanced`` for
 the round it should enter: its clone ends with the boundary round completed.
@@ -58,6 +60,7 @@ from glossogen.run_replay.message_rewind import (
     build_rewind_state_from_log_end,
     find_event_timestamp,
 )
+from glossogen.run_replay.transferred_history import splice_transferred_histories
 from glossogen.run_storage.cross_run_replace_manifest import read_cross_run_replace_manifest
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.replace_manifest import read_replace_manifest
@@ -523,7 +526,9 @@ async def load_resume_state(
     """Build the rewind state for a resumed run from its directory and events.
 
     Dispatches on the manifests in ``run_dir``: cross-run replace-agent, then
-    replace-agent / fork-at-round, then plain ``--resume`` with no manifest.
+    replace-agent / fork-at-round, then plain ``--resume`` with no manifest. A
+    plain resume of a history-transfer run puts each transferred seat's saved
+    history in front of its turns in the run.
     """
     cross_run_info = read_cross_run_manifest_info(run_dir=run_dir)
     if cross_run_info is not None:
@@ -531,7 +536,11 @@ async def load_resume_state(
 
     replace_info = read_replace_manifest_info(run_dir=run_dir)
     if replace_info is None:
-        return build_rewind_state_from_log_end(events=events, agent_filters={})
+        return await splice_transferred_histories(
+            run_dir=run_dir,
+            events=events,
+            state=build_rewind_state_from_log_end(events=events, agent_filters={}),
+        )
 
     if replace_info.replaced_agent_id is None:
         return _load_fork_at_round_state(events=events, replace_info=replace_info)

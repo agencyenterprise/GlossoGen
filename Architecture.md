@@ -337,7 +337,9 @@ runs/{scenario_name}/{unix_timestamp}/
 ├── cross_run_replace_manifest.json    # (cross-run replace-agent runs only) source A/B + imported model
 ├── imported_history_source.jsonl      # (cross-run replace-agent runs only) verbatim copy of Sim B's JSONL
 ├── replace_config.json                # (replace-agent / cross-run / fork-at-round runs) merged scenario_config + model_overrides written by the orchestrator
-├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run runs) per-agent reconstructed pydantic-ai history dumped at resume time
+├── history_transfer_manifest.json     # (history-transfer runs only) source run, last source round kept, source agent of each seat
+├── transferred_history_{agent_id}.json  # (history-transfer runs only) the seat's first-turn history as pydantic-ai messages, read back on resume
+├── resume_context_{agent_id}.json     # (resume / fork / replace-agent / cross-run / history-transfer runs) per-agent pydantic-ai history the agent started from
 ├── resume_context_{agent_id}_round_{R}.json  # (in-run scheduled swap) one file per AgentSwappedMidRun event
 ├── labels.json                        # JSON array of label strings, for filtering and grouping
 ├── note.md                            # (optional) free-text note for the run
@@ -458,6 +460,38 @@ The same packages as replace-agent. The cross-run manifest has its own model in 
 ### Provenance
 
 Cross-run replace-agent runs store a `cross_run_replace_manifest.json` plus a `imported_history_source.jsonl` (verbatim copy of Sim B's JSONL). The run discovery and detail endpoints expose the manifest as `cross_run_replace_agent_source` on the response models alongside `replace_agent_source`. The frontend shows a violet "Cross-run X: A=… · B=… → imported_model after round N" badge in the run detail header with both sources as links, and a violet floating action button to scroll to the swap divider in the chat pane.
+
+## History Transfer Between Runs
+
+A history-transfer run is a new run in which some agents begin with a copy of the history that an agent built in an earlier run. The earlier run is the *source run*, and its agent is the *source agent*. An agent of the new run that begins with the copy is a *transferred seat*. Its *transferred history* is the source agent's history followed by the *opening message*, a user message that gives the new run's prompts. A transferred seat's `agent_id` and its source agent's `agent_id` can differ, whether or not the two runs share a scenario. The new run's log holds only the new run's events; no source events are copied into it. [Agent swaps and forks](docs/agent-swaps.md#start-a-run-with-agents-from-another-run) describes the flags.
+
+### Flow
+
+1. **Entry**: `glossogen run <scenario> ... --history-from-run <dir> --history-seat <seat>=<source_agent> [--history-through-round N]`. `cli/` reads the flags and takes the source run's scenario from the name of the directory above `<dir>`.
+2. **Checks, before the new run claims a directory**: `run_derivation/` refuses the launch unless all of these hold:
+   - at least one `--history-seat` is given;
+   - the source log exists, and its `SimulationStarted` names that scenario;
+   - each transferred seat is an agent of the new run;
+   - each source agent has an `AgentRegistered` in the source log before the end of round N;
+   - the source run completed round N, by the check `fork-at-round` applies to its boundary: the source opened round N + 1, or it ended with `scenario_complete` after closing round N;
+   - without `--history-through-round`, N is the last round the source opened;
+   - each source agent has at least one model response by the end of round N.
+3. **Refused source agents**: the checks in `run_derivation/` refuse a source agent whose turns in the source log are mixed with another agent's turns. `cross-run-replace-agent` runs the same checks on the run that it imports from. They refuse an agent that an in-run swap replaced before the end of round N, and an agent that `replace-agent` or `cross-run-replace-agent` put into the source run. They also refuse a source agent that was a transferred seat in an earlier history-transfer run, because the source log does not hold that agent's transferred history.
+4. **Building each transferred history, once the new run's agents exist**: `run_derivation/` cuts the source log at the source's `RoundAdvanced(N + 1)`, or keeps the whole log when N was the source's last round. `run_replay/` rebuilds the source agent's history from the cut log, with the source agent's own system prompt, text and thinking. A tool call whose result was logged after the cut has no result in the cut log, so it is left out with its result; this keeps the next round's briefing out of the history. When the seat runs another model or provider than its source agent, the thinking parts are left out, because a provider takes back only its own model's thinking. One `ModelRequest` is appended, which holds the opening message. The opening message is the platform template `history_transfer_prompt.jinja`, rendered with two values from the new scenario: the seat's system prompt with the platform's communication-protocol instructions appended (as every agent's system prompt has them), and the seat's initial prompt.
+5. **Saving**: the transferred history is written to `transferred_history_{agent_id}.json` in pydantic-ai's JSON message format. `history_transfer_manifest.json` records the source run, N, and each transferred seat's source agent with that agent's model and provider.
+6. **Run**: the seat's `AgentConfig.initial_message_history` is set to its transferred history. pydantic-ai adds an agent's system prompt only when the history is empty. The model's requests therefore keep the source agent's system prompt, and the new scenario's system prompt reaches the model inside the opening message.
+
+`replace-agent`, `fork-at-round` and `cross-run-replace-agent` cannot fork a history-transfer run. They copy its log and rebuild each agent from the copy, and the copy does not hold the transferred histories.
+
+A *cycle* is one `agent.run()` call in the runner: the model's responses and tool calls until the model answers with text. At the start of each cycle, `runners/` chooses which prompt to send by looking at the last message of the agent's history. With no history, the runner sends the initial prompt. If the last message is a request that holds a user prompt, the runner sends the history as it is and adds no prompt; this is the case for the opening message. Otherwise, the runner adds the continuation prompt, which is the runner prompt sent between cycles. When a history rebuilt for a resume ends in tool results, the runner therefore adds the continuation prompt. A seat that completes no cycle before the run ends gets no closing prompt, because its history still ends in the unanswered opening message.
+
+### Resume
+
+A crashed history-transfer run resumes with `glossogen run --resume <run dir>` and no `--history-*` flags. `run_replay/` rebuilds each agent from the new run's log. The rebuild opens each agent's history with a request that holds the new scenario's system prompt and initial prompt. A transferred seat was not sent that request. It received those prompts in the opening message. So for each transferred seat, that first request is dropped, and the saved transferred history is put in front of the rest. A seat that an in-run swap gave to another agent is rebuilt without the transferred history, because the agent swapped in did not start with it. Resume reads only files in the new run's directory, so it works after the source run is moved or deleted. The `protocol_probe` and `protocol_explanation` metrics put the saved history in front of a seat's rebuilt turns in the same way. The ATIF export and the thread export do not.
+
+### Where it lives
+
+The manifest model is in `run_storage/`. `run_replay/` builds each transferred history, and on resume and in the probes puts it back in front of the seat's turns. `run_derivation/` runs the checks and saves the files. `cli/` reads the flags, and `runners/` holds the rule for the prompt that opens a cycle.
 
 ## Fork-at-Round System (Post-Hoc Fork, No Agent Replacement)
 
