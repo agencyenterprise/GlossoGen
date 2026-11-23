@@ -193,21 +193,21 @@ def resolve_fork_boundary(
     if end_index is None:
         raise ValueError(
             f"source run opened round {after_round} but never finished it "
-            f"(no simulation_ended); fork-at-round requires a completed boundary"
+            f"(no simulation_ended); a cut after round {after_round} needs a completed round"
         )
     last_ended = events[end_index]
     assert isinstance(last_ended, SimulationEnded)
     if last_ended.reason != RunStatus.SCENARIO_COMPLETE:
         raise ValueError(
             f"source run ended with reason {last_ended.reason.value!r}, so round "
-            f"{after_round} may be incomplete; fork after the last round the "
+            f"{after_round} may be incomplete; cut after the last round the "
             f"source completed instead"
         )
     if log_has_round_ended_events and not boundary_round_ended:
         raise ValueError(
             f"source run ended scenario_complete without closing round "
             f"{after_round} (no round_ended for it), so that round was never "
-            f"judged; fork after the last round the source completed instead"
+            f"judged; cut after the last round the source completed instead"
         )
     target = _last_event_before_game_over(events=events, end_index=end_index)
     if target is None:
@@ -217,6 +217,17 @@ def resolve_fork_boundary(
         boundary_timestamp=target.timestamp,
         advances_into_round=True,
     )
+
+
+def opening_simulation_started(events: list[SimulationEvent], run_label: str) -> SimulationStarted:
+    """The ``SimulationStarted`` that opens ``events``, a run's log.
+
+    Raises ``ValueError`` naming ``run_label`` when the log is empty or opens with
+    another event.
+    """
+    if not events or not isinstance(events[0], SimulationStarted):
+        raise ValueError(f"First event in {run_label} JSONL is not SimulationStarted")
+    return events[0]
 
 
 def _last_simulation_ended_index(events: list[SimulationEvent]) -> int | None:
@@ -799,9 +810,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
             f"found in {source_log_path}"
         )
 
-    source_first_event = source_events[0]
-    if not isinstance(source_first_event, SimulationStarted):
-        raise ValueError("First event in source JSONL is not SimulationStarted")
+    source_first_event = opening_simulation_started(events=source_events, run_label="source")
 
     scenario_cls = get_scenario_class(name=request.scenario_name)
 

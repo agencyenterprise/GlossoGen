@@ -11,6 +11,7 @@ agent carrying another run's history is a platform template too.
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 from glossogen.models.event import AgentRegistered, SimulationEvent
 from glossogen.models.runner_prompts import RunnerPrompts
@@ -60,6 +61,24 @@ def registered_runner_prompts(registration: AgentRegistered) -> RunnerPrompts:
     """The runner prompts the agent behind ``registration`` ran with."""
     return runner_prompts_for(
         role_name=registration.role_name, replacement=registration.runner_prompts
+    )
+
+
+class RegisteredPrompts(NamedTuple):
+    """The full system prompt and the runner prompts an agent ran with."""
+
+    full_system_prompt: str
+    runner_prompts: RunnerPrompts
+
+
+def registered_prompts(registration: AgentRegistered) -> RegisteredPrompts:
+    """The full system prompt and runner prompts of the agent behind ``registration``."""
+    runner_prompts = registered_runner_prompts(registration=registration)
+    return RegisteredPrompts(
+        full_system_prompt=build_full_system_prompt(
+            base_prompt=registration.system_prompt, prompts=runner_prompts
+        ),
+        runner_prompts=runner_prompts,
     )
 
 

@@ -20,13 +20,13 @@ from typing import Any, NamedTuple
 import orjson
 
 from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS
-from glossogen.models.event import SimulationStarted
 from glossogen.run_config.config_overrides import model_overrides_config_value
 from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_derivation.replace_agent import (
     build_model_overrides,
     collect_source_agents,
+    opening_simulation_started,
     read_replacement_settings,
     read_user_model_overrides,
     refuse_boundary_with_swapped_seats,
@@ -158,12 +158,8 @@ async def prepare_cross_run_replace_agent_run(
     source_a_events = await load_events(log_path=source_a_log_path)
     source_b_events = await load_events(log_path=source_b_log_path)
 
-    source_a_first_event = source_a_events[0]
-    if not isinstance(source_a_first_event, SimulationStarted):
-        raise ValueError("First event in source A JSONL is not SimulationStarted")
-    source_b_first_event = source_b_events[0]
-    if not isinstance(source_b_first_event, SimulationStarted):
-        raise ValueError("First event in source B JSONL is not SimulationStarted")
+    source_a_first_event = opening_simulation_started(events=source_a_events, run_label="source A")
+    source_b_first_event = opening_simulation_started(events=source_b_events, run_label="source B")
     if source_a_first_event.scenario_name != source_b_first_event.scenario_name:
         raise ValueError(
             f"Scenario mismatch: source A is {source_a_first_event.scenario_name!r}, "

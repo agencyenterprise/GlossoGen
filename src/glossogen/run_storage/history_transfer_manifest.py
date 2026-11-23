@@ -7,8 +7,8 @@ of the source each transferred seat carries. Each seat's history, ending in the
 message that opens the new run, is saved beside the manifest as written at launch,
 so a resumed run hands the agent the same history.
 
-``run_derivation/history_transfer.py`` writes it; resume and the fork guards read
-it from here without importing ``run_derivation/``.
+``run_derivation/history_transfer.py`` writes it. Resume, the protocol probes and
+the thread export read it from here without importing ``run_derivation/``.
 """
 
 from pathlib import Path
@@ -43,7 +43,6 @@ class HistoryTransferManifest(BaseModel):
     source_run_dir: str
     source_round_end: int
     seats: list[TransferredSeat]
-    transferred_at: float
 
 
 def transferred_history_file_name(agent_id: str) -> str:

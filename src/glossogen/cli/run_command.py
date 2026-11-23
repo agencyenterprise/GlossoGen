@@ -115,7 +115,7 @@ def add_run_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> 
         "--history-from-run",
         type=str,
         help=(
-            "Run directory (runs-dir/<scenario>/<run>) of a finished run, possibly of "
+            "Run directory (runs-dir/<scenario>/<run>) of an earlier run, possibly of "
             "another scenario, whose agents' histories seats of this new run start with"
         ),
     )
@@ -133,8 +133,8 @@ def add_run_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> 
         "--history-through-round",
         type=int,
         help=(
-            "Last --history-from-run round the histories keep (default: every round "
-            "of a finished source)"
+            "Last --history-from-run round the histories keep; that run must have "
+            "completed it (default: the last round of a run that ended scenario_complete)"
         ),
     )
 

@@ -538,6 +538,7 @@ async def load_resume_state(
     if replace_info is None:
         return await splice_transferred_histories(
             run_dir=run_dir,
+            events=events,
             state=build_rewind_state_from_log_end(events=events, agent_filters={}),
         )
 

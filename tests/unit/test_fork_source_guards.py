@@ -95,7 +95,6 @@ def _write_history_transfer_manifest(run_dir: Path, transferred_agent_id: str) -
                     history_file=f"transferred_history_{transferred_agent_id}.json",
                 )
             ],
-            transferred_at=1_780_000_000.0,
         ),
     )
 

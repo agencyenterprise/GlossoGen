@@ -793,10 +793,13 @@ class PydanticAIRunner(AgentRunner):
                     agent_id,
                     self._max_turns,
                 )
+            # A transferred seat that completed no cycle still holds its unanswered
+            # opening message; the closing prompt would join it in one user turn.
             if (
                 termination.scenario_completed
                 and runner_prompts.closing is not None
                 and last_completed_history is not None
+                and not _ends_in_user_prompt(history=last_completed_history)
             ):
                 cumulative_cost = await self._send_closing_prompt(
                     agent=agent,

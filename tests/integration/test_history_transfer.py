@@ -24,6 +24,7 @@ from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.models.function import (
@@ -35,7 +36,7 @@ from pydantic_ai.models.function import (
 )
 
 from glossogen.models.agent_config import AgentConfig
-from glossogen.models.event import SimulationEnded
+from glossogen.models.event import AgentSwappedMidRun, SimulationEnded, SimulationEvent
 from glossogen.run_derivation.history_transfer import (
     HistoryTransferPlan,
     HistoryTransferRequest,
@@ -43,7 +44,12 @@ from glossogen.run_derivation.history_transfer import (
     prepare_history_transfer,
 )
 from glossogen.run_replay.resume_state_loader import load_resume_state
-from glossogen.run_replay.transferred_history import read_transferred_history
+from glossogen.run_replay.transferred_history import (
+    build_source_history,
+    read_transferred_history,
+    splice_transferred_histories,
+    with_transferred_history,
+)
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.history_transfer_manifest import read_history_transfer_manifest
 from glossogen.run_storage.run_file_paths import event_log_path
@@ -337,23 +343,158 @@ async def test_a_resumed_transfer_run_puts_the_saved_history_before_the_seats_ow
     assert sent_texts(history=other_history) == []
 
 
-async def test_a_source_without_its_end_marker_needs_the_round_named(
+def rewrite_end_marker(*, log_path: Path, reason: str | None) -> None:
+    """Drop the source log's ``simulation_ended``, or rewrite its reason to ``reason``."""
+    kept: list[bytes] = []
+    for line in log_path.read_bytes().splitlines():
+        if not line.strip():
+            continue
+        event = orjson.loads(line)
+        if event["event_type"] == "simulation_ended":
+            if reason is None:
+                continue
+            event["reason"] = reason
+            line = orjson.dumps(event)
+        kept.append(line)
+    log_path.write_bytes(b"\n".join(kept) + b"\n")
+
+
+async def make_target_with_transfer(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, list[SimulationEvent], dict[str, list[ModelMessage]]]:
+    """A finished one-round target run whose second seat got the source's first agent's history."""
+    source = await make_source(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    target = build_smoke_scenario(round_count=1)
+    await run_simulation(
+        scenario=target,
+        scripts={SEAT_ID: [TARGET_SEND, SayTurn(text="done")], FIRST_AGENT_ID: []},
+        tmp_path=target_dir,
+        monkeypatch=monkeypatch,
+        phase_timed_out=never_times_out,
+    )
+    histories = await prepare_seat(
+        plan=await plan_seat(source_run_dir=source, source_round_end=1),
+        run_dir=target_dir,
+        scenario=target,
+    )
+    events = await load_events(
+        log_path=event_log_path(run_dir=target_dir, scenario_name=SCENARIO_NAME)
+    )
+    return target_dir, events, histories
+
+
+async def test_the_probes_see_a_seats_transferred_history_and_nothing_extra_for_others(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A source that did not finish has no settled last round to keep."""
-    source = await make_source(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    log_path = event_log_path(run_dir=source, scenario_name=SCENARIO_NAME)
-    kept_lines = [
-        line
-        for line in log_path.read_bytes().splitlines()
-        if line.strip() and orjson.loads(line)["event_type"] != "simulation_ended"
+    """A probe rebuilds from the run's log, which lacks the history the seat started with."""
+    target_dir, events, histories = await make_target_with_transfer(
+        tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+    state = await load_resume_state(run_dir=target_dir, events=events)
+    own_seat = [
+        ModelRequest(parts=[UserPromptPart(content="own opening")]),
+        *state.agent_message_histories[SEAT_ID][len(histories[SEAT_ID]) :],
     ]
-    log_path.write_bytes(b"\n".join(kept_lines) + b"\n")
+    other = state.agent_message_histories[FIRST_AGENT_ID]
 
-    with pytest.raises(ValueError, match=r"has not finished"):
+    seat_history = await with_transferred_history(
+        run_dir=target_dir, events=events, agent_id=SEAT_ID, own_history=own_seat
+    )
+    other_history = await with_transferred_history(
+        run_dir=target_dir, events=events, agent_id=FIRST_AGENT_ID, own_history=other
+    )
+
+    assert seat_history == state.agent_message_histories[SEAT_ID]
+    assert other_history == other
+
+
+async def test_a_seat_swapped_in_run_is_rebuilt_without_the_transferred_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The agent that an in-run swap put in the seat never held the transferred history."""
+    target_dir, events, _ = await make_target_with_transfer(
+        tmp_path=tmp_path, monkeypatch=monkeypatch
+    )
+    swap = AgentSwappedMidRun(
+        round_number=1,
+        agent_id=SEAT_ID,
+        new_model="claude-haiku-5-5",
+        new_provider="anthropic",
+        channel_visibility={},
+    )
+    state = await load_resume_state(run_dir=target_dir, events=events)
+    own_only = state._replace(agent_message_histories={})
+    rebuilt = await load_resume_state(run_dir=target_dir, events=[*events, swap])
+
+    spliced = await splice_transferred_histories(
+        run_dir=target_dir, events=[*events, swap], state=own_only
+    )
+
+    assert SEAT_ID not in spliced.agent_message_histories
+    assert sent_texts(history=rebuilt.agent_message_histories[SEAT_ID]) == ["target-second-r1"]
+
+
+async def test_a_source_without_its_end_marker_keeps_only_rounds_it_completed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A source that did not finish has not completed its last round; earlier rounds still count."""
+    source = await make_source(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    rewrite_end_marker(
+        log_path=event_log_path(run_dir=source, scenario_name=SCENARIO_NAME), reason=None
+    )
+
+    with pytest.raises(ValueError, match=r"opened round 2 but never finished it"):
         await plan_seat(source_run_dir=source, source_round_end=None)
-    plan = await plan_seat(source_run_dir=source, source_round_end=SOURCE_ROUND_COUNT)
-    assert plan.cutoff.cutoff_round == SOURCE_ROUND_COUNT + 1
+    with pytest.raises(ValueError, match=r"opened round 2 but never finished it"):
+        await plan_seat(source_run_dir=source, source_round_end=SOURCE_ROUND_COUNT)
+    plan = await plan_seat(source_run_dir=source, source_round_end=1)
+    assert plan.source_round_end == 1
+
+
+@pytest.mark.parametrize("reason", ["killed", "error"])
+async def test_a_source_that_was_stopped_keeps_only_rounds_it_completed(
+    reason: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A killed or errored source may have stopped partway through its last round."""
+    source = await make_source(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    rewrite_end_marker(
+        log_path=event_log_path(run_dir=source, scenario_name=SCENARIO_NAME), reason=reason
+    )
+
+    with pytest.raises(ValueError, match=rf"ended with reason '{reason}'"):
+        await plan_seat(source_run_dir=source, source_round_end=None)
+    plan = await plan_seat(source_run_dir=source, source_round_end=1)
+    assert plan.source_round_end == 1
+
+
+async def test_a_cut_before_the_last_round_leaves_out_the_next_rounds_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A call made in round 1 whose result came back in round 2 is not part of round 1."""
+    source = await make_source(tmp_path=tmp_path, monkeypatch=monkeypatch)
+
+    cut = await plan_seat(source_run_dir=source, source_round_end=1)
+    whole = await plan_seat(source_run_dir=source, source_round_end=None)
+
+    def round_two_results(plan: HistoryTransferPlan) -> list[str]:
+        history = build_source_history(
+            source_events=plan.source_events,
+            source_agent_id=SOURCE_AGENT_ID,
+            keep_thinking=True,
+            split_parallel_tool_calls=False,
+        )
+        return [
+            str(part.content)
+            for message in history
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if isinstance(part, ToolReturnPart) and '"current_round": 2' in str(part.content)
+        ]
+
+    assert round_two_results(plan=cut) == []
+    assert round_two_results(plan=whole) != []
 
 
 async def test_a_source_agent_with_no_turns_is_refused_before_a_directory_is_claimed(
@@ -384,7 +525,7 @@ async def test_a_source_agent_with_no_turns_is_refused_before_a_directory_is_cla
         ({}, 1, r"name at least one seat"),
         ({"no_such_seat": SOURCE_AGENT_ID}, 1, r"\['no_such_seat'\] are not agents of this run"),
         ({SEAT_ID: "no_such_agent"}, 1, r"agent 'no_such_agent' is not in source run"),
-        ({SEAT_ID: SOURCE_AGENT_ID}, SOURCE_ROUND_COUNT + 1, r"did not reach round 3"),
+        ({SEAT_ID: SOURCE_AGENT_ID}, SOURCE_ROUND_COUNT + 1, r"never completed round 3"),
         ({SEAT_ID: SOURCE_AGENT_ID}, 0, r"must be >= 1"),
     ],
 )

@@ -193,20 +193,21 @@ glossogen run spot_the_difference \
   empty history, as in any run. The command refuses a source agent that has no
   model response in the rounds that the history keeps.
 - `--history-through-round N` keeps rounds 1 to N of the source run. The source
-  log must hold the start of round N. Without the flag, N is the source run's
-  last round, and the source run must have finished: its log must hold
-  `simulation_ended`.
+  run must have completed round N, by the same check that `fork-at-round`
+  applies to its boundary. Without the flag, N is the source run's last round,
+  and the source run must have ended with `scenario_complete`. A run that was
+  killed, that failed, or that is still running has not completed its last
+  round.
 
-The history normally ends at the end of round N. In one case it ends at the
-log's last event, which can fall partway through round N. That case needs
-`--history-through-round`, and both of these must hold: the source run crashed
-or is still running, and round N is the last round that its log started.
+The history ends where round N + 1 started. A tool call that the source agent
+made in round N and whose result came back after that point is left out with
+its result, because that result belongs to round N + 1. When N is the source
+run's last round, the history runs to the end of the source log.
 
 On a transferred seat's first turn, the runner sends the seat's model its
 transferred history:
 
-1. The source agent's history up to the end of round N, or up to the log's last
-   event in the case above. It holds the source
+1. The source agent's history up to the end of round N. It holds the source
    scenario's system prompt for that agent, the agent's text and thinking, and
    its tool calls with their results.
 2. The opening message. It starts with "The session above has ended. A new
@@ -222,17 +223,19 @@ new scenario's system prompt reaches the model only inside the opening message.
 When the source run is of another scenario, some tool calls in the history
 name the source scenario's own tools, which the new run does not offer. Calls
 to the platform's communication tools, such as `send_message` and
-`read_channel`, name tools that the new run also offers. A provider's API could
-refuse a history with calls to tools that the request does not offer. On
-2026-11-23, a test sent one such request to `claude-haiku-5-5` and one to
-`gpt-6.1-sol`. Each request's history called a tool that the request did not
-offer, and both got an answer with no API error. Self-hosted models have not
-been tried.
+`read_channel`, name tools that the new run also offers, unless the new
+scenario hides those tools. A provider's API could refuse a history with calls
+to tools that the request does not offer. Self-hosted models have not been
+tried with such a history.
 
 A transferred seat uses the model that the new run's config sets for it, which
-can differ from the source agent's model. If the two models differ, the
-transferred history holds thinking that the source agent's model wrote. That
-case is untested.
+can differ from the source agent's model. When the model or the provider
+differs, the transferred history leaves out the source agent's thinking,
+because a provider takes back only the thinking that its own model wrote. The
+text and the tool calls stay.
+
+The transferred history counts toward the seat's context window on every
+request. A scenario that limits the tokens its agents read also counts it.
 
 A history-transfer run directory holds these files besides those of any run.
 In the file names, `<agent_id>` is the transferred seat's agent id.
@@ -252,6 +255,13 @@ In the file names, `<agent_id>` is the transferred seat's agent id.
   describes, for reading by eye. After the first launch, it holds the
   transferred history. After a `--resume`, it holds the transferred history and
   the seat's turns up to the crash.
+
+The `protocol_probe` and `protocol_explanation` metrics put a seat's
+transferred history in front of its turns in the run, as `--resume` does. The
+ATIF export and the thread export do not: they show only the seat's turns in
+the new run. If an in-run swap gives a transferred seat to another agent, a
+`--resume` and the probes rebuild that seat without the transferred history,
+because the agent swapped in did not start with it.
 
 Some commands refuse a history-transfer run or its agents:
 
