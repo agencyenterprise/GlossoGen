@@ -2031,6 +2031,13 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>A run can record a self-hosted model's token ids in its event log.</strong> With
+  the <code>record_token_ids</code> knob on, each request of a <code>self-hosted</code> agent asks the
+  server for <code>return_token_ids</code>, and each <code>llm_response_received</code> event holds
+  the token ids of the answer (<code>token_ids</code>) and of the prompt, stored as a
+  shared prefix (<code>prompt_prefix_tokens</code>) and the rest (<code>prompt_tail_ids</code>).
+  <code>glossogen.run_storage.recorded_token_ids</code> rebuilds an agent's full prompts.
+  <code>agent_model_settings</code> takes <code>record_token_ids</code>.</li>
 <li><strong>Requests to self-hosted models carry the run id and the agent id.</strong> Under
   <code>--provider self-hosted</code>, an agent's requests and the protocol probe metrics'
   requests carry the headers <code>X-GlossoGen-Run-Id</code> and <code>X-GlossoGen-Agent-Id</code>,
