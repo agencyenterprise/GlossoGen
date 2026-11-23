@@ -14,9 +14,17 @@ import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
-from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
+from pydantic_ai.models.function import (
+    AgentInfo,
+    BuiltinToolCallsReturns,
+    DeltaThinkingCalls,
+    DeltaToolCall,
+    DeltaToolCalls,
+    FunctionModel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +236,31 @@ def build_round_paced_model(
         return turn
 
     return _model_playing(take_turn=take_turn, hold=_hold_nothing)
+
+
+class RequestObserver(Protocol):
+    """Receives one request to a model: its messages, and its tools and settings in ``info``."""
+
+    def __call__(self, messages: list[ModelMessage], info: AgentInfo) -> None: ...
+
+
+def observe_requests(*, model: FunctionModel, observer: RequestObserver) -> FunctionModel:
+    """Return a streaming model that passes each request to ``observer``, then streams ``model``.
+
+    If ``observer`` raises an exception, the request fails, as it would on a provider error.
+    """
+    stream_function = model.stream_function
+    if stream_function is None:
+        raise ValueError("observe_requests needs a model with a streaming function")
+
+    async def stream(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
+        observer(messages=messages, info=info)
+        async for chunk in stream_function(messages, info):
+            yield chunk
+
+    return FunctionModel(stream_function=stream)
 
 
 def _calls_of(turn: ToolTurn | ParallelToolTurn) -> tuple[ToolTurn, ...]:

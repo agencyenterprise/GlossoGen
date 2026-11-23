@@ -57,10 +57,20 @@ class AgentRegistered(EventBase):
     """Emitted when an agent joins the simulation, capturing its
     role, prompt, channels, and tools.
 
-    ``tool_names`` lists the agent's tools in the order that the model receives them,
-    and ``tool_definitions`` holds the schema of every tool in ``tool_names``, in
-    the same order. ``tool_definitions`` defaults to empty so that logs recorded
-    before schemas were logged still parse.
+    ``tool_names`` lists the agent's tools, and ``tool_definitions`` holds the
+    schema of every tool in ``tool_names``, in the same order. ``tool_definitions``
+    defaults to empty so that logs recorded before schemas were logged still parse.
+
+    The order of ``tool_names`` depends on the glossogen version that wrote the line:
+
+    - v0.31.19 or later: the order in which the model receives the tools.
+    - v0.1.14 to v0.31.18: alphabetical order.
+    - before v0.1.14: the base tools, then the tools that the agent's config
+      listed. A base tool that the config also listed appears twice. From
+      31 Mar 2026, the base tools came in an order that varied from one process
+      to the next.
+
+    Nothing in a line says which version wrote it.
 
     ``runner_prompts`` holds the scenario's replacement for the runner prompts,
     or None when the agent ran with the platform's. It is left out of the JSON
