@@ -604,6 +604,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#start-a-run-with-agents-from-another-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start a run with agents from another run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fork-at-a-round-no-replacement" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1463,6 +1474,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#start-a-run-with-agents-from-another-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start a run with agents from another run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fork-at-a-round-no-replacement" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1557,7 +1579,9 @@
 <h1 id="agent-swaps-and-forks">Agent swaps and forks<a class="headerlink" href="#agent-swaps-and-forks" title="Permanent link">&para;</a></h1>
 <p>These commands fork a finished run into a new one, replaying its remaining
 rounds under a controlled change: a different agent in one seat, an agent
-imported from another run, or the same team under different knobs.</p>
+imported from another run, or the same team under different knobs. One more
+flow starts a new run in which chosen agents begin with histories from an earlier
+run. The earlier run can be a run of another scenario.</p>
 <p>Every fork cuts at the <em>end</em> of a round: <code>--after-round N</code> keeps rounds 1..N
 complete, verdict and postmortem included, and the new run plays round N+1
 onward.</p>
@@ -1585,10 +1609,15 @@ onward.</p>
 <td><a href="#in-run-swaps"><code>scheduled_events</code></a></td>
 <td>Swap agents at round boundaries inside one live run</td>
 </tr>
+<tr>
+<td><a href="#start-a-run-with-agents-from-another-run"><code>run --history-from-run</code></a></td>
+<td>Start a new run in which chosen agents begin with histories from an earlier run, which can be of another scenario</td>
+</tr>
 </tbody>
 </table>
-<p>All four keep every non-replaced agent on its exact original model and full
-reconstructed history. To carry on inside an existing run instead of forking it
+<p><code>replace-agent</code>, <code>cross-run-replace-agent</code>, <code>fork-at-round</code> and
+<code>scheduled_events</code> keep every non-replaced agent on its exact original model and
+full reconstructed history. To carry on inside an existing run instead of forking it
 into a new one, see
 <a href="../running-simulations/#continuing-a-run">Continuing a run</a>.</p>
 <p>Each command prepares the new run directory, prints <code>new_run_id=</code> and
@@ -1693,6 +1722,137 @@ within a round or two, which washes out the effect you are trying to measure.</p
 swap, such as <code>15-25</code>, as soon as the run directory exists. Analysis groups them
 by those labels to compare <code>round_success_after_resume</code> per imported model and
 boundary round against both sources over the same rounds.</p>
+<h2 id="start-a-run-with-agents-from-another-run">Start a run with agents from another run<a class="headerlink" href="#start-a-run-with-agents-from-another-run" title="Permanent link">&para;</a></h2>
+<p><code>glossogen run --history-from-run</code> gives chosen agents of a new run a copy of the
+history that an agent built in an earlier run. This section uses these terms:</p>
+<ul>
+<li>The <em>source run</em> is the earlier run whose agent's history is copied. It can be
+  a run of another scenario. In the fork sections of this page, "the source"
+  means something else: the run that a fork copies.</li>
+<li>The <em>source agent</em> is the agent of the source run whose history is copied.</li>
+<li>A <em>transferred seat</em> is an agent of the new run that begins with that copy.
+  A transferred seat and its source agent can have different agent ids,
+  whether or not the two runs share a scenario.</li>
+<li>The <em>opening message</em> is a user message that tells a transferred seat about
+  the new run.</li>
+<li>The <em>transferred history</em> is what a transferred seat begins with: the source
+  agent's history, followed by the opening message.</li>
+<li>A <em>history-transfer run</em> is a run with at least one transferred seat.</li>
+</ul>
+<p>Use a history-transfer run to test whether an agent reuses, extends or drops a
+protocol that it built in another scenario.</p>
+<p>The flow is a set of flags on <code>glossogen run</code>. The other <code>run</code> flags and the
+<code>key=value</code> overrides work as in any run. The one exception is <code>--resume</code>:
+<code>glossogen run</code> refuses <code>--resume</code> together with <code>--history-from-run</code>, because
+<code>--history-from-run</code> starts a new run. To continue a crashed history-transfer
+run, pass <code>--resume</code> without the <code>--history-*</code> flags, as the list of files
+below describes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>run<span class="w"> </span>spot_the_difference<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--model<span class="w"> </span>gpt-6.1-sol<span class="w"> </span>--provider<span class="w"> </span>openai<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span>--config<span class="w"> </span>knobs_single_team<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--history-from-run<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--history-seat<span class="w"> </span><span class="nv">viewer_left</span><span class="o">=</span>field_observer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span>--history-seat<span class="w"> </span><span class="nv">viewer_right</span><span class="o">=</span>stabilization_engineer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="o">[</span>--history-through-round<span class="w"> </span>N<span class="o">]</span>
+</code></pre></div>
+<ul>
+<li><code>--history-from-run</code> names the source run's directory. The command takes the
+  source run's scenario from the name of the directory that holds the source
+  run's directory, because <code>glossogen run</code> stores each run at
+  <code>&lt;runs-dir&gt;/&lt;scenario&gt;/&lt;timestamp&gt;</code>. If the
+  source run was moved out of that layout, the command fails with "source run
+  log not found".</li>
+<li><code>--history-seat SEAT=SOURCE_AGENT</code> makes the agent <code>SEAT</code> a transferred seat
+  with the history of <code>SOURCE_AGENT</code>. Repeat the flag for each transferred
+  seat, and name at least one. An agent that no flag names starts with an
+  empty history, as in any run. The command refuses a source agent that has no
+  model response in the rounds that the history keeps.</li>
+<li><code>--history-through-round N</code> keeps rounds 1 to N of the source run. The source
+  run must have completed round N, by the same check that <code>fork-at-round</code>
+  applies to its boundary. Without the flag, N is the source run's last round,
+  and the source run must have ended with <code>scenario_complete</code>. A run that was
+  killed, that failed, or that is still running has not completed its last
+  round.</li>
+</ul>
+<p>The history ends where round N + 1 started. A tool call that the source agent
+made in round N and whose result came back after that point is left out with
+its result, because that result belongs to round N + 1. When N is the source
+run's last round, the history runs to the end of the source log.</p>
+<p>On a transferred seat's first turn, the runner sends the seat's model its
+transferred history:</p>
+<ol>
+<li>The source agent's history up to the end of round N. It holds the source
+   scenario's system prompt for that agent, the agent's text and thinking, and
+   its tool calls with their results.</li>
+<li>The opening message. It starts with "The session above has ended. A new
+   session starts now. Its instructions follow, and they replace the earlier
+   ones." It then gives the new scenario's system prompt and initial prompt for
+   that seat. Its template is <code>history_transfer_prompt.jinja</code>, beside the
+   platform's other prompt templates in <code>scenario_contract/runner_prompts/</code>.</li>
+</ol>
+<p>The system prompt of every request stays the source scenario's system prompt.
+pydantic-ai adds an agent's system prompt only when the history is empty, so the
+new scenario's system prompt reaches the model only inside the opening message.</p>
+<p>When the source run is of another scenario, some tool calls in the history
+name the source scenario's own tools, which the new run does not offer. Calls
+to the platform's communication tools, such as <code>send_message</code> and
+<code>read_channel</code>, name tools that the new run also offers, unless the new
+scenario hides those tools. A provider's API could refuse a history with calls
+to tools that the request does not offer. Self-hosted models have not been
+tried with such a history.</p>
+<p>A transferred seat uses the model that the new run's config sets for it, which
+can differ from the source agent's model. When the model or the provider
+differs, the transferred history leaves out the source agent's thinking,
+because a provider takes back only the thinking that its own model wrote. The
+text and the tool calls stay.</p>
+<p>The transferred history counts toward the seat's context window on every
+request. A scenario that limits the tokens its agents read also counts it.</p>
+<p>A history-transfer run directory holds these files besides those of any run.
+In the file names, <code>&lt;agent_id&gt;</code> is the transferred seat's agent id.</p>
+<ul>
+<li><code>history_transfer_manifest.json</code> names the source run and the value of N.
+  For each transferred seat, it names the source agent and the model and
+  provider that the source agent ran on.</li>
+<li><code>transferred_history_&lt;agent_id&gt;.json</code> holds the seat's transferred history in
+  pydantic-ai's JSON message format. To continue a crashed history-transfer
+  run, run <code>glossogen run</code> with <code>--resume &lt;run dir&gt;</code> and without the
+  <code>--history-*</code> flags. <code>--resume</code> reads this file and appends the seat's own
+  turns from the new run's log. It reads nothing from the source run, so the
+  source run can be moved or deleted after the launch.</li>
+<li><code>resume_context_&lt;agent_id&gt;.json</code> holds the history that the seat started
+  with at the latest launch, in the shorter form that
+  <a href="#verifying-the-reconstructed-history">Verifying the reconstructed history</a>
+  describes, for reading by eye. After the first launch, it holds the
+  transferred history. After a <code>--resume</code>, it holds the transferred history and
+  the seat's turns up to the crash.</li>
+</ul>
+<p>The <code>protocol_probe</code> and <code>protocol_explanation</code> metrics put a seat's
+transferred history in front of its turns in the run, as <code>--resume</code> does. The
+ATIF export and the thread export do not: they show only the seat's turns in
+the new run. If an in-run swap gives a transferred seat to another agent, a
+<code>--resume</code> and the probes rebuild that seat without the transferred history,
+because the agent swapped in did not start with it.</p>
+<p>Some commands refuse a history-transfer run or its agents:</p>
+<ul>
+<li><code>replace-agent</code>, <code>fork-at-round</code> and <code>cross-run-replace-agent</code> refuse a
+  history-transfer run as the run to fork. They rebuild each agent from the
+  log of the run to fork, and that log does not hold the transferred histories.</li>
+<li>For the same reason, a transferred seat cannot be the source agent of a
+  later history transfer. It also cannot be the imported agent of
+  <code>cross-run-replace-agent</code>. In a history-transfer run, an agent that started
+  with an empty history can be the source agent of a later history transfer,
+  and it can be the imported agent of <code>cross-run-replace-agent</code>.</li>
+<li><code>glossogen run</code> refuses a source agent if an in-run swap
+  (<code>scheduled_events</code>) replaced it before the end of round N. It also refuses a
+  source agent if the source run was made by <code>replace-agent</code> or
+  <code>cross-run-replace-agent</code> and that agent is the one which <code>replace-agent</code> or
+  <code>cross-run-replace-agent</code> put in. In
+  both cases, the source log holds the turns of two different agents under
+  that agent id.</li>
+</ul>
+<p>The runs index, the run page and the CSV export's <code>lineage.*</code> columns do not
+link the new run to its source run. Inside the new run's directory, only
+<code>history_transfer_manifest.json</code> names the source run.</p>
 <h2 id="fork-at-a-round-no-replacement">Fork at a round (no replacement)<a class="headerlink" href="#fork-at-a-round-no-replacement" title="Permanent link">&para;</a></h2>
 <p>Forks after round N with no agent replaced. Every agent keeps its full history,
 and the fork differs from the source only through merged knob overrides. Useful
@@ -1702,12 +1862,12 @@ mid-experiment, or replaying the remaining rounds on a different configuration.
 included, and resolves against a <code>round_count</code> in <code>--knobs</code> as on
 <a href="#replace-an-agent-at-a-round-boundary"><code>replace-agent</code></a>.</p>
 <p><img alt="Forking a run at a round" src="../images/fork_run_at_round.webp" /></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>glossogen<span class="w"> </span>fork-at-round<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="o">[</span>--knobs<span class="w"> </span>&lt;preset-name<span class="p">|</span>path&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="o">[</span>--rounds-after<span class="w"> </span>K<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>glossogen<span class="w"> </span>fork-at-round<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--source-run-dir<span class="w"> </span>./runs/veyru/&lt;timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--after-round<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--runs-dir<span class="w"> </span>./runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="o">[</span>--knobs<span class="w"> </span>&lt;preset-name<span class="p">|</span>path&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="o">[</span>--rounds-after<span class="w"> </span>K<span class="o">]</span>
 </code></pre></div>
 <p>Every agent is pinned to whichever model it was running at the boundary.</p>
 <p><strong>Forking after the final round.</strong> A completed run can be forked past its own
@@ -1734,17 +1894,17 @@ boundary, so re-create it.</p>
 <p><code>scheduled_events</code> swaps agents at round boundaries inside a single live run, on
 one continuous timeline. Three swaps produce four phases (A → B → C → D).</p>
 <p><img alt="In-run swaps on one timeline" src="../images/in_run_swaps.webp" /></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  &quot;scheduled_events&quot;: [
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    { &quot;type&quot;: &quot;set_postmortem&quot;, &quot;at_round&quot;: 16, &quot;enabled&quot;: false },
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    { &quot;type&quot;: &quot;swap_agent&quot;, &quot;at_round&quot;: 16, &quot;agent_id&quot;: &quot;field_observer&quot;,
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>      &quot;model&quot;: &quot;claude-sonnet-4-6&quot;, &quot;provider&quot;: &quot;anthropic&quot;,
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>      &quot;channel_visibility&quot;: { &quot;link&quot;: { &quot;kind&quot;: &quot;full&quot; } } },
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    { &quot;type&quot;: &quot;swap_agent&quot;, &quot;at_round&quot;: 31, &quot;agent_id&quot;: &quot;stabilization_engineer&quot;,
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>      &quot;model&quot;: &quot;claude-sonnet-4-6&quot;, &quot;provider&quot;: &quot;anthropic&quot;,
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>      &quot;channel_visibility&quot;: { &quot;link&quot;: { &quot;kind&quot;: &quot;from_round&quot;, &quot;round_floor&quot;: 16 } } }
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  ]
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>{
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  &quot;scheduled_events&quot;: [
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    { &quot;type&quot;: &quot;set_postmortem&quot;, &quot;at_round&quot;: 16, &quot;enabled&quot;: false },
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    { &quot;type&quot;: &quot;swap_agent&quot;, &quot;at_round&quot;: 16, &quot;agent_id&quot;: &quot;field_observer&quot;,
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>      &quot;model&quot;: &quot;claude-sonnet-4-6&quot;, &quot;provider&quot;: &quot;anthropic&quot;,
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>      &quot;channel_visibility&quot;: { &quot;link&quot;: { &quot;kind&quot;: &quot;full&quot; } } },
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    { &quot;type&quot;: &quot;swap_agent&quot;, &quot;at_round&quot;: 31, &quot;agent_id&quot;: &quot;stabilization_engineer&quot;,
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>      &quot;model&quot;: &quot;claude-sonnet-4-6&quot;, &quot;provider&quot;: &quot;anthropic&quot;,
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>      &quot;channel_visibility&quot;: { &quot;link&quot;: { &quot;kind&quot;: &quot;from_round&quot;, &quot;round_floor&quot;: 16 } } }
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  ]
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>}
 </code></pre></div>
 <p>Each swap writes an <code>AgentSwappedMidRun</code> event and a
 <code>resume_context_&lt;agent_id&gt;_round_&lt;R&gt;.json</code> file holding the seed history the
@@ -1807,10 +1967,10 @@ flows (Sim A for a cross-run run), the previous phase for an in-run swap. The
 summary gives the baseline's score and the difference as <code>Δ vs source: ±N pp</code>.
 It emits one measurement per swap, named
 <code>round_success_after_resume_round_&lt;R&gt;_&lt;agent_id&gt;</code> for in-run swaps.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/&lt;new_timestamp&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,round_success_after_resume,protocol_learned_after_swap<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>glossogen<span class="w"> </span>evaluate<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/&lt;new_timestamp&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--metrics<span class="w"> </span>round_success,round_success_after_resume,protocol_learned_after_swap<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--model<span class="w"> </span>claude-haiku-4-5-20251001<span class="w"> </span>--provider<span class="w"> </span>anthropic
 </code></pre></div>
 <p><code>protocol_learned_after_swap</code> asks the complementary question: is there observable
 evidence the newcomer picked up the protocol? See <a href="../evaluation/">Evaluation</a>.</p>

@@ -2031,6 +2031,20 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>A run can start with agents that carry histories from an earlier run of any
+  scenario.</strong> <code>glossogen run</code> takes <code>--history-from-run &lt;run dir&gt;</code>, one
+  <code>--history-seat SEAT=SOURCE_AGENT</code> for each agent that takes a history, and
+  <code>--history-through-round N</code>. The earlier run must have completed round N.
+  Without <code>--history-through-round</code>, N is its last round, and it must have
+  ended with <code>scenario_complete</code>. Each named agent starts with the history of
+  <code>SOURCE_AGENT</code> in the earlier run up to the end of round N, without its
+  thinking when the agent runs another model. One user message follows that
+  history. It holds the agent's system prompt and initial prompt in the new
+  scenario, and its template is <code>history_transfer_prompt.jinja</code>. The run saves
+  each named agent's history and a <code>history_transfer_manifest.json</code>.
+  <code>--resume</code>, <code>protocol_probe</code> and <code>protocol_explanation</code> put the saved history
+  back in front of the agent's turns. <code>replace-agent</code>, <code>fork-at-round</code> and
+  <code>cross-run-replace-agent</code> cannot fork such a run.</li>
 <li><code>glossogen.testing.scripted_agent.observe_requests</code> wraps a scripted model.
   It passes each request to a function before the model answers it.</li>
 <li><strong>A run can record a self-hosted model's token ids in its event log.</strong> With
