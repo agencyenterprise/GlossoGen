@@ -2218,11 +2218,17 @@ team independently. The types (<code>TeamSpec</code>, <code>RoleSpec</code>, <co
 </tr>
 </tbody>
 </table>
-<p>No field has a default, so omitting one is a type error rather than a silent
-behaviour. <code>tool_names</code> is the list of tools the agent is offered, and it is not
-additive: a role that talks lists <code>send_message</code>, and an empty list connects an
-agent that can do nothing. Names are the platform's five plus whatever
-<code>get_tools()</code> returns, and <code>validate</code> rejects a name no tool answers to.</p>
+<p>No field has a default, so omitting one is a type error. <code>tool_names</code> lists the
+scenario tools that the agent is offered: tools that the scenario's <code>get_tools()</code>
+returns. The platform also offers each agent
+five base tools: <code>read_channel</code>, <code>send_message</code>, <code>list_channels</code>,
+<code>get_channel_members</code> and <code>read_notifications</code>. A scenario can hide any of the
+first four from an agent through <code>hidden_base_tools</code>, but not
+<code>read_notifications</code>. A role may also list a base tool in <code>tool_names</code>. That
+entry has no effect: the agent gets each base tool once, and a base tool that
+the scenario hides stays hidden. <code>tool_names</code> accepts the names of the five base
+tools and of the tools that <code>get_tools()</code> returns. <code>validate</code> rejects any other
+name.</p>
 <p>The two booleans answer different questions. <code>joins_debrief</code> is membership:
 whether this role belongs to the team's debrief channel at all, since a team
 can hold a debrief that not every member attends. <code>starts_as_member</code> is timing:
