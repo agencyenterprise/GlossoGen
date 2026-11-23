@@ -2501,6 +2501,13 @@ the commit log.</p>
   unchanged, as are the commands and their flags.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The <code>tool_names</code> and <code>tool_definitions</code> of <code>agent_registered</code> list an
+  agent's tools in the order that the model receives them. Until this change,
+  they listed the tools in alphabetical order. A script that rebuilt a prompt
+  from the event log therefore put the tools in a different order from the one
+  that the model received. ATIF trajectories listed the tools in alphabetical
+  order too. Event logs written before this change keep the alphabetical
+  order.</li>
 <li><code>glossogen new-scenario</code> counts the built-in scenarios package when it checks
   that the new folder is loaded, so <code>--target-dir src/glossogen/scenarios</code> in a
   checkout no longer asks for a <code>[tool.glossogen] scenarios</code> entry. Its next
