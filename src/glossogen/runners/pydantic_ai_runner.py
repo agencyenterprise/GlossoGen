@@ -34,6 +34,7 @@ from pydantic_ai.messages import (
     ThinkingPart,
     ThinkingPartDelta,
     ToolCallPart,
+    UserPromptPart,
 )
 from pydantic_ai.models.anthropic import AnthropicCompaction
 from pydantic_ai.models.openai import OpenAICompaction
@@ -347,17 +348,31 @@ class _RunCheckpoint:
         self.prompt = None
 
 
-def _restart_checkpoint(
+def _cycle_start_checkpoint(
     history: list[ModelMessage] | None, initial: str, continuation: str
 ) -> _RunCheckpoint:
-    """Where a cycle starts after the previous one failed every retry.
+    """Where a cycle starts from a completed history.
 
-    The last completed cycle's history with the continuation prompt, or the
-    initial prompt when no cycle has completed yet.
+    No history starts on the initial prompt. A history ending in a request that
+    already holds a user prompt, such as a transferred history's opening message,
+    starts by sending that request with no further prompt. Any other history,
+    including one ending in tool results, starts on the continuation prompt.
     """
     if history is None:
         return _RunCheckpoint(messages=None, prompt=initial)
+    if _ends_in_user_prompt(history=history):
+        return _RunCheckpoint(messages=history, prompt=None)
     return _RunCheckpoint(messages=history, prompt=continuation)
+
+
+def _ends_in_user_prompt(history: list[ModelMessage]) -> bool:
+    """Whether ``history``'s last message is a request carrying a user prompt."""
+    if not history:
+        return False
+    last = history[-1]
+    if not isinstance(last, ModelRequest):
+        return False
+    return any(isinstance(part, UserPromptPart) for part in last.parts)
 
 
 @agent_run_retry
@@ -580,12 +595,11 @@ class PydanticAIRunner(AgentRunner):
             total_turns = 0
             cumulative_cost = 0.0
             last_completed_history = message_history
-            if message_history is not None:
-                checkpoint = _RunCheckpoint(
-                    messages=message_history, prompt=runner_prompts.continuation
-                )
-            else:
-                checkpoint = _RunCheckpoint(messages=None, prompt=runner_prompts.initial)
+            checkpoint = _cycle_start_checkpoint(
+                history=message_history,
+                initial=runner_prompts.initial,
+                continuation=runner_prompts.continuation,
+            )
 
             def _before_model_request() -> None:
                 runtime.scenario.on_model_request_started(agent_id=agent_id)
@@ -709,7 +723,7 @@ class PydanticAIRunner(AgentRunner):
                     # Every retry resumed at the failed request and still failed,
                     # so re-sending it would fail the same way. Restart from the
                     # last completed cycle, as a fresh cycle.
-                    checkpoint = _restart_checkpoint(
+                    checkpoint = _cycle_start_checkpoint(
                         history=last_completed_history,
                         initial=runner_prompts.initial,
                         continuation=runner_prompts.continuation,

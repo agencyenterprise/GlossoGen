@@ -57,6 +57,10 @@ from glossogen.run_storage.cross_run_replace_manifest import (
     read_cross_run_replace_manifest,
 )
 from glossogen.run_storage.event_log_reader import load_events
+from glossogen.run_storage.history_transfer_manifest import (
+    HISTORY_TRANSFER_MANIFEST_FILENAME,
+    read_history_transfer_manifest,
+)
 from glossogen.run_storage.replace_manifest import (
     REPLACE_MANIFEST_FILENAME,
     ReplaceManifest,
@@ -292,6 +296,12 @@ def refuse_unforkable_source(
             "run; forking it is not supported because the imported agent's "
             "history cannot be rebuilt past its import boundary"
         )
+    if (source_run_dir / HISTORY_TRANSFER_MANIFEST_FILENAME).exists():
+        raise ValueError(
+            f"source run {source_run_dir} is a history-transfer run; forking it "
+            "is not supported because a fork rebuilds each seat from the run's own "
+            "log, which does not hold the history its transferred seats started with"
+        )
     manifest = read_replace_manifest(run_dir=source_run_dir)
     if manifest is None:
         return
@@ -341,60 +351,69 @@ def refuse_boundary_with_swapped_seats(
         )
 
 
-def refuse_source_b_with_swapped_seat(
-    source_b_events: list[SimulationEvent],
-    boundary_timestamp: datetime,
-    imported_agent_id: str,
+def refuse_seat_swapped_before_cutoff(
+    source_events: list[SimulationEvent],
+    cutoff_timestamp: datetime,
+    agent_id: str,
 ) -> None:
-    """Refuse importing a seat that source B itself swapped in-run before the cutoff.
+    """Refuse taking a seat's history from a run that swapped that seat in-run before the cutoff.
 
-    The seat's turns in B's log before the swap belong to its predecessor, so
-    the mounted history would mix two agents' turns with full text. A swap of
-    a different seat leaves the imported seat's log clean, and a swap past the
-    cutoff never enters the mounted history.
+    The seat's turns in the source log before the swap belong to its
+    predecessor, so the mounted history would mix two agents' turns with full
+    text. A swap of a different seat leaves this seat's log clean, and a swap
+    past the cutoff never enters the mounted history.
     """
-    for event in source_b_events:
-        if event.timestamp > boundary_timestamp:
+    for event in source_events:
+        if event.timestamp > cutoff_timestamp:
             break
         if not isinstance(event, AgentSwappedMidRun):
             continue
-        if event.agent_id != imported_agent_id:
+        if event.agent_id != agent_id:
             continue
         raise ValueError(
-            f"source B swapped seat {imported_agent_id!r} in-run at round "
-            f"{event.round_number}, before the import cutoff, so its log "
-            "mixes two agents' turns for that seat; import it from the run "
-            "the agent originally played in"
+            f"the source run swapped seat {agent_id!r} in-run at round "
+            f"{event.round_number}, before the history cutoff, so its log "
+            "mixes two agents' turns for that seat; take its history from the "
+            "run the agent originally played in"
         )
 
 
-def refuse_source_b_with_mixed_seat(
-    source_b_run_dir: Path,
-    imported_agent_id: str,
-) -> None:
-    """Refuse importing a seat whose source-B log mixes two agents' turns.
+def refuse_seat_with_mixed_history(source_run_dir: Path, agent_id: str) -> None:
+    """Refuse taking a seat's history from a source log that does not hold it whole.
 
-    When source B was itself created by replacing or importing that same
-    seat, its log holds the replaced-away agent's turns before B's own
-    boundary, and the imported agent's real earlier context lives in B's own
-    import sidecar, which this flow never reads. Importing a different seat
-    from such a run is fine: that seat's turns in B's log are all its own.
+    When the source run was itself created by replacing or importing that same
+    seat, its log holds the replaced-away agent's turns before the source's own
+    boundary, and the seat's real earlier context lives in the source's import
+    sidecar, which a rebuild from the log never reads. A seat of a
+    history-transfer run started with another run's history, which the log
+    does not hold either. Taking a different seat from such a run is fine: that
+    seat's turns in the log are all its own.
     """
-    cross_run_manifest = read_cross_run_replace_manifest(run_dir=source_b_run_dir)
-    replace_manifest = read_replace_manifest(run_dir=source_b_run_dir)
+    transfer_manifest = read_history_transfer_manifest(run_dir=source_run_dir)
+    if transfer_manifest is not None and agent_id in {
+        seat.agent_id for seat in transfer_manifest.seats
+    }:
+        raise ValueError(
+            f"source run {source_run_dir} is a history-transfer run whose seat "
+            f"{agent_id!r} started with the history of {transfer_manifest.source_run_id}, "
+            "which its log does not hold. Take that seat's history from the run it "
+            "was transferred from"
+        )
+    cross_run_manifest = read_cross_run_replace_manifest(run_dir=source_run_dir)
+    replace_manifest = read_replace_manifest(run_dir=source_run_dir)
     replaced_seats: list[tuple[str, str | None]] = []
     if cross_run_manifest is not None:
         replaced_seats.append(("cross-run replace-agent", cross_run_manifest.replaced_agent_id))
     if replace_manifest is not None:
         replaced_seats.append(("replace-agent", replace_manifest.replaced_agent_id))
     for flow_name, source_seat in replaced_seats:
-        if source_seat != imported_agent_id:
+        if source_seat != agent_id:
             continue
         raise ValueError(
-            f"source B run {source_b_run_dir} is a {flow_name} run whose own "
-            f"boundary replaced {imported_agent_id!r}: its log holds the "
-            "replaced-away agent's turns before that boundary, so importing "
-            "that seat would mix two agents' histories. Import it from the "
+            f"source run {source_run_dir} is a {flow_name} run whose own "
+            f"boundary replaced {agent_id!r}: its log holds the "
+            "replaced-away agent's turns before that boundary, so taking "
+            "that seat would mix two agents' histories. Take it from the "
             "run the agent originally played in"
         )
 

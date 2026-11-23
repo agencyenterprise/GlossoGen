@@ -12,6 +12,19 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **A run can start with agents that carry histories from an earlier run of any
+  scenario.** `glossogen run` takes `--history-from-run <run dir>`, one
+  `--history-seat SEAT=SOURCE_AGENT` for each agent that takes a history, and
+  `--history-through-round N`. Without `--history-through-round`, N is the
+  earlier run's last round, and the earlier run must have finished. Each named
+  agent starts with the history of `SOURCE_AGENT` in the earlier run, up to the
+  end of round N, or up to the log's last event when an unfinished earlier run
+  has not ended round N. One user message follows that history. It holds the agent's
+  system prompt and initial prompt in the new scenario, and its template is
+  `history_transfer_prompt.jinja`. The run saves each named agent's history
+  and a `history_transfer_manifest.json`, and `--resume` puts the saved history
+  back in front of the agent's turns. `replace-agent`, `fork-at-round` and
+  `cross-run-replace-agent` cannot fork such a run.
 - **A run can record a self-hosted model's token ids in its event log.** With
   the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
   server for `return_token_ids`, and each `llm_response_received` event holds

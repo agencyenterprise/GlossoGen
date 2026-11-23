@@ -5,7 +5,8 @@ read channels, send messages, and loop until done. The platform's prompt text
 lives in Jinja2 templates under ``runner_prompts/`` beside this module. A
 scenario can replace the runner prompts with its own through
 ``ScenarioBase.runner_prompts``; the registration records the replacement, so a
-reconstruction renders what the run used.
+reconstruction renders what the run used. The message that opens a run for an
+agent carrying another run's history is a platform template too.
 """
 
 from collections.abc import Sequence
@@ -76,3 +77,18 @@ def runner_prompts_from_events(
 def build_full_system_prompt(base_prompt: str, prompts: RunnerPrompts) -> str:
     """Combine an agent's base system prompt with the runner's protocol instructions."""
     return base_prompt + "\n\n" + prompts.system_suffix
+
+
+def history_transfer_prompt(full_system_prompt: str, prompts: RunnerPrompts) -> str:
+    """The message that opens a run for an agent carrying another run's history.
+
+    The model keeps the source run's system prompt, so this message hands it the
+    new run's full system prompt and initial prompt.
+    """
+    return _renderer.render(
+        template_name="history_transfer_prompt.jinja",
+        template_variables={
+            "system_prompt": full_system_prompt,
+            "initial_prompt": prompts.initial,
+        },
+    )

@@ -359,7 +359,7 @@ def _build_rewind_state_at_timestamp(
             history_events = list(history_filter.imported.events)
             history_target_timestamp = history_filter.imported.target_timestamp
             history_cutoff_round = history_filter.imported.cutoff_round
-            imported_registration = _find_imported_registration(
+            imported_registration = find_first_registration(
                 events=history_events,
                 agent_id=reg.agent_id,
             )
@@ -486,6 +486,51 @@ def _find_message_timestamp(
     )
 
 
+class RoundEndCutoff(NamedTuple):
+    """Where a run's events are cut to keep every round up to ``round_end``.
+
+    ``event_id`` is the run's ``RoundAdvanced(round_end + 1)``, or the empty
+    string when the run never advanced past ``round_end``. ``timestamp`` is that
+    event's timestamp, or the run's last event's when there is none.
+    ``cutoff_round`` is ``round_end + 1``, the exclusive bound
+    ``build_message_history`` takes.
+    """
+
+    event_id: str
+    timestamp: datetime
+    cutoff_round: int
+
+
+def resolve_round_end_cutoff(events: list[SimulationEvent], round_end: int) -> RoundEndCutoff:
+    """Locate the cut that keeps rounds ``1..round_end`` of ``events``.
+
+    Raises ``ValueError`` when ``round_end`` is below 1 or the run never reached it.
+    """
+    if round_end < 1:
+        raise ValueError(f"the round to cut at must be >= 1 (got {round_end})")
+    max_round = 0
+    cutoff_event: RoundAdvanced | None = None
+    for event in events:
+        if not isinstance(event, RoundAdvanced):
+            continue
+        max_round = max(max_round, event.round_number)
+        if event.round_number == round_end + 1 and cutoff_event is None:
+            cutoff_event = event
+    if max_round < round_end:
+        raise ValueError(
+            f"the run did not reach round {round_end} (max observed round: {max_round})"
+        )
+    if cutoff_event is None:
+        return RoundEndCutoff(
+            event_id="", timestamp=events[-1].timestamp, cutoff_round=round_end + 1
+        )
+    return RoundEndCutoff(
+        event_id=cutoff_event.event_id,
+        timestamp=cutoff_event.timestamp,
+        cutoff_round=round_end + 1,
+    )
+
+
 def find_event_timestamp(
     events: list[SimulationEvent],
     target_event_id: str,
@@ -501,15 +546,15 @@ def find_event_timestamp(
     raise ValueError(f"No event with event_id={target_event_id!r} found in the log.")
 
 
-def _find_imported_registration(
+def find_first_registration(
     events: list[SimulationEvent],
     agent_id: str,
 ) -> AgentRegistered:
-    """Locate the ``AgentRegistered`` event for ``agent_id`` inside an imported stream.
+    """Locate the first ``AgentRegistered`` event for ``agent_id`` in ``events``.
 
-    Used when an ``AgentHistoryFilter`` redirects an agent's history
-    reconstruction to a different run's events: the system prompt for the
-    reconstructed history must come from that run, not the live one.
+    Used when an agent's history is rebuilt from a different run's events: the
+    system prompt for the rebuilt history must come from that run, not the live
+    one.
 
     Raises ``ValueError`` if no matching event exists.
     """
