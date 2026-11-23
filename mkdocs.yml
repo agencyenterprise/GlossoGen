@@ -131,6 +131,7 @@ nav:
       - ATIF export: atif-export.md
       - Analysis and dashboards: analysis.md
       - Reading runs from code: reading-runs-from-code.md
+      - Training a model with RL: rl-training.md
       - Notebooks:
           - About the notebooks: notebooks.md
           - Reading a run: 01_read_a_run.ipynb

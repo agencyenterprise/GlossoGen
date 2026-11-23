@@ -1,0 +1,30 @@
+{
+  "agent_model_settings": {
+    "extra_body": {
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      },
+      "min_p": 0.0,
+      "top_k": -1
+    },
+    "max_tokens": 16384,
+    "parallel_tool_calls": false,
+    "presence_penalty": 0.0,
+    "temperature": 1.0,
+    "top_p": 1.0
+  },
+  "colour_count": 3,
+  "fill_count": 0,
+  "grid_size": 3,
+  "max_moves_per_call": 20,
+  "max_round_duration_seconds": 600,
+  "model_overrides": {},
+  "move_reasoning": true,
+  "moves_per_round": 200,
+  "partner_colours_visible": false,
+  "record_token_ids": true,
+  "round_count": 10,
+  "seed": 42,
+  "shape_count": 3,
+  "word_count": 0
+}

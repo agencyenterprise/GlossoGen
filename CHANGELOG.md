@@ -12,6 +12,13 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Qwen3.8-27B can be trained by reinforcement learning on signal_game.**
+  `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
+  serves each new adapter. It also holds the loop that runs on your machine.
+  The loop plays signal_game games with `record_token_ids`, scores each player
+  in each round, and sends a GRPO step to the trainer.
+  [Training a model with RL](docs/rl-training.md) gives the commands for a
+  training run and the results of one.
 - **A run can record a self-hosted model's token ids in its event log.** With
   the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
   server for `return_token_ids`, and each `llm_response_received` event holds
