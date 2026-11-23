@@ -1,4 +1,4 @@
-"""The two chance baselines of the first_item reward, for the seeds that a training run plays.
+"""The random-square and start-square baselines of the first_item reward, for a run's seeds.
 
 The boards of each seed come from the game config. Each baseline counts the player-rounds that end
 on the alphabetically first item of the player's own grid:
@@ -6,8 +6,8 @@ on the alphabetically first item of the player's own grid:
 - random square: the expected count when each player ends on a random square of its grid;
 - start square: the count when each player stays on its start square and never moves.
 
-The seeds' boards set both counts, so compare each step with its own baselines. Run from the
-repository root:
+Both counts depend on the seeds' boards, so compare each step with its own baselines. Run from
+the repository root:
 
     VIRTUAL_ENV= uv run --no-sync python modal/grpo/first_item_baselines.py \\
       --game-config modal/grpo/signal_game_shapes.json --games-per-seed 6 \\

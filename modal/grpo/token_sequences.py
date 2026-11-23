@@ -3,13 +3,13 @@
 ``recorded_token_ids`` gives each of an agent's requests with its full prompt and the model's
 answer, in the order in which the agent made them. ``player_sequences`` chains them. A sequence
 starts with a request's prompt and answer. The next request extends it when its prompt starts
-with the whole sequence so far, and starts a new sequence otherwise. A new sequence starts after
-the runner restarts an agent's turn from an earlier point.
+with the whole sequence so far, and a new sequence begins otherwise. A new sequence begins after
+the runner restarts an agent's turn from an earlier point. The trainer therefore computes each
+answer token's log-probability in the context in which vLLM sampled it.
 
 Only the answer tokens are marked. Each marked token gets the advantage of its answer's round.
 An answer's round is the round of its first tool call. An answer without a tool call keeps the
-round of the agent's previous call. The trainer therefore computes each answer token's
-log-probability in the context in which vLLM sampled it.
+round of the agent's previous call.
 """
 
 from typing import NamedTuple

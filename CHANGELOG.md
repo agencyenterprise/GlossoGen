@@ -16,7 +16,8 @@ the commit log.
   `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
   serves each new adapter. It also holds the loop that runs on your machine.
   The loop plays signal_game games with `record_token_ids`, scores each player
-  in each round, and sends a GRPO step to the trainer.
+  in each round, and sends the training sequences to the trainer, which takes
+  one GRPO step.
   [Training a model with RL](docs/rl-training.md) gives the commands for a
   training run and the results of one.
 - **A run can record a self-hosted model's token ids in its event log.** With

@@ -5,7 +5,8 @@ The app's volume has the same name, and its control Dict is named ``<GRPO_APP_NA
 Two deployments under two names share the Hugging Face cache volume and the two secrets, and no
 other volume or Dict.
 
-``Trainer`` keeps the model with its LoRA adapter and its optimizer in GPU memory between steps.
+``Trainer`` keeps the model, its LoRA adapter and its optimizer in GPU memory until 20 minutes
+after its last call. When a step's games take longer, the next call starts a new container.
 ``initialize`` saves step 0, an adapter whose B matrices are 0, which leaves the base model's
 outputs unchanged.
 ``train_step(step, sequences)`` takes one GRPO step from adapter ``step - 1`` and saves adapter
@@ -95,7 +96,7 @@ def adapter_dir(*, run_name: str, step: int) -> Path:
     max_containers=1,
 )
 class Trainer:
-    """One training run's model, adapter and optimizer, kept in GPU memory between steps."""
+    """One training run's model, adapter and optimizer, in GPU memory while the container runs."""
 
     run_name: str = modal.parameter()
 
@@ -221,7 +222,7 @@ def load_adapter_requests(*, api_key: str) -> None:
         try:
             request = control.get("request")
         except Exception:
-            # A Dict read can fail for a moment. The loop reads the Dict again 5 seconds later.
+            # A Dict read can fail for a moment. This thread reads the Dict again 5 seconds later.
             logger.exception("adapter loader: reading the control Dict failed")
             continue
         if request is None or request["id"] == handled:

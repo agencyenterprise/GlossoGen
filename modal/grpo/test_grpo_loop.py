@@ -1,4 +1,6 @@
-"""Tests of the loop's pure parts: rewards, advantages and training sequences, on hand-built events.
+"""Tests of the rewards, the advantages, the sequences and the game config, on hand-built events.
+
+A last test checks that the modules that run on Modal parse as Python 3.12.
 
 Run from the repository root:
 

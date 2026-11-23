@@ -5,7 +5,8 @@ The rewards:
 - ``win`` scores the round's result, the same for both players.
 - ``first_item`` scores 1 when the player ended the round on a square that holds the
   alphabetically first item of its own grid, whatever its partner did. A player can score on it
-  without its partner, so it shows whether training changes where players end their rounds.
+  without its partner, so a run on it tests whether training changes where players end their
+  rounds.
 
 To train on another scenario, write a module like this one. It reads a run's events and gives
 each agent a score in each round.
@@ -39,8 +40,11 @@ class PlayerRound(NamedTuple):
 class GameOutcome(NamedTuple):
     """What a game's event log says about each player in each round.
 
-    ``rounds`` holds the rounds that resolved. ``won_rounds`` holds those that the players won,
-    and ``first_item_finishes`` the player-rounds that ended on the player's first item.
+    ``finished`` says whether the log holds ``simulation_ended``, and ``players`` lists the agent
+    ids. ``rounds`` holds the rounds that ended with a result. ``won_rounds`` holds those that the
+    players won, and ``first_item_finishes`` the player-rounds that ended on the player's first
+    item. ``moves`` counts the accepted moves, and ``player_rounds_without_move`` the player-rounds
+    in which the player made none.
     """
 
     finished: bool

@@ -1,14 +1,15 @@
-# `modal/grpo/` — reinforcement learning on GlossoGen games
+# `modal/grpo/` — reinforcement learning on signal_game
 
-These files train Qwen3.8-27B by reinforcement learning on signal_game, with GRPO and a LoRA
-adapter. The trainer, and the vLLM server that serves each new adapter, run on Modal. The loop
-that plays the games runs on your machine. [Training a model with RL](../../docs/rl-training.md)
-gives the commands for a training run and the results of one.
+With the code in this folder, you can train Qwen3.8-27B by reinforcement learning on
+signal_game, with GRPO and a LoRA adapter. The trainer, and the vLLM server that serves each
+new adapter, run on Modal. The loop that plays the games runs on your machine.
+[Training a model with RL](../../docs/rl-training.md) gives the commands for a training run and
+the results of one.
 
 | File | What it holds |
 | --- | --- |
 | `grpo_app.py` | The Modal app: the trainer, and the vLLM server that serves each new adapter |
-| `grpo_loop.py` | The loop: load an adapter, play games, score them, send a training step |
+| `grpo_loop.py` | The loop: load an adapter, play games, score them, and send the training sequences to the trainer |
 | `grpo_training.py` | The GRPO loss, the LoRA setup, and saving and loading an adapter |
 | `grpo_records.py` | The records that the loop and the trainer exchange |
 | `signal_game_rewards.py` | The signal_game rewards, `win` and `first_item` |
@@ -24,7 +25,8 @@ The repository's test suite does not run these tests. Run the loop's tests with:
 VIRTUAL_ENV= uv run --no-sync pytest modal/grpo/test_grpo_loop.py
 ```
 
-The loss tests need torch, transformers and peft, so they run in a throwaway environment:
+The tests in `test_grpo_training.py` need torch, transformers and peft, which the repository's
+environment does not install. Run them in a throwaway environment:
 
 ```bash
 uv run --no-project --python 3.12 --with torch==2.15.0 --with transformers==5.22.1 \

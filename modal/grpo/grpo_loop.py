@@ -1,4 +1,4 @@
-"""GRPO on GlossoGen games: the loop that plays, scores and trains, run on your machine.
+"""GRPO on signal_game: the loop that plays, scores and trains, run on your machine.
 
 Each training step k:
 
@@ -270,7 +270,8 @@ async def play_games(
 ) -> list[Game]:
     """Play every game of a step, ``settings.concurrency`` at a time.
 
-    Each game waits LAUNCH_GAP_SECONDS times its place in the batch of starts before it starts.
+    Once a game gets a slot, it waits LAUNCH_GAP_SECONDS times its index modulo
+    ``settings.concurrency`` before it starts.
     """
     url = await serve_url(app_name=settings.app_name)
     slots = asyncio.Semaphore(settings.concurrency)
