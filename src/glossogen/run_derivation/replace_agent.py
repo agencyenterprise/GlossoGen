@@ -773,8 +773,8 @@ def build_fork_run_config(
 
     Sets ``round_count`` to the entry round plus the fork's window and
     ``model_overrides`` to :func:`build_model_overrides` of the source agents.
-    Raises ``ValueError`` when the scenario rejects the config or a model it
-    names has no reachable credentials.
+    Raises when the scenario rejects the config or a model it names has no
+    reachable credentials.
     """
     entry_round = after_round + 1
     merged_scenario_config: dict[str, Any] = dict(source_scenario_config)
