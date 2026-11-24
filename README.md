@@ -256,7 +256,7 @@
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
 | src/glossogen/runners/pydantic\_ai\_banner.py                                                          |        3 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      443 |       38 |      146 |       25 |     87% |100-101, 184, 189, 193, 267, 271, 300-\>299, 303-309, 371, 447-456, 503, 533, 563-564, 746-749, 814-815, 987-988, 1154-\>exit, 1170-\>1173, 1174, 1175-\>1184, 1179, 1184-\>1186, 1186-\>exit, 1191, 1192-\>exit, 1199, 1248-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      443 |       39 |      146 |       26 |     87% |92, 100-101, 184, 189, 193, 267, 271, 300-\>299, 303-309, 371, 447-456, 503, 533, 563-564, 746-749, 814-815, 987-988, 1154-\>exit, 1170-\>1173, 1174, 1175-\>1184, 1179, 1184-\>1186, 1186-\>exit, 1191, 1192-\>exit, 1199, 1248-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       63 |        1 |       10 |        2 |     96% |65-\>64, 68 |
 | src/glossogen/runners/token\_id\_log.py                                                                |       19 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
@@ -601,7 +601,7 @@
 | src/glossogen/server/scenarios/filterable\_knobs.py                                                    |       72 |        2 |       30 |        3 |     95% |61, 141-\>144, 147 |
 | src/glossogen/server/scenarios/models.py                                                               |        8 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/scenarios/router.py                                                               |       39 |       12 |        6 |        0 |     69% |     80-98 |
-| src/glossogen/server/server\_runtime\_config.py                                                        |       17 |        1 |        4 |        1 |     90% |        28 |
+| src/glossogen/server/server\_runtime\_config.py                                                        |       17 |        1 |        4 |        1 |     90% |        29 |
 | src/glossogen/telemetry/\_\_init\_\_.py                                                                |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/telemetry/telemetry\_bootstrap.py                                                        |       48 |       33 |        6 |        0 |     28% |47-87, 97-101, 109-112 |
 | src/glossogen/telemetry/telemetry\_round\_processor.py                                                 |       29 |       13 |        6 |        0 |     46% |34, 38-40, 50, 54-60, 70 |
@@ -619,7 +619,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **30617** | **3958** | **8844** | **1173** | **85%** |           |
+| **TOTAL**                                                                                              | **30617** | **3959** | **8844** | **1174** | **85%** |           |
 
 
 ## Setup coverage badge
