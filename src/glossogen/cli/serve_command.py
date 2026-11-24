@@ -8,7 +8,6 @@ from types import FrameType
 
 import uvicorn
 
-from glossogen.cli.access_log_redaction import access_log_redacting_config
 from glossogen.cli.frontend_container import (
     allow_ui_origin,
     default_frontend_image,
@@ -101,7 +100,6 @@ def _run_uvicorn(port: int) -> None:
         reload=False,
         proxy_headers=True,
         forwarded_allow_ips="*",
-        log_config=access_log_redacting_config(),
     )
 
 

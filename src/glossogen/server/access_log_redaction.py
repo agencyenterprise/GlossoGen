@@ -4,18 +4,19 @@ An `EventSource` cannot set an `Authorization` header, so the browser sends its
 session token as a `?token=` query parameter, and the identity middleware accepts
 any bearer there. uvicorn's access log writes each request's path with its query
 string, so without this filter every such token lands in the log in the clear.
+
+The filter covers the HTTP access log only. uvicorn logs a WebSocket handshake's
+path and query on `uvicorn.error` instead; the server has no WebSocket routes, and
+one that accepted `?token=` would need that logger redacted too.
 """
 
-import copy
 import logging
 import urllib.parse
-from typing import Any
-
-from uvicorn.config import LOGGING_CONFIG
 
 REDACTED_VALUE = "[redacted]"
 
 _CREDENTIAL_QUERY_PARAMETERS = frozenset({"token"})
+_ACCESS_LOGGER_NAME = "uvicorn.access"
 _ACCESS_LOG_PATH_ARG_INDEX = 2
 
 
@@ -64,9 +65,15 @@ def redact_query_credentials(path_with_query: str) -> str:
     return f"{path}?{'&'.join(pairs)}"
 
 
-def access_log_redacting_config() -> dict[str, Any]:
-    """Return uvicorn's default logging config with the redaction filter on its access logger."""
-    config = copy.deepcopy(LOGGING_CONFIG)
-    config.setdefault("filters", {})["redact_query_credentials"] = {"()": RedactQueryCredentials}
-    config["loggers"]["uvicorn.access"]["filters"] = ["redact_query_credentials"]
-    return config
+def redact_credentials_in_access_log() -> None:
+    """Attach the redaction filter to uvicorn's access logger, once.
+
+    Called when the server app is imported. uvicorn applies its logging config
+    before it imports the app, and `logging.config.dictConfig` keeps a logger's
+    existing filters, so the filter holds under `glossogen serve`, `make dev` and a
+    plain `uvicorn` command alike.
+    """
+    access_logger = logging.getLogger(_ACCESS_LOGGER_NAME)
+    if any(isinstance(existing, RedactQueryCredentials) for existing in access_logger.filters):
+        return
+    access_logger.addFilter(RedactQueryCredentials())

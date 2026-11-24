@@ -1,32 +1,26 @@
-"""`glossogen serve` keeps `?token=` credentials out of uvicorn's access log.
+"""The server keeps `?token=` credentials out of uvicorn's access log.
 
 The browser sends its session token as a query parameter on event-stream requests,
-and uvicorn logs each request's path with its query string. The first test serves
-one such request through each of uvicorn's HTTP protocols (production picks
-httptools), configured with the keyword arguments `glossogen serve` passes to
-`uvicorn.run`, and reads the access log line it prints. No socket is opened: the
-request bytes go straight to the protocol.
+and uvicorn logs each request's path with its query string. The first test does
+what every way of starting the server does: it applies uvicorn's default logging
+config, then imports the server app. It serves one such request through each of
+uvicorn's HTTP protocols (production picks httptools) and reads the access log line
+printed. No socket is opened: the request bytes go straight to the protocol.
 """
 
-import argparse
 import asyncio
+import importlib
 import logging
 from collections.abc import Iterator
 from typing import Any, NamedTuple
 
 import pytest
-import uvicorn
 from uvicorn.config import LOGGING_CONFIG, Config
 from uvicorn.protocols.http.h11_impl import H11Protocol
 from uvicorn.protocols.http.httptools_impl import HttpToolsProtocol
 from uvicorn.server import ServerState
 
-from glossogen.cli import serve_command
-from glossogen.cli.access_log_redaction import (
-    REDACTED_VALUE,
-    RedactQueryCredentials,
-    redact_query_credentials,
-)
+from glossogen.server.access_log_redaction import REDACTED_VALUE, redact_query_credentials
 
 _SECRET = "eyJhbGciOiJSUzI1NiJ9.session-claims.signature"
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
@@ -80,7 +74,10 @@ class _SavedLogger(NamedTuple):
 
 @pytest.fixture
 def restored_uvicorn_loggers() -> Iterator[None]:
-    """Undo the logging config the test applies, so other tests see the loggers as before."""
+    """Undo the logging config the test applies, so other tests see the loggers as before.
+
+    The redaction filter stays: the app attaches it once, when first imported.
+    """
     saved: list[_SavedLogger] = []
     for name in _UVICORN_LOGGERS:
         logger = logging.getLogger(name)
@@ -95,42 +92,20 @@ def restored_uvicorn_loggers() -> Iterator[None]:
     yield
     for entry in saved:
         entry.logger.handlers = entry.handlers
-        for added in list(entry.logger.filters):
-            if isinstance(added, RedactQueryCredentials):
-                entry.logger.removeFilter(added)
         entry.logger.setLevel(entry.level)
         entry.logger.propagate = entry.propagate
 
 
-def _serve_uvicorn_run_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Return the keyword arguments `glossogen serve` passes to `uvicorn.run`."""
-    captured: dict[str, Any] = {}
-
-    def fake_uvicorn_run(**kwargs: Any) -> None:  # noqa: ANN401 — uvicorn.run's kwargs
-        captured.update(kwargs)
-
-    monkeypatch.setattr(target=uvicorn, name="run", value=fake_uvicorn_run)
-    monkeypatch.setenv("GLOSSOGEN_RUNS_DIR", "")
-    serve_command.handle_serve(
-        args=argparse.Namespace(runs_dir="runs", port=8000, ui_port=None, ui_image=None)
-    )
-    return captured
-
-
 @pytest.mark.parametrize(argnames="protocol_class", argvalues=[H11Protocol, HttpToolsProtocol])
-async def test_serve_access_log_omits_the_query_token(
+async def test_access_log_omits_the_query_token(
     protocol_class: type[H11Protocol] | type[HttpToolsProtocol],
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     restored_uvicorn_loggers: None,  # noqa: ARG001 — fixture for its teardown
 ) -> None:
-    run_kwargs = _serve_uvicorn_run_kwargs(monkeypatch=monkeypatch)
-    config = Config(
-        app=_ok_app,
-        log_config=run_kwargs.get("log_config", LOGGING_CONFIG),
-        lifespan="off",
-    )
-    protocol = protocol_class(config=config, server_state=ServerState(), app_state={})
+    config = Config(app=_ok_app, log_config=LOGGING_CONFIG, lifespan="off")
+    importlib.import_module(name="glossogen.server.app")
+    server_state = ServerState()
+    protocol = protocol_class(config=config, server_state=server_state, app_state={})
     transport = _RecordingTransport()
     protocol.connection_made(transport=transport)
 
@@ -140,10 +115,7 @@ async def test_serve_access_log_omits_the_query_token(
             "Host: localhost\r\n\r\n"
         ).encode()
     )
-    for _ in range(100):
-        if protocol.cycle.response_complete:
-            break
-        await asyncio.sleep(0)
+    await asyncio.gather(*server_state.tasks)
 
     access_line = capsys.readouterr().out
     assert transport.written.startswith(b"HTTP/1.1 200")
