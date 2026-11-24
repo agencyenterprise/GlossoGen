@@ -33,12 +33,20 @@ async def _build_source_summary(
     run_dir_name: str,
     derived_count: int,
 ) -> BranchSourceSummary | None:
-    """Enrich one source run into a summary; ``None`` if its dir is unreadable."""
-    summary = await build_summary(
-        scenario_name=scenario,
-        timestamp_dir=runs_dir / scenario / run_dir_name,
-        evaluation_content_hash=None,
-    )
+    """Enrich one source run into a summary; ``None`` if its dir is unreadable.
+
+    A source whose own derivation manifest cannot be read is logged and left
+    out rather than failing the whole branches page.
+    """
+    try:
+        summary = await build_summary(
+            scenario_name=scenario,
+            timestamp_dir=runs_dir / scenario / run_dir_name,
+            evaluation_content_hash=None,
+        )
+    except Exception:
+        logger.exception("Skipping branch source %s/%s: summary failed", scenario, run_dir_name)
+        return None
     if summary is None:
         logger.warning(
             "Skipping branch source %s/%s: build_summary returned None",

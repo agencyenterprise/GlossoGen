@@ -273,6 +273,27 @@ async def test_a_run_whose_manifest_cannot_be_read_is_not_counted(tmp_path: Path
     assert await branches_over_http(runs_dir=tmp_path) == {f"{SCENARIO}/1770000100": 1}
 
 
+async def test_a_parent_whose_own_manifest_cannot_be_read_is_left_out(tmp_path: Path) -> None:
+    """The parent's summary reads its own manifests; a broken one drops that parent only."""
+    write_run(runs_dir=tmp_path, run_dir_name="1770000100")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000200",
+        source_run_dir_name="1770000100",
+        replaced_agent_id="field_observer",
+    )
+    broken_parent = write_run(runs_dir=tmp_path, run_dir_name="1770000300")
+    (broken_parent / REPLACE_MANIFEST_FILENAME).write_text("{not json")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000400",
+        source_run_dir_name="1770000300",
+        replaced_agent_id="field_observer",
+    )
+
+    assert await branches_over_http(runs_dir=tmp_path) == {f"{SCENARIO}/1770000100": 1}
+
+
 # --- with a database ------------------------------------------------------------
 
 
