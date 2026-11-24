@@ -127,25 +127,50 @@ def _find_children_on_disk_sync(runs_dir: Path, parent_run_id: str) -> list[_Chi
 
     Orders ties within one second by scenario and run directory name, ascending,
     the same order :func:`~glossogen.run_storage.run_discovery.discover_runs`
-    gives. A run whose manifests cannot be read is logged and left out rather
-    than failing the parent's page.
+    gives.
     """
-    children: list[RunDescriptor] = []
-    for descriptor in discover_run_descriptors(runs_dir=runs_dir):
-        run_dir = runs_dir / descriptor.scenario_name / descriptor.run_dir_name
-        try:
-            parent = _timeline_parent_on_disk(run_dir=run_dir)
-        except Exception:
-            logger.exception("Could not read the derivation manifests at %s", run_dir)
-            continue
-        if parent == parent_run_id:
-            children.append(descriptor)
+    children = [
+        derived.descriptor
+        for derived in derived_runs_on_disk(
+            runs_dir=runs_dir, descriptors=discover_run_descriptors(runs_dir=runs_dir)
+        )
+        if derived.parent_run_id == parent_run_id
+    ]
     children.sort(key=lambda descriptor: (descriptor.scenario_name, descriptor.run_dir_name))
     children.sort(key=lambda descriptor: descriptor.timestamp, reverse=True)
     return [
         _ChildRunId(scenario=descriptor.scenario_name, run_dir_name=descriptor.run_dir_name)
         for descriptor in children
     ]
+
+
+class DerivedRunOnDisk(NamedTuple):
+    """A run on disk that has a timeline parent, with that parent's run id."""
+
+    descriptor: RunDescriptor
+    parent_run_id: str
+
+
+def derived_runs_on_disk(
+    runs_dir: Path, descriptors: list[RunDescriptor]
+) -> list[DerivedRunOnDisk]:
+    """Return each of ``descriptors`` that has a timeline parent, in the order given.
+
+    Blocking. Reads only each run's derivation manifests, never its event log,
+    labels or evaluation. A run whose manifests cannot be read is logged and
+    left out rather than failing the caller's page.
+    """
+    derived: list[DerivedRunOnDisk] = []
+    for descriptor in descriptors:
+        run_dir = runs_dir / descriptor.scenario_name / descriptor.run_dir_name
+        try:
+            parent = _timeline_parent_on_disk(run_dir=run_dir)
+        except Exception:
+            logger.exception("Could not read the derivation manifests at %s", run_dir)
+            continue
+        if parent is not None:
+            derived.append(DerivedRunOnDisk(descriptor=descriptor, parent_run_id=parent))
+    return derived
 
 
 def _timeline_parent_on_disk(run_dir: Path) -> str | None:
