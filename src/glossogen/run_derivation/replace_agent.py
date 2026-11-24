@@ -71,6 +71,7 @@ from glossogen.run_storage.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.scenario_contract.base_knobs import AgentModelOverride
 from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
@@ -745,6 +746,165 @@ def resolve_knob_round_count(knobs: dict[str, Any] | None) -> int | None:
     return value
 
 
+class ForkRunConfig(NamedTuple):
+    """A fork's validated scenario config, and the rounds it plays past its entry round.
+
+    ``rounds_after_swap`` is the manifest window :func:`resolve_rounds_after` returns.
+    """
+
+    scenario_config: dict[str, Any]
+    rounds_after_swap: int
+
+
+def build_fork_run_config(
+    scenario_cls: type[SimulationScenario],
+    source_scenario_config: dict[str, Any],
+    knobs: dict[str, Any] | None,
+    after_round: int,
+    rounds_after: int | None,
+    source_agents: dict[str, AgentRegistered],
+    replaced_agent_id: str | None,
+    replacement_model: str | None,
+    replacement_provider: str | None,
+    default_model: str,
+    default_provider: str,
+) -> ForkRunConfig:
+    """Merge ``knobs`` over the source's config, pin every seat's model, and validate it.
+
+    Sets ``round_count`` to the entry round plus the fork's window and
+    ``model_overrides`` to :func:`build_model_overrides` of the source agents.
+    Raises when the scenario rejects the config or a model it names has no
+    reachable credentials.
+    """
+    entry_round = after_round + 1
+    merged_scenario_config: dict[str, Any] = dict(source_scenario_config)
+    if knobs is not None:
+        merged_scenario_config.update(knobs)
+    rounds_after_swap = resolve_rounds_after(
+        after_round=after_round,
+        rounds_after=rounds_after,
+        knob_round_count=resolve_knob_round_count(knobs=knobs),
+        source_scenario_config=source_scenario_config,
+    )
+    merged_scenario_config["round_count"] = entry_round + rounds_after_swap
+    # Honour any user-provided model_overrides from the merged knobs; anything
+    # the user didn't specify falls back to the source-active model.
+    model_overrides = build_model_overrides(
+        source_agents=source_agents,
+        replaced_agent_id=replaced_agent_id,
+        replacement_model=replacement_model,
+        replacement_provider=replacement_provider,
+        replacement_settings=read_replacement_settings(
+            knobs=knobs,
+            replaced_agent_id=replaced_agent_id,
+            replacement_model=replacement_model,
+            replacement_provider=replacement_provider,
+        ),
+        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    merged_scenario_config["model_overrides"] = model_overrides_config_value(
+        overrides=model_overrides
+    )
+    validated = validate_run_config(
+        scenario_cls=scenario_cls,
+        scenario_config=merged_scenario_config,
+        default_provider=default_provider,
+        valid_providers=set(SIMULATION_PROVIDERS),
+    )
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=validated.scenario_config,
+        agent_overrides=validated.normalized_agent_overrides,
+        default_model=default_model,
+        default_provider=default_provider,
+        first_round=entry_round,
+    )
+    return ForkRunConfig(
+        scenario_config=validated.scenario_config, rounds_after_swap=rounds_after_swap
+    )
+
+
+class ClonedRun(NamedTuple):
+    """A new run directory holding a source run cut at a fork boundary."""
+
+    new_run_id: str
+    new_run_dir: Path
+    log_path: Path
+
+
+async def clone_source_at_boundary(
+    source_run_dir: Path,
+    runs_dir: Path,
+    scenario_name: str,
+    truncate_after_offset: int,
+) -> ClonedRun:
+    """Claim a run directory and copy ``source_run_dir`` into it, cut at the boundary.
+
+    The copied log ends at ``truncate_after_offset``, carries the new run's id,
+    and has no ``SimulationEnded``.
+    """
+    new_run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
+    new_log_path = event_log_path(run_dir=new_run_dir, scenario_name=scenario_name)
+    await copy_run_at_event(
+        source_dir=source_run_dir,
+        target_dir=new_run_dir,
+        jsonl_path_within_run=Path(new_log_path.name),
+        truncate_after_offset=truncate_after_offset,
+    )
+    new_run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=new_run_dir.name)
+    rewrite_run_jsonl(
+        log_path=new_log_path,
+        new_run_id=new_run_id,
+        message_edits={},
+        should_drop_event=drop_simulation_ended,
+    )
+    return ClonedRun(new_run_id=new_run_id, new_run_dir=new_run_dir, log_path=new_log_path)
+
+
+def write_fork_run_config(cloned: ClonedRun, scenario_config: dict[str, Any]) -> Path:
+    """Save the fork's config for its resumed launch and record it in the cloned log.
+
+    Returns the path of the saved config, which the launch passes as ``--config``.
+    """
+    config_path = cloned.new_run_dir / "replace_config.json"
+    config_path.write_bytes(orjson.dumps(scenario_config))
+    patch_simulation_started_scenario_config(
+        log_path=cloned.log_path,
+        scenario_config=scenario_config,
+    )
+    return config_path
+
+
+def prepared_fork_run(
+    cloned: ClonedRun,
+    scenario_name: str,
+    model: str,
+    provider: str,
+    config_path: Path,
+) -> PreparedForkRun:
+    """The ``glossogen run --resume`` launch of ``cloned`` under ``config_path``."""
+    return PreparedForkRun(
+        new_run_id=cloned.new_run_id,
+        new_run_dir=cloned.new_run_dir,
+        launch_cmd=(
+            sys.executable,
+            "-m",
+            "glossogen",
+            "run",
+            scenario_name,
+            "--model",
+            model,
+            "--provider",
+            provider,
+            "--resume",
+            str(cloned.new_run_dir),
+            "--config",
+            str(config_path),
+        ),
+        stdout_log_path=stdout_log_path(run_dir=cloned.new_run_dir, scenario_name=scenario_name),
+    )
+
+
 async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedForkRun:
     """Prepare a replace-agent or fork-at-round run on disk, without launching it.
 
@@ -814,81 +974,32 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
 
     scenario_cls = get_scenario_class(name=request.scenario_name)
 
-    merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
-    if request.knobs is not None:
-        merged_scenario_config.update(request.knobs)
-    effective_rounds_after_swap = resolve_rounds_after(
-        after_round=request.after_round,
-        rounds_after=request.rounds_after,
-        knob_round_count=resolve_knob_round_count(knobs=request.knobs),
-        source_scenario_config=source_first_event.scenario_config,
-    )
-    merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
-    # Extract any user-provided model_overrides from the merged knobs so they
-    # survive the source-agent pinning that follows. Anything not specified by
-    # the user falls back to the source-active model.
-    model_overrides = build_model_overrides(
-        source_agents=source_agents,
-        replaced_agent_id=request.replaced_agent_id,
-        replacement_model=request.model,
-        replacement_provider=request.provider,
-        replacement_settings=read_replacement_settings(
-            knobs=request.knobs,
-            replaced_agent_id=request.replaced_agent_id,
-            replacement_model=request.model,
-            replacement_provider=request.provider,
-        ),
-        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
-    )
-    merged_scenario_config["model_overrides"] = model_overrides_config_value(
-        overrides=model_overrides
-    )
-
     subprocess_model, subprocess_provider = _pick_subprocess_default_model(
         request=request,
         source_agents=source_agents,
     )
-    validated = validate_run_config(
+    fork_config = build_fork_run_config(
         scenario_cls=scenario_cls,
-        scenario_config=merged_scenario_config,
-        default_provider=subprocess_provider,
-        valid_providers=set(SIMULATION_PROVIDERS),
-    )
-
-    require_reachable_models(
-        scenario_cls=scenario_cls,
-        scenario_config=validated.scenario_config,
-        agent_overrides=validated.normalized_agent_overrides,
+        source_scenario_config=source_first_event.scenario_config,
+        knobs=request.knobs,
+        after_round=request.after_round,
+        rounds_after=request.rounds_after,
+        source_agents=source_agents,
+        replaced_agent_id=request.replaced_agent_id,
+        replacement_model=request.model,
+        replacement_provider=request.provider,
         default_model=subprocess_model,
         default_provider=subprocess_provider,
-        first_round=entry_round,
     )
 
-    new_run_dir = claim_run_dir(
+    cloned = await clone_source_at_boundary(
+        source_run_dir=request.source_run_dir,
         runs_dir=request.runs_dir,
         scenario_name=request.scenario_name,
-    )
-    new_log_path = event_log_path(run_dir=new_run_dir, scenario_name=request.scenario_name)
-    await copy_run_at_event(
-        source_dir=request.source_run_dir,
-        target_dir=new_run_dir,
-        jsonl_path_within_run=Path(new_log_path.name),
         truncate_after_offset=location.end_offset,
     )
 
-    new_run_id = compose_run_id(
-        scenario_name=request.scenario_name,
-        run_dir_name=new_run_dir.name,
-    )
-
-    rewrite_run_jsonl(
-        log_path=new_log_path,
-        new_run_id=new_run_id,
-        message_edits={},
-        should_drop_event=drop_simulation_ended,
-    )
-
-    rewritten_events = await load_events(log_path=new_log_path)
+    rewritten_events = await load_events(log_path=cloned.log_path)
     build_rewind_state_at_event(
         events=rewritten_events,
         target_event_id=boundary.target_event_id,
@@ -896,13 +1007,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         agent_filters={},
     )
 
-    config_path = new_run_dir / "replace_config.json"
-    config_path.write_bytes(orjson.dumps(validated.scenario_config))
-
-    patch_simulation_started_scenario_config(
-        log_path=new_log_path,
-        scenario_config=validated.scenario_config,
-    )
+    config_path = write_fork_run_config(cloned=cloned, scenario_config=fork_config.scenario_config)
 
     source_run_id = compose_run_id(
         scenario_name=request.scenario_name,
@@ -921,7 +1026,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         source_run_id=source_run_id,
         source_run_dir=str(request.source_run_dir),
         round_start=entry_round,
-        rounds_after_swap=effective_rounds_after_swap,
+        rounds_after_swap=fork_config.rounds_after_swap,
         target_event_id=boundary.target_event_id,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
@@ -932,30 +1037,15 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         history_floor_round=request.history_floor_round,
         replaced_at=time.time(),
     )
-    manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
+    manifest_path = cloned.new_run_dir / REPLACE_MANIFEST_FILENAME
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
-    stdout_log = stdout_log_path(run_dir=new_run_dir, scenario_name=request.scenario_name)
-    cmd = (
-        sys.executable,
-        "-m",
-        "glossogen",
-        "run",
-        request.scenario_name,
-        "--model",
-        subprocess_model,
-        "--provider",
-        subprocess_provider,
-        "--resume",
-        str(new_run_dir),
-        "--config",
-        str(config_path),
-    )
-    return PreparedForkRun(
-        new_run_id=new_run_id,
-        new_run_dir=new_run_dir,
-        launch_cmd=cmd,
-        stdout_log_path=stdout_log,
+    return prepared_fork_run(
+        cloned=cloned,
+        scenario_name=request.scenario_name,
+        model=subprocess_model,
+        provider=subprocess_provider,
+        config_path=config_path,
     )
 
 
