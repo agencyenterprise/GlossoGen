@@ -345,6 +345,7 @@ _.result_round_number  # unused attribute (src/glossogen/server/runs/detail_read
 list_label_descriptions  # unused function (src/glossogen/server/runs/label_description_router.py:31)
 set_label_description  # unused function (src/glossogen/server/runs/label_description_router.py:40)
 delete_label_description  # unused function (src/glossogen/server/runs/label_description_router.py:50)
+source_run  # unused variable (src/glossogen/server/runs/models.py:86)
 result_timestamp  # unused variable (src/glossogen/server/runs/models.py:198)
 result_round_number  # unused variable (src/glossogen/server/runs/models.py:200)
 measurement_count  # unused variable (src/glossogen/server/runs/models.py:481)
