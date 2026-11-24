@@ -2102,6 +2102,13 @@ the commit log.</p>
   virtual clock, each <code>act</code> list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
   its tokens as before.</li>
+<li><code>spot_the_intersection</code> knobs <code>postmortem_mode</code> and
+  <code>postmortem_character_limit</code> set who posts in the discussion phase and how many
+  characters each viewer may send in one phase. <code>whole_team</code> lets every viewer
+  post. <code>single_author</code> and <code>rotating_author</code> let one viewer post. In
+  <code>chosen_partner</code> each viewer messages one teammate it picks, on a channel the
+  two share. Every shipped preset sets <code>whole_team</code> and <code>-1</code>. See its
+  <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/spot_the_intersection/README.md#discussion-phase">README</a>.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>

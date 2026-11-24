@@ -1934,9 +1934,11 @@ preset needs at least 3. Larger teams need a larger <code>grid_size</code>.</p>
 <p>Two teams play the same boards, and among correct teams the one that said least
 wins. <code>simulated_opponent_ratio</code> replaces Team B with a simulated team that is
 always right in a share of Team A's characters, fixed or drawn each round from a
-range. Team A reads exactly what it would against a real team. Every round is
-certified from the lines the viewers read before it is played, and recorded
-runs can be audited against what each viewer was sent.</p>
+range. Team A reads exactly what it would against a real team.
+<code>postmortem_mode</code> and <code>postmortem_character_limit</code> set who posts in the
+discussion phase after each round, and how much. Every round is certified from
+the lines the viewers read before it is played, and recorded runs can be
+audited against what each viewer was sent.</p>
 <h2 id="prisoners-dilemma">Prisoners' dilemma<a class="headerlink" href="#prisoners-dilemma" title="Permanent link">&para;</a></h2>
 <p>Iterated prisoners' dilemma. Two players talk freely on a shared link, then each
 locks in <code>cooperate</code> or <code>defect</code>, and the round resolves as soon as both are in.
