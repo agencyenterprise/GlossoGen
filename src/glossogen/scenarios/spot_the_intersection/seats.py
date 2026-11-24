@@ -92,16 +92,26 @@ def postmortem_display_name_for(team_id: str) -> str:
     return f"team discussion ({_TEAM_LABELS[team_id]})"
 
 
-def teammates_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[Teammate]:
-    """The other members of ``agent_id``'s team, in seat order."""
+def _team_of(teams: tuple[TeamSpec, ...], agent_id: str) -> TeamSpec:
+    """The team ``agent_id`` is a member of."""
     for team in teams:
         if any(role.agent_id == agent_id for role in team.roles):
-            return [
-                Teammate(agent_id=role.agent_id, role_name=role.role_name)
-                for role in team.roles
-                if role.agent_id != agent_id
-            ]
+            return team
     raise ValueError(f"{agent_id} is on no team")
+
+
+def teammates_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[Teammate]:
+    """The other members of ``agent_id``'s team, in seat order."""
+    return [
+        Teammate(agent_id=role.agent_id, role_name=role.role_name)
+        for role in _team_of(teams=teams, agent_id=agent_id).roles
+        if role.agent_id != agent_id
+    ]
+
+
+def seat_role_names_of(teams: tuple[TeamSpec, ...], agent_id: str) -> list[str]:
+    """The role names on ``agent_id``'s team, in seat order, its own included."""
+    return [role.role_name for role in _team_of(teams=teams, agent_id=agent_id).roles]
 
 
 def seats_by_agent_id(teams: tuple[TeamSpec, ...]) -> dict[str, Seat]:

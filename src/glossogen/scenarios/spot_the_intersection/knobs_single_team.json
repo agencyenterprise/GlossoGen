@@ -18,6 +18,8 @@
   "two_teams": false,
   "messaging": "broadcast",
   "team_characters": "total",
+  "postmortem_mode": "whole_team",
+  "postmortem_character_limit": -1,
   "simulated_opponent_ratio": null,
   "model_overrides": {},
   "replace_agent_default_channel_visibility": {

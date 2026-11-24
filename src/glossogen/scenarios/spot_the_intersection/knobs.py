@@ -4,7 +4,8 @@ Controls how many viewers a team has, the grid and how many objects each board
 holds, whether near-misses make every board necessary, the competing second
 team and whether it is simulated, whether viewers broadcast or message one
 teammate at a time, how a team's characters are counted, the postmortem
-discussion phase, channel noise, and the optional per-round character budget.
+discussion phase with who may post in it and how much, channel noise, and the
+optional per-round character budget.
 """
 
 from typing import Annotated, Self
@@ -18,6 +19,10 @@ from glossogen.scenarios.spot_the_intersection.board_generation import (
 )
 from glossogen.scenarios.spot_the_intersection.board_model import MAX_GRID_SIZE
 from glossogen.scenarios.spot_the_intersection.messaging import Messaging
+from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
+    NO_CHARACTER_LIMIT,
+    PostmortemMode,
+)
 from glossogen.scenarios.spot_the_intersection.world_state import TeamCharacters
 
 MAX_TEAM_SIZE = 12
@@ -55,6 +60,15 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     charged: every character its members sent (``total``), or the most any one
     member sent (``busiest_member``). ``round_time_budget_seconds`` is an
     optional hard cap on that charge (``-1`` for none).
+
+    ``postmortem_mode`` sets who posts in each discussion phase: every viewer
+    on the team's discussion channel (``whole_team``), one viewer on it
+    (``single_author``, ``rotating_author``), or each viewer to one teammate it
+    picks on a channel the two share (``chosen_partner``, broadcast messaging
+    only). ``postmortem_character_limit`` caps the characters each viewer sends
+    in one discussion phase (``-1`` for none). A run with no discussion phase,
+    because ``postmortem_enabled`` is off or ``postmortem_disabled_at_start`` is
+    on, sets ``whole_team`` and ``-1``.
     """
 
     round_time_budget_seconds: int
@@ -70,6 +84,8 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     simulated_opponent_ratio: PositiveShare | tuple[PositiveShare, PositiveShare] | None
     messaging: Messaging
     team_characters: TeamCharacters
+    postmortem_mode: PostmortemMode
+    postmortem_character_limit: int
 
     @model_validator(mode="after")
     def _validate_count_distributions(self) -> Self:
@@ -134,6 +150,50 @@ class SpotTheIntersectionKnobs(BaseKnobs):
             raise ValueError(
                 f"round_time_budget_seconds must be > 0, or -1 for no budget "
                 f"(got {self.round_time_budget_seconds})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_postmortem_character_limit(self) -> Self:
+        limit = self.postmortem_character_limit
+        if limit != NO_CHARACTER_LIMIT and limit <= 0:
+            raise ValueError(
+                f"postmortem_character_limit must be > 0, or {NO_CHARACTER_LIMIT} for no limit "
+                f"(got {limit})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_postmortem_rules_need_a_postmortem(self) -> Self:
+        if self.postmortem_enabled and not self.postmortem_disabled_at_start:
+            return self
+        if (
+            self.postmortem_mode != PostmortemMode.WHOLE_TEAM
+            or self.postmortem_character_limit != NO_CHARACTER_LIMIT
+        ):
+            raise ValueError(
+                "this run has no discussion phase "
+                f"(postmortem_enabled={self.postmortem_enabled}, "
+                f"postmortem_disabled_at_start={self.postmortem_disabled_at_start}), so set "
+                f"postmortem_mode={PostmortemMode.WHOLE_TEAM.value!r} and "
+                f"postmortem_character_limit={NO_CHARACTER_LIMIT} "
+                f"(got postmortem_mode={self.postmortem_mode.value!r}, "
+                f"postmortem_character_limit={self.postmortem_character_limit})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_chosen_partner_needs_broadcast(self) -> Self:
+        if (
+            self.postmortem_mode == PostmortemMode.CHOSEN_PARTNER
+            and self.messaging != Messaging.BROADCAST
+        ):
+            raise ValueError(
+                f"postmortem_mode={PostmortemMode.CHOSEN_PARTNER.value!r} is written for "
+                f"messaging={Messaging.BROADCAST.value!r} only: the one-to-one prompts tell a "
+                "viewer to name a teammate by agent id, which reaches their direct channel, and "
+                "direct channels are closed in the discussion phase "
+                f"(got messaging={self.messaging.value!r})"
             )
         return self
 

@@ -1,4 +1,4 @@
 {% if postmortem_enabled %}
 DISCUSSION PHASE:
-After each round there is a discussion phase in the team discussion channel (see the channel list below for its exact channel_id). Use it to agree on conventions for future rounds. Messages in the discussion channel do NOT count toward your character score.{% if one_to_one %} Unlike your other messages, every teammate reads the discussion channel.{% endif %}
+{% if postmortem_mode == "chosen_partner" %}{% include "_postmortem_chosen_partner.jinja" %}{% elif postmortem_mode == "single_author" %}{% include "_postmortem_single_author.jinja" %}{% elif postmortem_mode == "rotating_author" %}{% include "_postmortem_rotating_author.jinja" %}{% else %}{% include "_postmortem_whole_team.jinja" %}{% endif %}{% include "_postmortem_character_limit.jinja" %}
 {% endif %}

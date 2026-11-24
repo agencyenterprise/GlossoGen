@@ -137,11 +137,12 @@ glossogen analyze --runs-dir ./runs --scenario spot_the_intersection --label <co
 ## What viewers are told
 
 The system prompt states the grid and its cell names, that exactly one object is
-on every board, the submission rule, how the team's characters are counted, and
-the competition. With one-to-one messaging it also lists the viewer's teammates
-by agent id. It does not mention near-misses, twins, decoys, or that every board
-is needed. Each round's briefing lists the viewer's own board and the previous
-round's result, never the answer.
+on every board, the submission rule, how the team's characters are counted, the
+competition, and who may post in the discussion phase and how much. With
+one-to-one messaging it also lists the viewer's teammates by agent id. It does
+not mention near-misses, twins, decoys, or that every board is needed. Each
+round's briefing lists the viewer's own board and the previous round's result,
+never the answer.
 
 ## Messaging
 
@@ -167,6 +168,41 @@ Under one-to-one messaging, `protocol_probe` uses
 first and with what message. `protocol_explanation` uses
 `viewer_describe_one_to_one.jinja`, which asks who messages whom, in what order,
 and how a viewer chose a teammate.
+
+## Discussion phase
+
+After each round, a discussion phase lets viewers agree on conventions.
+Messages in it do not count toward the team's charge. `postmortem_mode` sets
+who posts in it:
+
+- `whole_team`: every viewer posts on the team's discussion channel.
+- `single_author`: only Viewer 1 posts on the discussion channel. The other
+  viewers read it, and a message from one of them is refused.
+- `rotating_author`: one viewer posts on the discussion channel in each phase,
+  by round. Viewer 1 posts after round 1, Viewer 2 after round 2, and Viewer 1
+  again after the last seat's turn. The other viewers read it.
+- `chosen_partner`: the team has no discussion channel. Each pair of teammates
+  shares a channel that is open only during the phase, such as
+  `postmortem_a_1_2` for Viewers 1 and 2 of Team A. A viewer's partner is the
+  first teammate it messages in a phase. A message to any other teammate is
+  then refused until the next phase. Receiving a message does not choose a
+  partner, and neither does a message that was refused or held for unread
+  messages. This mode is written for `messaging: "broadcast"` only. The
+  one-to-one prompts tell a viewer to name a teammate by agent id, which
+  reaches their direct channel, and direct channels are closed in the phase.
+
+`postmortem_character_limit` caps the characters each viewer sends in one
+phase, in any mode. `-1` sets no limit. A message that would take the viewer
+over the limit is refused. With a limit set, every `send_message` result in
+the phase carries `discussion_characters_left`. When a viewer makes two sends
+at once, they are checked one after the other, so they cannot both choose a
+partner or both fit under the limit.
+
+The system prompt and the message that opens each phase state the mode and the
+limit, and the run's description names both. A run with no discussion phase,
+because `postmortem_enabled` is false or `postmortem_disabled_at_start` is
+true, must set `whole_team` and `-1`. Every shipped preset sets `whole_team`
+and `-1`.
 
 ## Modes
 
@@ -209,8 +245,11 @@ and how a viewer chose a teammate.
   near-misses on and three or more viewers) plus both counts, so a board missing
   a decoy holds an extra filler in its place. Decoys need three viewers, so set
   `decoy_count_values: [0]` and `decoy_count_weights: [1]` for `team_size: 2`.
+- `postmortem_mode` and `postmortem_character_limit`: who posts in the
+  discussion phase, and how many characters each viewer may send in it. See
+  [Discussion phase](#discussion-phase).
 - `round_time_budget_seconds`, `channel_noise_level`, `noise_replacement_mode`,
-  and the postmortem knobs, as in other scenarios.
+  and the other postmortem knobs, as in other scenarios.
 
 ## Recorded events
 
@@ -267,6 +306,9 @@ the run's grid.
 - `metered_messages.py`: the messages a log shows each team was charged for,
   read by the resume and by this scenario's metrics.
 - `messaging.py`: the `messaging` modes and who a viewer may address one-to-one.
+- `postmortem_modes.py`, `discussion_phase.py`, `partner_channels.py`: the
+  `postmortem_mode` rules and their refusals, what each viewer has sent in the
+  current discussion phase, and the pair channels of a `chosen_partner` run.
 - `evaluation/busiest_member_share_metric.py`,
   `evaluation/message_routes_metric.py`, `evaluation/team_traffic.py`:
   this scenario's metrics and the per-team messages they read.
