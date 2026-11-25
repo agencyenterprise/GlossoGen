@@ -265,9 +265,8 @@ def gpu_memory_mib() -> int:
 
 @app.function(
     image=vllm_image,
-    # H200 or H100 only. On 18 Nov 2026, with LoRA on, vLLM 0.31 failed twice in its
-    # flash-attention kernel while capturing CUDA graphs: once on a B200, and once on a GPU whose
-    # type was not recorded. The H200 containers worked.
+    # H200 or H100 only. With LoRA on, vLLM 0.31 failed in its flash-attention kernel while
+    # capturing CUDA graphs on a B200. The H200 containers worked.
     gpu=[f"{gpu_type}:{SERVE_GPUS}" for gpu_type in ("H200", "H100")],
     secrets=[
         modal.Secret.from_name("huggingface-glossogen"),
@@ -289,7 +288,7 @@ def serve() -> None:
     environment = dict(os.environ, VLLM_ALLOW_RUNTIME_LORA_UPDATING="True")
     total_mib = gpu_memory_mib()
     # On an 80 GB H100, vLLM's start-up profiling ran out of memory while capturing CUDA graphs,
-    # with --gpu-memory-utilization at 0.90 and at 0.85 (19 Nov 2026). The profile covers the
+    # with --gpu-memory-utilization at 0.90 and at 0.85. The profile covers the
     # vision encoder and an 8,192-token batch, so on a GPU under 100 GB the server takes no images
     # and smaller batches.
     memory_utilization = "0.90"

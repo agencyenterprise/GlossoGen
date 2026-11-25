@@ -19,7 +19,7 @@ the commit log.
   in each round, and sends the training sequences to the trainer, which takes
   one GRPO step.
   [Training a model with RL](docs/rl-training.md) gives the commands for a
-  training run and the results of one.
+  training run and the results of our runs.
 - **A run can record a self-hosted model's token ids in its event log.** With
   the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
   server for `return_token_ids`, and each `llm_response_received` event holds

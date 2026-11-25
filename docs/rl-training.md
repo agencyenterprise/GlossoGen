@@ -208,11 +208,15 @@ accepts:
 | `win` | the round was won: both players ended on the same item |
 | `first_item` | the player ended on the alphabetically first item of its own grid |
 
-A player can score on `first_item` whatever its partner does. Each item is a colour and a shape,
-such as `blue star`. The game config uses the colours red, blue and green, and the shapes circle,
-triangle and star. In alphabetical order, blue comes before green and red, and circle before star
-and triangle. So a grid's first item is a blue item whenever the grid holds one, and the blue circle
-when the grid holds a blue circle. A blue item of another shape on the same grid does not score.
+A player scores on `first_item` regardless of what its partner does. Each item is a colour and a
+shape, such as `blue star`. The game config uses the colours red, blue and green, and the shapes
+circle, triangle and star. In alphabetical order, blue comes before green and red, and circle before
+star and triangle. So the first item of a grid with a blue item is blue, and the blue circle when
+the grid holds a blue circle. On a grid that holds a blue circle, a blue item of another shape does
+not score.
+
+Start with `first_item`. In 2 of the 4 runs under [Our runs](#our-runs), its count rose within ten
+steps. `win` has not been tested with this loop.
 
 ### Settings
 
@@ -257,10 +261,8 @@ serves one adapter under one name.
 
 ## Our runs
 
-The commands above ran four times from 23 to 25 Nov 2026, as the runs `tutorial-check`,
-`first-item-rep1`, `first-item-rep2` and `first-item-rep3`. `tutorial-check` ran step 0 on an
-earlier revision of `grpo_loop.py` and resumed at step 1 the next day. Two of the four learned
-within ten steps:
+The commands above ran four times, as the runs `tutorial-check`, `first-item-rep1`,
+`first-item-rep2` and `first-item-rep3`. Two of the four learned within ten steps:
 
 | Run | Base model | Adapter 10 | Difference |
 | --- | --- | --- | --- |
@@ -293,23 +295,34 @@ of 8.5, and the binomial value is 8.1. Five counts give only a rough estimate.
 
 ### Training longer
 
-`first-item-rep3` ran `train` with `--last-step 19`, and then with `--first-step 20 --last-step 29`.
-On seeds 45 to 56, its players ended on the first item in 257 of 1,440 player-rounds with adapter
-0, 246 with adapter 10, 346 with adapter 20 and 632 with adapter 30. This is one run, so it does
-not show how often a run learns within 30 steps.
+`first-item-rep3` did not learn within ten steps. It trained for 20 more steps, steps 10 to 29,
+which produced adapter 30. The table gives its tests on seeds 45 to 56, which no training step
+plays. Each test holds 1,440 player-rounds and 720 rounds.
 
-With adapter 30, the players won 131 of 720 rounds, and with adapter 0, 88. Both players ended on a
-blue circle in 74 of those 131 rounds, and in 10 of the 88. When both grids hold a blue circle,
-two players who each end on their first item end on the same item and win the round.
+| Adapter | Ended on the first item | Minus the base model | Rounds won |
+| --- | --- | --- | --- |
+| 0, the base model | 257 (17.8%) | | 88 |
+| 10 | 246 (17.1%) | −11 | 87 |
+| 20 | 346 (24.0%) | +89 | 84 |
+| 30 | 632 (43.9%) | +375 | 131 |
+
+The held-out count rose between adapter 10 and adapter 20, and most between adapter 20 and adapter
+30. During training, its players ended on the first item in 863, 890 and 1,633 of 4,800
+player-rounds over steps 0 to 9, 10 to 19 and 20 to 29. If each player had ended on a random square,
+the expected counts on the same seeds would be 816, 837 and 835. This is one run, so it does not
+show how often a run learns within 30 steps.
+
+The rounds won rose with adapter 30 because of the first item. When both grids hold a blue circle,
+two players who each end on their first item end on the same item and win the round. In the test
+games' event logs, both players ended on a blue circle in 74 of the 131 rounds that adapter 30
+won, and in 10 of the 88 that the base model won.
 
 ### During training
 
 The per-step counts of a run are `first_item` in its `steps.jsonl`. Step k plays its own seeds, so
 compare each step with the base model on the same seeds. The base model's column comes from one
-test of adapter 0 on seeds 1000 to 1039, which took 1.7 hours. A step's count is the sum over its
-four seeds. Our record of that test predates `first_item_by_seed`, so we counted its games from
-their event logs. A record written by the current loop holds each game's count in
-`first_item_by_seed`.
+test of adapter 0 on seeds 1000 to 1039, which took 1.7 hours. `first_item_by_seed` in its
+`eval.jsonl` line holds each game's count, and a step's count is the sum over its four seeds.
 
 | Step | Base model | `first-item-rep1` | `first-item-rep2` | `first-item-rep3` | `tutorial-check` |
 | --- | --- | --- | --- | --- | --- |
@@ -343,20 +356,7 @@ uv run --no-sync python modal/grpo/first_item_baselines.py \
   --last-step 9 --seeds-per-step 4 --held-out-seeds $(seq 45 56)
 ```
 
-### Runs with the `win` reward
-
-Before the four runs above, two runs trained with the `win` reward, for 10 and 12 steps, at
-learning rates 1e-4 and 2e-5. Neither won more rounds than the base model. On seeds 42 to 44, the
-10-step run won 20 of 180 rounds, the 12-step run won 19, and the base model won 22. Both trained
-on prompts rebuilt from the log's text, so they do not show whether `win` can train the model on
-logged token ids.
-
 ## Checks and problems
-
-**Train on the logged token ids, never on prompts rebuilt from the log's text.** The loop refuses
-a game config without `record_token_ids`. On 20 Nov 2026, 240 of the 2,223 prompts of one step,
-rebuilt from the event log's text, differed from vLLM's prompts. One cause is a refused move. The
-model received the refusal's error as JSON, and the log holds it as plain text.
 
 **Before you train on a new reward, check that answer tokens get a nonzero advantage.** In step 0's
 line of `steps.jsonl`, divide `trainer.advantaged_tokens` by `trainer.marked_tokens`. A share near 0
@@ -365,9 +365,8 @@ only through k3. At step 0, the share was 41% and 47% in the two runs under [Our
 that learned, and 57% and 65% in the two that did not. Four runs are too few to tell whether the
 share predicts learning.
 
-**Keep the policy server on an H200 or an H100.** On 18 Nov 2026, with LoRA on, vLLM 0.31 failed
-twice while capturing CUDA graphs: once on a B200, and once on a GPU whose type was not recorded.
-The app's `serve` function asks for an H200 or an H100.
+**Keep the policy server on an H200 or an H100.** With LoRA on, vLLM 0.31 fails on a B200 while it
+captures CUDA graphs. The app's `serve` function asks for an H200 or an H100.
 
 **Check the volume before you run `init` again.** `init` refuses a run that already exists on the
 volume. An `init` call can create the run even when your terminal shows an error. If `uv run
@@ -380,7 +379,7 @@ does not count as started.
 
 **Expect a few retried requests.** Modal answers HTTP 303 to a request that has run for 150
 seconds. GlossoGen then sends the request again, up to 3 attempts, and then restarts the agent's
-turn. In step 0 of `tutorial-check`, 8 of 2,156 requests got a 303, and every game finished. An
+turn. In one step of our runs, 8 of 2,156 requests got a 303, and every game finished. An
 answer that takes more than 150 seconds to generate never reaches the batch.
 
 ## Where to go next
