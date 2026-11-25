@@ -713,6 +713,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../rl-training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training a model with RL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -722,10 +750,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_13" >
         
           
-          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_13" id="__nav_4_13_label" tabindex="0">
             
   
   
@@ -743,8 +771,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_12">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2031,6 +2059,14 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Qwen3.8-27B can be trained by reinforcement learning on signal_game.</strong>
+  <code>modal/grpo/</code> holds a Modal app with a LoRA trainer and a vLLM server that
+  serves each new adapter. It also holds the loop that runs on your machine.
+  The loop plays signal_game games with <code>record_token_ids</code>, scores each player
+  in each round, and sends the training sequences to the trainer, which takes
+  one GRPO step.
+  <a href="../rl-training/">Training a model with RL</a> gives the commands for a
+  training run and the results of our runs.</li>
 <li><strong>A run can start with agents that carry histories from an earlier run of any
   scenario.</strong> <code>glossogen run</code> takes <code>--history-from-run &lt;run dir&gt;</code>, one
   <code>--history-seat SEAT=SOURCE_AGENT</code> for each agent that takes a history, and
