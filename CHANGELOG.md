@@ -12,6 +12,14 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Qwen3.8-27B can be trained by reinforcement learning on signal_game.**
+  `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
+  serves each new adapter. It also holds the loop that runs on your machine.
+  The loop plays signal_game games with `record_token_ids`, scores each player
+  in each round, and sends the training sequences to the trainer, which takes
+  one GRPO step.
+  [Training a model with RL](docs/rl-training.md) gives the commands for a
+  training run and the results of our runs.
 - **A run can start with agents that carry histories from an earlier run of any
   scenario.** `glossogen run` takes `--history-from-run <run dir>`, one
   `--history-seat SEAT=SOURCE_AGENT` for each agent that takes a history, and

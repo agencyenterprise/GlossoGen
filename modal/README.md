@@ -34,6 +34,7 @@ The simulation runner forces `stream=False` on the OpenAI-compatible endpoint fo
 | `tool_chat_template_llama3.1_json.jinja` | Llama 3.1/3.3 tool-calling chat template (baked into the Llama image only; Qwen uses its bundled `tokenizer_config.json` template). |
 | `smoke_test_llama.py` | Ephemeral end-to-end test against the Llama endpoint. |
 | `smoke_test_qwen.py` | Ephemeral end-to-end test against the Qwen3-32B endpoint. |
+| `grpo/` | Reinforcement learning of Qwen3.8-27B on signal_game: a LoRA trainer, a vLLM server that serves each new adapter, and the loop that plays the games on your machine. See [grpo/README.md](grpo/README.md) and [Training a model with RL](../docs/rl-training.md). |
 
 ## Prerequisites
 
