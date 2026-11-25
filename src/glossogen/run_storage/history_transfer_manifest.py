@@ -7,8 +7,10 @@ of the source each transferred seat carries. Each seat's history, ending in the
 message that opens the new run, is saved beside the manifest as written at launch,
 so a resumed run hands the agent the same history.
 
-``run_derivation/history_transfer.py`` writes it. Resume, the protocol probes and
-the thread export read it from here without importing ``run_derivation/``.
+``run_derivation/history_transfer.py`` writes it. Resume and the protocol probes
+read it through ``run_replay/`` without importing ``run_derivation/``. The fork
+flows check for it to refuse a history-transfer run as a source, and the seat checks
+read it to refuse a transferred seat as a source agent.
 """
 
 from pathlib import Path

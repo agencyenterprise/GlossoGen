@@ -8,13 +8,19 @@ launches a resumed subprocess.
 The boundary is the *end* of round ``after_round``: the fork keeps rounds
 ``1..after_round`` complete, verdict and postmortem included, and plays round
 ``after_round + 1`` onward. When the source finished at ``after_round`` itself
-(no later round exists), the clone is truncated before ``SimulationEnded`` and
-the resumed clock advances into the new round instead of re-opening one.
+(no later round exists), the clone is truncated before the source told its
+agents the game was over, and the resumed clock advances into the new round
+instead of re-opening one.
 
 When ``replaced_agent_id`` is set, that agent restarts fresh while every other
 agent keeps its full reconstructed history. When ``replaced_agent_id`` is
 ``None`` (fork-at-round), every agent keeps its full reconstructed history;
 only the JSONL clone, knob merge, and round-count adjustment happen.
+
+The steps the other derivation flows share also live here: the boundary, the
+source agents, the source and seat checks, the fork config, the clone and the
+launch command. Cross-run replace-agent imports them; the history transfer
+imports the boundary, the source agents and the seat checks.
 """
 
 import logging
@@ -84,10 +90,10 @@ class ReplaceAgentRequest(NamedTuple):
     The exact event that anchors the truncation is resolved internally.
 
     ``rounds_after`` is how many new rounds the fork plays: round_count is set
-    to ``after_round + rounds_after``. When ``None``, it defaults to
+    to ``after_round + rounds_after``. When ``None``, a ``round_count`` in
+    ``knobs`` sets the total, and without one it defaults to
     ``source_round_count - after_round`` (the source rounds past the boundary);
-    forking after the source's final round therefore requires an explicit
-    value.
+    forking after the source's final round therefore needs one of the two.
 
     When ``replaced_agent_id`` is set, that agent restarts with only the
     prior agent's tool-call history (text and thinking stripped, blocked
@@ -130,9 +136,10 @@ class ForkBoundary(NamedTuple):
     ``target_event_id`` is the last event the clone keeps. When the source
     played rounds past the boundary, that is the ``RoundAdvanced`` for the
     entry round and the resumed clock re-opens it. When the boundary round was
-    the source's last, ``advances_into_round`` is ``True``: the clone ends just
-    before ``SimulationEnded`` and the resumed clock must advance into the
-    entry round with a fresh ``RoundAdvanced``.
+    the source's last, ``advances_into_round`` is ``True``: the clone ends at
+    the last event before the source told its agents the game was over, and the
+    resumed clock must advance into the entry round with a fresh
+    ``RoundAdvanced``.
     """
 
     target_event_id: str
@@ -395,9 +402,10 @@ def refuse_seat_with_mixed_history(source_run_dir: Path, agent_id: str) -> None:
 
     When the source run was itself created by replacing or importing that same
     seat, its log holds the replaced-away agent's turns before the source's own
-    boundary, and the seat's real earlier context lives in the source's import
-    sidecar, which a rebuild from the log never reads. A seat of a
-    history-transfer run started with another run's history, which the log
+    boundary, and the seat's real earlier context is set by the source's
+    manifest filters (and, for a cross-run source, the copy of the imported
+    agent's own log it holds), which a rebuild from the log never reads. A seat
+    of a history-transfer run started with another run's history, which the log
     does not hold either. Taking a different seat from such a run is fine: that
     seat's turns in the log are all its own.
     """
