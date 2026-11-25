@@ -4,9 +4,7 @@ The rewards:
 
 - ``win`` scores the round's result, the same for both players.
 - ``first_item`` scores 1 when the player ended the round on a square that holds the
-  alphabetically first item of its own grid, whatever its partner did. A player can score on it
-  without its partner, so a run on it tests whether training changes where players end their
-  rounds.
+  alphabetically first item of its own grid, whatever its partner did.
 
 To train on another scenario, write a module like this one. It reads a run's events and gives
 each agent a score in each round.

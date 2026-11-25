@@ -6,7 +6,8 @@ Two deployments under two names share the Hugging Face cache volume and the two 
 other volume or Dict.
 
 ``Trainer`` keeps the model, its LoRA adapter and its optimizer in GPU memory until 20 minutes
-after its last call. When a step's games take longer, the next call starts a new container.
+after its last call. When a step's games take longer than that, the next call starts a new
+container.
 ``initialize`` saves step 0, an adapter whose B matrices are 0, which leaves the base model's
 outputs unchanged.
 ``train_step(step, sequences)`` takes one GRPO step from adapter ``step - 1`` and saves adapter
@@ -20,7 +21,7 @@ writes the outcome under ``result``. The adapter is then playable as a model of 
 
 Deploy from the repository root:
 
-    GRPO_APP_NAME=<app name> modal deploy modal/grpo/grpo_app.py
+    GRPO_APP_NAME=<app name> uv run --no-sync modal deploy modal/grpo/grpo_app.py
 """
 
 import logging

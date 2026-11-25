@@ -4,7 +4,7 @@ With the code in this folder, you can train Qwen3.8-27B by reinforcement learnin
 signal_game, with GRPO and a LoRA adapter. The trainer, and the vLLM server that serves each
 new adapter, run on Modal. The loop that plays the games runs on your machine.
 [Training a model with RL](../../docs/rl-training.md) gives the commands for a training run and
-the results of one.
+the results of our runs.
 
 | File | What it holds |
 | --- | --- |
