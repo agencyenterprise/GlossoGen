@@ -30,7 +30,10 @@ from glossogen.models.event import (
     SimulationStarted,
 )
 from glossogen.run_storage.knob_filter import KnobFilter, parse_knob_filters
+from glossogen.run_storage.run_discovery import build_summary
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.identity.identity_model import Identity
+from glossogen.server.runs import listing
 from glossogen.server.runs.listing import (
     list_all_labels_for_group,
     list_runs_matching_filters,
@@ -473,3 +476,208 @@ async def test_the_label_union_ignores_a_labels_file_that_is_not_a_list(runs_dir
     labels = await list_all_labels_for_group(request=request)
 
     assert labels == ["baseline_oss", "budget=800"]
+
+
+ENRICHED_FILTERS = [chosen for chosen in FILTERS if chosen.status or chosen.contains_agent_id]
+
+
+@pytest.mark.parametrize("chosen", ENRICHED_FILTERS, ids=lambda f: f.name)
+async def test_the_enriched_filters_select_what_the_summaries_report(
+    runs_dir: Path, chosen: Filters
+) -> None:
+    """The status and agent filters answer a completed run from its summary cache.
+
+    The first listing writes the caches; the agreement test above never gets
+    past it. This lists once to write them, then checks both listings against
+    the unfiltered summaries, selected by the fields a summary reports.
+    """
+    everything = await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=chosen.scenarios,
+        labels=chosen.labels,
+        run_id_contains=chosen.run_id_contains,
+        status=None,
+        contains_agent_id=None,
+        knob_filters=chosen.knob_filters,
+    )
+    assert (runs_dir / "veyru" / "1000000001" / "run_summary_cache.json").exists()
+    expected = [
+        run
+        for run in everything
+        if (chosen.status is None or run.status == chosen.status)
+        and (
+            chosen.contains_agent_id is None
+            or chosen.contains_agent_id in {agent.agent_id for agent in run.agent_models}
+        )
+    ]
+
+    page = await list_runs_page(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=chosen.scenarios,
+        labels=chosen.labels,
+        run_id_contains=chosen.run_id_contains,
+        status=chosen.status,
+        contains_agent_id=chosen.contains_agent_id,
+        knob_filters=chosen.knob_filters,
+        cursor=None,
+        limit=100,
+    )
+    exported = await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=chosen.scenarios,
+        labels=chosen.labels,
+        run_id_contains=chosen.run_id_contains,
+        status=chosen.status,
+        contains_agent_id=chosen.contains_agent_id,
+        knob_filters=chosen.knob_filters,
+    )
+
+    assert page.runs == expected
+    assert exported == expected
+    assert page.total == len(expected)
+
+
+async def test_a_status_filter_builds_summaries_only_for_the_page(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Completed runs are matched from their caches; only the page is enriched.
+
+    The fixture's unfinished run has no cache, so matching builds its summary
+    too. A regression to enriching every candidate builds all of them.
+    """
+    for second in range(4, 10):
+        write_run(
+            runs_dir=runs_dir,
+            scenario_name="veyru",
+            run_dir_name=f"100000000{second}",
+            labels=[],
+            agent_id="field_observer",
+            finished=True,
+            scenario_config={"round_count": 15},
+        )
+    await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=None,
+        contains_agent_id=None,
+        knob_filters=[],
+    )
+    built: list[Path] = []
+
+    async def counting_build_summary(
+        scenario_name: str, timestamp_dir: Path, evaluation_content_hash: str | None
+    ) -> RunSummary | None:
+        built.append(timestamp_dir)
+        return await build_summary(
+            scenario_name=scenario_name,
+            timestamp_dir=timestamp_dir,
+            evaluation_content_hash=evaluation_content_hash,
+        )
+
+    monkeypatch.setattr(listing, "build_summary", counting_build_summary)
+
+    first = await list_runs_page(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=RunStatus.SCENARIO_COMPLETE,
+        contains_agent_id=None,
+        knob_filters=[],
+        cursor=None,
+        limit=3,
+    )
+    second = await list_runs_page(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=RunStatus.SCENARIO_COMPLETE,
+        contains_agent_id=None,
+        knob_filters=[],
+        cursor=first.next_cursor,
+        limit=3,
+    )
+
+    unfinished = runs_dir / "veyru" / "1000000002"
+    expected = [
+        unfinished,
+        *(Path(run.run_dir) for run in first.runs),
+        unfinished,
+        *(Path(run.run_dir) for run in second.runs),
+    ]
+    assert sorted(built) == sorted(expected)
+    assert first.total == second.total == 8
+    assert [run.run_id for run in first.runs] == [
+        "veyru/1000000009",
+        "veyru/1000000008",
+        "veyru/1000000007",
+    ]
+    assert [run.run_id for run in second.runs] == [
+        "veyru/1000000006",
+        "veyru/1000000005",
+        "veyru/1000000004",
+    ]
+
+
+async def test_an_export_status_filter_builds_summaries_only_for_its_matches(
+    runs_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The export listing matches completed runs from their caches before enriching.
+
+    Only the unfinished run, which has no cache, is built to decide; no
+    completed run is killed, so nothing else is.
+    """
+    await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=None,
+        contains_agent_id=None,
+        knob_filters=[],
+    )
+    built: list[Path] = []
+
+    async def counting_build_summary(
+        scenario_name: str, timestamp_dir: Path, evaluation_content_hash: str | None
+    ) -> RunSummary | None:
+        built.append(timestamp_dir)
+        return await build_summary(
+            scenario_name=scenario_name,
+            timestamp_dir=timestamp_dir,
+            evaluation_content_hash=evaluation_content_hash,
+        )
+
+    monkeypatch.setattr(listing, "build_summary", counting_build_summary)
+
+    exported = await list_runs_matching_filters(
+        pool=None,
+        runs_dir=runs_dir,
+        group_id=GROUP_ID,
+        scenarios=[],
+        labels=[],
+        run_id_contains=None,
+        status=RunStatus.KILLED,
+        contains_agent_id=None,
+        knob_filters=[],
+    )
+
+    assert exported == []
+    assert built == [runs_dir / "veyru" / "1000000002"]

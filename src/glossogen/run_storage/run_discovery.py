@@ -752,6 +752,83 @@ def _read_scenario_config_uncached(
     )
 
 
+class CompletedRunFilterFields(NamedTuple):
+    """What a completed run's summary would report for the runs list's enriched filters.
+
+    ``status`` and ``agent_ids`` are what the status and agent filters match on.
+    ``scenario_name`` and ``timestamp`` are the summary's own, which order the
+    filtered list: ``scenario_name`` comes from the log's first event and can
+    differ from the run directory's scenario.
+    """
+
+    status: RunStatus
+    agent_ids: frozenset[str]
+    scenario_name: str
+    timestamp: datetime
+
+
+class _CacheSources(NamedTuple):
+    """The stamps of the files :func:`read_completed_run_filter_fields` reads or gates on."""
+
+    event_log: _FileStamp | None
+    summary_cache: _FileStamp | None
+
+
+class _RememberedFilterFields(NamedTuple):
+    """A completed run's filter fields as read while its files had these stamps."""
+
+    sources: _CacheSources
+    fields: CompletedRunFilterFields | None
+
+
+# Keyed by run directory, cleared whole at the cap, like _SCENARIO_CONFIG_MEMO.
+_FILTER_FIELDS_MEMO: dict[Path, _RememberedFilterFields] = {}
+_FILTER_FIELDS_MEMO_MAX_ENTRIES = 100_000
+
+
+def read_completed_run_filter_fields(
+    scenario_name: str,
+    timestamp_dir: Path,
+) -> CompletedRunFilterFields | None:
+    """A completed run's status, agent ids and sort key, from its summary cache alone.
+
+    The runs list filters by status or agent over every run in the cohort, and
+    building a full summary for each costs a read of its labels, note, report and
+    evaluation manifest that the filter never looks at. These fields are fixed
+    once the run has ended, so the answer is remembered against the stamps of the
+    event log and the summary cache, taken before the read as in
+    :func:`read_scenario_config`.
+
+    Returns None when the run has no event log, or no summary cache this build
+    reads: a run that has not ended, one whose cache predates the current shape,
+    or one whose cache does not parse. The caller builds the full summary for
+    those, as :func:`build_summary` would.
+    """
+    sources = _CacheSources(
+        event_log=_stamp(path=event_log_path(run_dir=timestamp_dir, scenario_name=scenario_name)),
+        summary_cache=_stamp(path=timestamp_dir / _SUMMARY_CACHE_FILENAME),
+    )
+    if sources.event_log is None or sources.summary_cache is None:
+        return None
+    remembered = _FILTER_FIELDS_MEMO.get(timestamp_dir)
+    if remembered is not None and remembered.sources == sources:
+        return remembered.fields
+
+    cache = _read_summary_cache(run_dir=timestamp_dir)
+    fields: CompletedRunFilterFields | None = None
+    if cache is not None:
+        fields = CompletedRunFilterFields(
+            status=cache.status,
+            agent_ids=frozenset(agent.agent_id for agent in cache.agent_models),
+            scenario_name=cache.scenario_name,
+            timestamp=_timestamp_from_dir(dir_name=timestamp_dir.name),
+        )
+    if len(_FILTER_FIELDS_MEMO) >= _FILTER_FIELDS_MEMO_MAX_ENTRIES:
+        _FILTER_FIELDS_MEMO.clear()
+    _FILTER_FIELDS_MEMO[timestamp_dir] = _RememberedFilterFields(sources=sources, fields=fields)
+    return fields
+
+
 def completed_run_duration_seconds(
     run_dir: Path,
     started_at: datetime,
