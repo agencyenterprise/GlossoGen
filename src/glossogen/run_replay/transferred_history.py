@@ -7,9 +7,9 @@ One user message follows it and opens the new run with the new run's system and
 initial prompts. The model keeps the source's system prompt, because pydantic-ai
 adds an agent's system prompt only to an empty history.
 
-The history is built once, at launch, and saved in the run directory. A resumed run,
-the protocol probes and the thread export read it back and put it in front of what
-the agent did in the run itself.
+The history is built once, at launch, and saved in the run directory. A resumed run
+and the protocol probes read it back and put it in front of what the agent did in
+the run itself. The ATIF export and the thread export do not read it.
 """
 
 import asyncio

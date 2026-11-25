@@ -5,9 +5,8 @@ tool calls), from a different completed run (``Sim B``) into a target
 run (``Sim A``) at a chosen round boundary, and resumes the simulation.
 The target run's other agents continue with their full Sim A history.
 
-Used by both the FastAPI endpoint and the
-``glossogen cross-run-replace-agent`` CLI subcommand. Same scenario and
-same ``agent_id`` only.
+Used by the ``glossogen cross-run-replace-agent`` CLI subcommand. Same
+scenario and same ``agent_id`` only.
 """
 
 import logging
@@ -66,9 +65,10 @@ class CrossRunReplaceAgentRequest(NamedTuple):
     values.
 
     ``rounds_after`` is how many new rounds the fork plays: round_count
-    is set to ``after_round + rounds_after``. When ``None``, it defaults
-    to ``source_a_round_count - after_round`` (the target run's rounds
-    past the boundary).
+    is set to ``after_round + rounds_after``. When ``None``, a
+    ``round_count`` in ``knobs`` sets the total, and without one it
+    defaults to ``source_a_round_count - after_round`` (the target run's
+    rounds past the boundary).
     """
 
     source_a_run_dir: Path
