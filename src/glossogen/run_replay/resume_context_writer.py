@@ -3,7 +3,8 @@
 Whenever a run starts via ``--resume`` (plain resume, or the first launch
 of a fork-at-round, replace-agent or cross-run run), the supervisor passes
 a reconstructed ``message_history`` to every agent's pydantic-ai
-``Agent.run()`` call. That history is what the model "remembers" about
+``Agent.run()`` call. The first launch of a history-transfer run writes the
+transferred seats' histories the same way. That history is what the model "remembers" about
 prior rounds: filtered tool calls, the surviving text/thinking parts, the
 injected system and user prompts. The JSONL event log holds the events it
 was rebuilt from, not the history after filtering.

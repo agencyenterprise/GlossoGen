@@ -144,6 +144,24 @@ A `reconstructed` schema describes the code installed at export time, not the
 code the run used. Tool descriptions get edited, and some read knob values, which
 is why the rebuild uses the run's recorded config rather than a preset.
 
+The definitions follow the order of `tool_names` on the agent's
+`agent_registered` event, for each of the three sources in the table above.
+That order depends on the glossogen version that logged the event:
+
+- v0.31.19 or later: the order in which the model received the tools;
+- v0.1.14 to v0.31.18: alphabetical order;
+- before v0.1.14: the base tools, then the tools that the agent's config listed.
+  From 31 Mar 2026, the base tools came in an order that varied from one process
+  to the next. A base tool that the config also listed appears once in the
+  export, at its first position.
+
+When a seat keeps its model across a resume, a fork-at-round or a replace-agent
+run, the export takes the seat's tools from its first `agent_registered` event.
+After a resume, that event can come from an earlier process of the same run.
+After a fork-at-round or a replace-agent run, it can come from the source run.
+The definitions then follow the order of the glossogen version that logged that
+event.
+
 ## Swapped and replaced seats
 
 A seat produces one trajectory per generation. A new generation starts at an

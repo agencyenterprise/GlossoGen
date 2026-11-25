@@ -28,6 +28,12 @@ from glossogen.run_config.config_overrides import (
 from glossogen.run_config.knobs_resolution import resolve_knobs_config
 from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
+from glossogen.run_derivation.history_transfer import (
+    HistoryTransferPlan,
+    HistoryTransferRequest,
+    plan_history_transfer,
+    prepare_history_transfer,
+)
 from glossogen.run_replay.message_rewind import RewindState
 from glossogen.run_replay.recorded_run_spend import recorded_run_spend_usd
 from glossogen.run_replay.resume_context_writer import write_resume_context_files
@@ -36,7 +42,7 @@ from glossogen.run_storage.derived_run_start import derived_run_started_at
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_archive import claim_run_dir
 from glossogen.run_storage.run_file_paths import debug_log_path, event_log_path
-from glossogen.runners.agent_tools import list_tool_definitions
+from glossogen.runners.agent_tools import list_offered_tool_definitions
 from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
 from glossogen.runtime.autonomous_supervisor import AutonomousSupervisor
 from glossogen.runtime.event_bus import EventBus
@@ -105,6 +111,32 @@ def add_run_parser(subparsers: SubcommandParsers, scenario_names: list[str]) -> 
         default=LOCAL_GROUP_SLUG,
         help=f"Tenant group slug that owns the new run (default: {LOCAL_GROUP_SLUG})",
     )
+    run_parser.add_argument(
+        "--history-from-run",
+        type=str,
+        help=(
+            "Run directory (runs-dir/<scenario>/<run>) of an earlier run, possibly of "
+            "another scenario, whose agents' histories seats of this new run start with"
+        ),
+    )
+    run_parser.add_argument(
+        "--history-seat",
+        action="append",
+        default=[],
+        metavar="SEAT=SOURCE_AGENT",
+        help=(
+            "Seat of this run and the --history-from-run agent whose history it starts "
+            "with; repeat for each seat. Seats not named start fresh"
+        ),
+    )
+    run_parser.add_argument(
+        "--history-through-round",
+        type=int,
+        help=(
+            "Last --history-from-run round the histories keep; that run must have "
+            "completed it (default: the last round of a run that ended scenario_complete)"
+        ),
+    )
 
 
 def handle_run(
@@ -120,6 +152,7 @@ def handle_run(
     """
     if args.resume is None and args.runs_dir is None:
         parser.error("--runs-dir is required unless --resume is given")
+    history_transfer = _history_transfer_request(parser=parser, args=args)
     config = _build_run_config(args=args, remaining=remaining, scenario_cls=scenario_cls)
     if args.resume is None:
         resume_dir = None
@@ -154,7 +187,44 @@ def handle_run(
             args=args,
             scenario=scenario,
             agent_overrides=validated.normalized_agent_overrides or {},
+            history_transfer=history_transfer,
         )
+    )
+
+
+def _history_transfer_request(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> HistoryTransferRequest | None:
+    """Read the ``--history-*`` flags, or ``None`` when the run carries no history in.
+
+    The source's scenario is the name of the directory holding the source run,
+    as ``--runs-dir`` lays runs out.
+    """
+    if args.history_from_run is None:
+        if args.history_seat or args.history_through_round is not None:
+            parser.error("--history-seat and --history-through-round need --history-from-run")
+        return None
+    if args.resume is not None:
+        parser.error(
+            "--history-from-run starts a new run; a resumed history-transfer run "
+            "reads its histories from its own directory"
+        )
+    if not args.history_seat:
+        parser.error("--history-from-run needs at least one --history-seat SEAT=SOURCE_AGENT")
+    seat_sources: dict[str, str] = {}
+    for pair in args.history_seat:
+        seat_id, separator, source_agent_id = str(pair).partition("=")
+        if not separator or not seat_id or not source_agent_id:
+            parser.error(f"--history-seat expects SEAT=SOURCE_AGENT, got {pair!r}")
+        if seat_id in seat_sources:
+            parser.error(f"--history-seat names seat {seat_id!r} twice")
+        seat_sources[seat_id] = source_agent_id
+    source_run_dir = Path(args.history_from_run).resolve()
+    return HistoryTransferRequest(
+        source_run_dir=source_run_dir,
+        source_scenario_name=source_run_dir.parent.name,
+        seat_sources=seat_sources,
+        source_round_end=args.history_through_round,
     )
 
 
@@ -270,11 +340,26 @@ async def _run_simulation(
     args: argparse.Namespace,
     scenario: SimulationScenario,
     agent_overrides: dict[str, ResolvedAgentModel],
+    history_transfer: HistoryTransferRequest | None,
 ) -> None:
     """Wire up the autonomous supervisor, start the streaming server, and execute."""
 
     resume_dir: str | None = getattr(args, "resume", None)
     resuming = resume_dir is not None
+
+    history_transfer_plan: HistoryTransferPlan | None = None
+    if history_transfer is not None:
+        # Checked before the run claims a directory, so a bad source leaves none behind.
+        try:
+            history_transfer_plan = await plan_history_transfer(
+                request=history_transfer,
+                seat_ids=[
+                    role.agent_id
+                    for role in scenario.get_agent_roles(knobs=scenario.get_scenario_config())
+                ],
+            )
+        except ValueError as exc:
+            raise SystemExit(f"Invalid --history-from-run: {exc}") from exc
 
     if resume_dir is not None:
         run_dir = Path(resume_dir)
@@ -304,6 +389,19 @@ async def _run_simulation(
         agents=agents,
         agent_overrides=agent_overrides,
     )
+    if history_transfer_plan is not None:
+        transferred_histories = await prepare_history_transfer(
+            plan=history_transfer_plan,
+            run_dir=run_dir,
+            scenario=scenario,
+            agents=agents,
+        )
+        for agent in agents:
+            agent.initial_message_history = transferred_histories.get(agent.agent_id)
+        write_resume_context_files(
+            run_dir=run_dir,
+            agent_message_histories=transferred_histories,
+        )
 
     log_path = event_log_path(run_dir=run_dir, scenario_name=scenario.name())
     event_bus = EventBus(max_queue_size=EVENT_BUS_MAX_QUEUE_SIZE)
@@ -363,7 +461,7 @@ async def _run_simulation(
         idle_round_may_end=minimum_duration_elapsed,
         phase_timed_out=wall_clock_phase_timeout,
         runner_factory=_make_runner,
-        list_tool_definitions=list_tool_definitions,
+        list_offered_tool_definitions=list_offered_tool_definitions,
         resume_state=resume_state,
         run_id=run_id,
         provider=args.provider,

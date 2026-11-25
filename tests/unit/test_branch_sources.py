@@ -12,11 +12,13 @@ from uuid import UUID, uuid4
 import pytest
 
 from glossogen.db.rows import DerivedSourceCountRow
+from glossogen.run_storage import run_discovery
 from glossogen.run_storage.cross_run_replace_manifest import (
     CROSS_RUN_REPLACE_MANIFEST_FILENAME,
     CrossRunReplaceManifest,
 )
 from glossogen.run_storage.replace_manifest import REPLACE_MANIFEST_FILENAME, ReplaceManifest
+from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.server.runs import branch_sources
 from glossogen.server.runs.branch_sources import list_branch_sources
 from tests.fakes.db_pool import CountingPool
@@ -202,6 +204,94 @@ async def test_a_derived_run_is_itself_a_source_when_derived_from(tmp_path: Path
         f"{SCENARIO}/1770000200": 1,
         f"{SCENARIO}/1770000100": 1,
     }
+
+
+async def test_only_the_parents_are_built_into_summaries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Children and unrelated runs are read for their manifests only."""
+    write_run(runs_dir=tmp_path, run_dir_name="1770000100")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000200",
+        source_run_dir_name="1770000100",
+        replaced_agent_id="field_observer",
+    )
+    for unrelated in range(20):
+        write_run(runs_dir=tmp_path, run_dir_name=str(1_770_001_000 + unrelated))
+    built: list[str] = []
+    build_summary = run_discovery.build_summary
+
+    async def counting_build_summary(
+        scenario_name: str, timestamp_dir: Path, evaluation_content_hash: str | None
+    ) -> RunSummary | None:
+        built.append(timestamp_dir.name)
+        return await build_summary(
+            scenario_name=scenario_name,
+            timestamp_dir=timestamp_dir,
+            evaluation_content_hash=evaluation_content_hash,
+        )
+
+    # Patch both references: run_discovery's own, which discover_runs calls, and
+    # the one branch_sources imported.
+    monkeypatch.setattr(run_discovery, "build_summary", counting_build_summary)
+    monkeypatch.setattr(branch_sources, "build_summary", counting_build_summary)
+
+    assert await branches_over_http(runs_dir=tmp_path) == {f"{SCENARIO}/1770000100": 1}
+    assert built == ["1770000100"]
+
+
+async def test_parents_in_the_same_second_list_the_later_directory_first(
+    tmp_path: Path,
+) -> None:
+    """The order the database query gives: epoch, then run directory name, descending."""
+    for parent, child in [("1770000100", "1770000900"), ("1770000100_2", "1770000901")]:
+        write_run(runs_dir=tmp_path, run_dir_name=parent)
+        write_replace_child(
+            runs_dir=tmp_path,
+            run_dir_name=child,
+            source_run_dir_name=parent,
+            replaced_agent_id="field_observer",
+        )
+
+    branches = await branches_over_http(runs_dir=tmp_path)
+
+    assert list(branches) == [f"{SCENARIO}/1770000100_2", f"{SCENARIO}/1770000100"]
+
+
+async def test_a_run_whose_manifest_cannot_be_read_is_not_counted(tmp_path: Path) -> None:
+    write_run(runs_dir=tmp_path, run_dir_name="1770000100")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000200",
+        source_run_dir_name="1770000100",
+        replaced_agent_id="field_observer",
+    )
+    broken = write_run(runs_dir=tmp_path, run_dir_name="1770000300")
+    (broken / REPLACE_MANIFEST_FILENAME).write_text("{not json")
+
+    assert await branches_over_http(runs_dir=tmp_path) == {f"{SCENARIO}/1770000100": 1}
+
+
+async def test_a_parent_whose_own_manifest_cannot_be_read_is_left_out(tmp_path: Path) -> None:
+    """The parent's summary reads its own manifests; a broken one drops that parent only."""
+    write_run(runs_dir=tmp_path, run_dir_name="1770000100")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000200",
+        source_run_dir_name="1770000100",
+        replaced_agent_id="field_observer",
+    )
+    broken_parent = write_run(runs_dir=tmp_path, run_dir_name="1770000300")
+    (broken_parent / REPLACE_MANIFEST_FILENAME).write_text("{not json")
+    write_replace_child(
+        runs_dir=tmp_path,
+        run_dir_name="1770000400",
+        source_run_dir_name="1770000300",
+        replaced_agent_id="field_observer",
+    )
+
+    assert await branches_over_http(runs_dir=tmp_path) == {f"{SCENARIO}/1770000100": 1}
 
 
 # --- with a database ------------------------------------------------------------

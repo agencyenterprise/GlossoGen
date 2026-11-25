@@ -208,11 +208,17 @@ team independently. The types (`TeamSpec`, `RoleSpec`, `TaskChannel`,
 | `debrief` | `Debrief(...)` or `NoDebrief()`. A team with no post-round discussion says so |
 | `roles` | One `RoleSpec` per agent: id, role name, system-prompt template, `tool_names`, and the two booleans below |
 
-No field has a default, so omitting one is a type error rather than a silent
-behaviour. `tool_names` is the list of tools the agent is offered, and it is not
-additive: a role that talks lists `send_message`, and an empty list connects an
-agent that can do nothing. Names are the platform's five plus whatever
-`get_tools()` returns, and `validate` rejects a name no tool answers to.
+No field has a default, so omitting one is a type error. `tool_names` lists the
+scenario tools that the agent is offered: tools that the scenario's `get_tools()`
+returns. The platform also offers each agent
+five base tools: `read_channel`, `send_message`, `list_channels`,
+`get_channel_members` and `read_notifications`. A scenario can hide any of the
+first four from an agent through `hidden_base_tools`, but not
+`read_notifications`. A role may also list a base tool in `tool_names`. That
+entry has no effect: the agent gets each base tool once, and a base tool that
+the scenario hides stays hidden. `tool_names` accepts the names of the five base
+tools and of the tools that `get_tools()` returns. `validate` rejects any other
+name.
 
 The two booleans answer different questions. `joins_debrief` is membership:
 whether this role belongs to the team's debrief channel at all, since a team

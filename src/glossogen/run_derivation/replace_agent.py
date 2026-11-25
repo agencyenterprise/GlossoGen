@@ -8,13 +8,19 @@ launches a resumed subprocess.
 The boundary is the *end* of round ``after_round``: the fork keeps rounds
 ``1..after_round`` complete, verdict and postmortem included, and plays round
 ``after_round + 1`` onward. When the source finished at ``after_round`` itself
-(no later round exists), the clone is truncated before ``SimulationEnded`` and
-the resumed clock advances into the new round instead of re-opening one.
+(no later round exists), the clone is truncated before the source told its
+agents the game was over, and the resumed clock advances into the new round
+instead of re-opening one.
 
 When ``replaced_agent_id`` is set, that agent restarts fresh while every other
 agent keeps its full reconstructed history. When ``replaced_agent_id`` is
 ``None`` (fork-at-round), every agent keeps its full reconstructed history;
 only the JSONL clone, knob merge, and round-count adjustment happen.
+
+The steps the other derivation flows share also live here: the boundary, the
+source agents, the source and seat checks, the fork config, the clone and the
+launch command. Cross-run replace-agent imports them; the history transfer
+imports the boundary, the source agents and the seat checks.
 """
 
 import logging
@@ -57,6 +63,10 @@ from glossogen.run_storage.cross_run_replace_manifest import (
     read_cross_run_replace_manifest,
 )
 from glossogen.run_storage.event_log_reader import load_events
+from glossogen.run_storage.history_transfer_manifest import (
+    HISTORY_TRANSFER_MANIFEST_FILENAME,
+    read_history_transfer_manifest,
+)
 from glossogen.run_storage.replace_manifest import (
     REPLACE_MANIFEST_FILENAME,
     ReplaceManifest,
@@ -67,6 +77,7 @@ from glossogen.run_storage.run_file_paths import event_log_path, stdout_log_path
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.scenario_contract.base_knobs import AgentModelOverride
 from glossogen.scenario_contract.loader import get_scenario_class
+from glossogen.scenario_contract.protocol import SimulationScenario
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +90,10 @@ class ReplaceAgentRequest(NamedTuple):
     The exact event that anchors the truncation is resolved internally.
 
     ``rounds_after`` is how many new rounds the fork plays: round_count is set
-    to ``after_round + rounds_after``. When ``None``, it defaults to
+    to ``after_round + rounds_after``. When ``None``, a ``round_count`` in
+    ``knobs`` sets the total, and without one it defaults to
     ``source_round_count - after_round`` (the source rounds past the boundary);
-    forking after the source's final round therefore requires an explicit
-    value.
+    forking after the source's final round therefore needs one of the two.
 
     When ``replaced_agent_id`` is set, that agent restarts with only the
     prior agent's tool-call history (text and thinking stripped, blocked
@@ -125,9 +136,10 @@ class ForkBoundary(NamedTuple):
     ``target_event_id`` is the last event the clone keeps. When the source
     played rounds past the boundary, that is the ``RoundAdvanced`` for the
     entry round and the resumed clock re-opens it. When the boundary round was
-    the source's last, ``advances_into_round`` is ``True``: the clone ends just
-    before ``SimulationEnded`` and the resumed clock must advance into the
-    entry round with a fresh ``RoundAdvanced``.
+    the source's last, ``advances_into_round`` is ``True``: the clone ends at
+    the last event before the source told its agents the game was over, and the
+    resumed clock must advance into the entry round with a fresh
+    ``RoundAdvanced``.
     """
 
     target_event_id: str
@@ -189,21 +201,21 @@ def resolve_fork_boundary(
     if end_index is None:
         raise ValueError(
             f"source run opened round {after_round} but never finished it "
-            f"(no simulation_ended); fork-at-round requires a completed boundary"
+            f"(no simulation_ended); a cut after round {after_round} needs a completed round"
         )
     last_ended = events[end_index]
     assert isinstance(last_ended, SimulationEnded)
     if last_ended.reason != RunStatus.SCENARIO_COMPLETE:
         raise ValueError(
             f"source run ended with reason {last_ended.reason.value!r}, so round "
-            f"{after_round} may be incomplete; fork after the last round the "
+            f"{after_round} may be incomplete; cut after the last round the "
             f"source completed instead"
         )
     if log_has_round_ended_events and not boundary_round_ended:
         raise ValueError(
             f"source run ended scenario_complete without closing round "
             f"{after_round} (no round_ended for it), so that round was never "
-            f"judged; fork after the last round the source completed instead"
+            f"judged; cut after the last round the source completed instead"
         )
     target = _last_event_before_game_over(events=events, end_index=end_index)
     if target is None:
@@ -213,6 +225,17 @@ def resolve_fork_boundary(
         boundary_timestamp=target.timestamp,
         advances_into_round=True,
     )
+
+
+def opening_simulation_started(events: list[SimulationEvent], run_label: str) -> SimulationStarted:
+    """The ``SimulationStarted`` that opens ``events``, a run's log.
+
+    Raises ``ValueError`` naming ``run_label`` when the log is empty or opens with
+    another event.
+    """
+    if not events or not isinstance(events[0], SimulationStarted):
+        raise ValueError(f"First event in {run_label} JSONL is not SimulationStarted")
+    return events[0]
 
 
 def _last_simulation_ended_index(events: list[SimulationEvent]) -> int | None:
@@ -292,6 +315,12 @@ def refuse_unforkable_source(
             "run; forking it is not supported because the imported agent's "
             "history cannot be rebuilt past its import boundary"
         )
+    if (source_run_dir / HISTORY_TRANSFER_MANIFEST_FILENAME).exists():
+        raise ValueError(
+            f"source run {source_run_dir} is a history-transfer run; forking it "
+            "is not supported because a fork rebuilds each seat from the run's own "
+            "log, which does not hold the history its transferred seats started with"
+        )
     manifest = read_replace_manifest(run_dir=source_run_dir)
     if manifest is None:
         return
@@ -341,60 +370,70 @@ def refuse_boundary_with_swapped_seats(
         )
 
 
-def refuse_source_b_with_swapped_seat(
-    source_b_events: list[SimulationEvent],
-    boundary_timestamp: datetime,
-    imported_agent_id: str,
+def refuse_seat_swapped_before_cutoff(
+    source_events: list[SimulationEvent],
+    cutoff_timestamp: datetime,
+    agent_id: str,
 ) -> None:
-    """Refuse importing a seat that source B itself swapped in-run before the cutoff.
+    """Refuse taking a seat's history from a run that swapped that seat in-run before the cutoff.
 
-    The seat's turns in B's log before the swap belong to its predecessor, so
-    the mounted history would mix two agents' turns with full text. A swap of
-    a different seat leaves the imported seat's log clean, and a swap past the
-    cutoff never enters the mounted history.
+    The seat's turns in the source log before the swap belong to its
+    predecessor, so the mounted history would mix two agents' turns with full
+    text. A swap of a different seat leaves this seat's log clean, and a swap
+    past the cutoff never enters the mounted history.
     """
-    for event in source_b_events:
-        if event.timestamp > boundary_timestamp:
+    for event in source_events:
+        if event.timestamp > cutoff_timestamp:
             break
         if not isinstance(event, AgentSwappedMidRun):
             continue
-        if event.agent_id != imported_agent_id:
+        if event.agent_id != agent_id:
             continue
         raise ValueError(
-            f"source B swapped seat {imported_agent_id!r} in-run at round "
-            f"{event.round_number}, before the import cutoff, so its log "
-            "mixes two agents' turns for that seat; import it from the run "
-            "the agent originally played in"
+            f"the source run swapped seat {agent_id!r} in-run at round "
+            f"{event.round_number}, before the history cutoff, so its log "
+            "mixes two agents' turns for that seat; take its history from the "
+            "run the agent originally played in"
         )
 
 
-def refuse_source_b_with_mixed_seat(
-    source_b_run_dir: Path,
-    imported_agent_id: str,
-) -> None:
-    """Refuse importing a seat whose source-B log mixes two agents' turns.
+def refuse_seat_with_mixed_history(source_run_dir: Path, agent_id: str) -> None:
+    """Refuse taking a seat's history from a source log that does not hold it whole.
 
-    When source B was itself created by replacing or importing that same
-    seat, its log holds the replaced-away agent's turns before B's own
-    boundary, and the imported agent's real earlier context lives in B's own
-    import sidecar, which this flow never reads. Importing a different seat
-    from such a run is fine: that seat's turns in B's log are all its own.
+    When the source run was itself created by replacing or importing that same
+    seat, its log holds the replaced-away agent's turns before the source's own
+    boundary, and the seat's real earlier context is set by the source's
+    manifest filters (and, for a cross-run source, the copy of the imported
+    agent's own log it holds), which a rebuild from the log never reads. A seat
+    of a history-transfer run started with another run's history, which the log
+    does not hold either. Taking a different seat from such a run is fine: that
+    seat's turns in the log are all its own.
     """
-    cross_run_manifest = read_cross_run_replace_manifest(run_dir=source_b_run_dir)
-    replace_manifest = read_replace_manifest(run_dir=source_b_run_dir)
+    transfer_manifest = read_history_transfer_manifest(run_dir=source_run_dir)
+    if transfer_manifest is not None and agent_id in {
+        seat.agent_id for seat in transfer_manifest.seats
+    }:
+        raise ValueError(
+            f"source run {source_run_dir} is a history-transfer run whose seat "
+            f"{agent_id!r} started with the history of {transfer_manifest.source_run_id}, "
+            "which its log does not hold. Take that seat's history from the run it "
+            "was transferred from"
+        )
+    cross_run_manifest = read_cross_run_replace_manifest(run_dir=source_run_dir)
+    replace_manifest = read_replace_manifest(run_dir=source_run_dir)
     replaced_seats: list[tuple[str, str | None]] = []
     if cross_run_manifest is not None:
         replaced_seats.append(("cross-run replace-agent", cross_run_manifest.replaced_agent_id))
     if replace_manifest is not None:
         replaced_seats.append(("replace-agent", replace_manifest.replaced_agent_id))
     for flow_name, source_seat in replaced_seats:
-        if source_seat != imported_agent_id:
+        if source_seat != agent_id:
             continue
         raise ValueError(
-            f"source B run {source_b_run_dir} is a {flow_name} run whose own "
-            f"boundary replaced {imported_agent_id!r}: its log holds the "
-            "replaced-away agent's turns before that boundary, so importing "
-            "that seat would mix two agents' histories. Import it from the "
+            f"source run {source_run_dir} is a {flow_name} run whose own "
+            f"boundary replaced {agent_id!r}: its log holds the "
+            "replaced-away agent's turns before that boundary, so taking "
+            "that seat would mix two agents' histories. Take it from the "
             "run the agent originally played in"
         )
 
@@ -715,6 +754,165 @@ def resolve_knob_round_count(knobs: dict[str, Any] | None) -> int | None:
     return value
 
 
+class ForkRunConfig(NamedTuple):
+    """A fork's validated scenario config, and the rounds it plays past its entry round.
+
+    ``rounds_after_swap`` is the manifest window :func:`resolve_rounds_after` returns.
+    """
+
+    scenario_config: dict[str, Any]
+    rounds_after_swap: int
+
+
+def build_fork_run_config(
+    scenario_cls: type[SimulationScenario],
+    source_scenario_config: dict[str, Any],
+    knobs: dict[str, Any] | None,
+    after_round: int,
+    rounds_after: int | None,
+    source_agents: dict[str, AgentRegistered],
+    replaced_agent_id: str | None,
+    replacement_model: str | None,
+    replacement_provider: str | None,
+    default_model: str,
+    default_provider: str,
+) -> ForkRunConfig:
+    """Merge ``knobs`` over the source's config, pin every seat's model, and validate it.
+
+    Sets ``round_count`` to the entry round plus the fork's window and
+    ``model_overrides`` to :func:`build_model_overrides` of the source agents.
+    Raises when the scenario rejects the config or a model it names has no
+    reachable credentials.
+    """
+    entry_round = after_round + 1
+    merged_scenario_config: dict[str, Any] = dict(source_scenario_config)
+    if knobs is not None:
+        merged_scenario_config.update(knobs)
+    rounds_after_swap = resolve_rounds_after(
+        after_round=after_round,
+        rounds_after=rounds_after,
+        knob_round_count=resolve_knob_round_count(knobs=knobs),
+        source_scenario_config=source_scenario_config,
+    )
+    merged_scenario_config["round_count"] = entry_round + rounds_after_swap
+    # Honour any user-provided model_overrides from the merged knobs; anything
+    # the user didn't specify falls back to the source-active model.
+    model_overrides = build_model_overrides(
+        source_agents=source_agents,
+        replaced_agent_id=replaced_agent_id,
+        replacement_model=replacement_model,
+        replacement_provider=replacement_provider,
+        replacement_settings=read_replacement_settings(
+            knobs=knobs,
+            replaced_agent_id=replaced_agent_id,
+            replacement_model=replacement_model,
+            replacement_provider=replacement_provider,
+        ),
+        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
+    )
+    merged_scenario_config["model_overrides"] = model_overrides_config_value(
+        overrides=model_overrides
+    )
+    validated = validate_run_config(
+        scenario_cls=scenario_cls,
+        scenario_config=merged_scenario_config,
+        default_provider=default_provider,
+        valid_providers=set(SIMULATION_PROVIDERS),
+    )
+    require_reachable_models(
+        scenario_cls=scenario_cls,
+        scenario_config=validated.scenario_config,
+        agent_overrides=validated.normalized_agent_overrides,
+        default_model=default_model,
+        default_provider=default_provider,
+        first_round=entry_round,
+    )
+    return ForkRunConfig(
+        scenario_config=validated.scenario_config, rounds_after_swap=rounds_after_swap
+    )
+
+
+class ClonedRun(NamedTuple):
+    """A new run directory holding a source run cut at a fork boundary."""
+
+    new_run_id: str
+    new_run_dir: Path
+    log_path: Path
+
+
+async def clone_source_at_boundary(
+    source_run_dir: Path,
+    runs_dir: Path,
+    scenario_name: str,
+    truncate_after_offset: int,
+) -> ClonedRun:
+    """Claim a run directory and copy ``source_run_dir`` into it, cut at the boundary.
+
+    The copied log ends at ``truncate_after_offset``, carries the new run's id,
+    and has no ``SimulationEnded``.
+    """
+    new_run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
+    new_log_path = event_log_path(run_dir=new_run_dir, scenario_name=scenario_name)
+    await copy_run_at_event(
+        source_dir=source_run_dir,
+        target_dir=new_run_dir,
+        jsonl_path_within_run=Path(new_log_path.name),
+        truncate_after_offset=truncate_after_offset,
+    )
+    new_run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=new_run_dir.name)
+    rewrite_run_jsonl(
+        log_path=new_log_path,
+        new_run_id=new_run_id,
+        message_edits={},
+        should_drop_event=drop_simulation_ended,
+    )
+    return ClonedRun(new_run_id=new_run_id, new_run_dir=new_run_dir, log_path=new_log_path)
+
+
+def write_fork_run_config(cloned: ClonedRun, scenario_config: dict[str, Any]) -> Path:
+    """Save the fork's config for its resumed launch and record it in the cloned log.
+
+    Returns the path of the saved config, which the launch passes as ``--config``.
+    """
+    config_path = cloned.new_run_dir / "replace_config.json"
+    config_path.write_bytes(orjson.dumps(scenario_config))
+    patch_simulation_started_scenario_config(
+        log_path=cloned.log_path,
+        scenario_config=scenario_config,
+    )
+    return config_path
+
+
+def prepared_fork_run(
+    cloned: ClonedRun,
+    scenario_name: str,
+    model: str,
+    provider: str,
+    config_path: Path,
+) -> PreparedForkRun:
+    """The ``glossogen run --resume`` launch of ``cloned`` under ``config_path``."""
+    return PreparedForkRun(
+        new_run_id=cloned.new_run_id,
+        new_run_dir=cloned.new_run_dir,
+        launch_cmd=(
+            sys.executable,
+            "-m",
+            "glossogen",
+            "run",
+            scenario_name,
+            "--model",
+            model,
+            "--provider",
+            provider,
+            "--resume",
+            str(cloned.new_run_dir),
+            "--config",
+            str(config_path),
+        ),
+        stdout_log_path=stdout_log_path(run_dir=cloned.new_run_dir, scenario_name=scenario_name),
+    )
+
+
 async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedForkRun:
     """Prepare a replace-agent or fork-at-round run on disk, without launching it.
 
@@ -780,87 +978,36 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
             f"found in {source_log_path}"
         )
 
-    source_first_event = source_events[0]
-    if not isinstance(source_first_event, SimulationStarted):
-        raise ValueError("First event in source JSONL is not SimulationStarted")
+    source_first_event = opening_simulation_started(events=source_events, run_label="source")
 
     scenario_cls = get_scenario_class(name=request.scenario_name)
-
-    merged_scenario_config: dict[str, Any] = dict(source_first_event.scenario_config)
-    if request.knobs is not None:
-        merged_scenario_config.update(request.knobs)
-    effective_rounds_after_swap = resolve_rounds_after(
-        after_round=request.after_round,
-        rounds_after=request.rounds_after,
-        knob_round_count=resolve_knob_round_count(knobs=request.knobs),
-        source_scenario_config=source_first_event.scenario_config,
-    )
-    merged_scenario_config["round_count"] = entry_round + effective_rounds_after_swap
-    # Extract any user-provided model_overrides from the merged knobs so they
-    # survive the source-agent pinning that follows. Anything not specified by
-    # the user falls back to the source-active model.
-    model_overrides = build_model_overrides(
-        source_agents=source_agents,
-        replaced_agent_id=request.replaced_agent_id,
-        replacement_model=request.model,
-        replacement_provider=request.provider,
-        replacement_settings=read_replacement_settings(
-            knobs=request.knobs,
-            replaced_agent_id=request.replaced_agent_id,
-            replacement_model=request.model,
-            replacement_provider=request.provider,
-        ),
-        user_overrides=read_user_model_overrides(merged_scenario_config=merged_scenario_config),
-    )
-    merged_scenario_config["model_overrides"] = model_overrides_config_value(
-        overrides=model_overrides
-    )
 
     subprocess_model, subprocess_provider = _pick_subprocess_default_model(
         request=request,
         source_agents=source_agents,
     )
-    validated = validate_run_config(
+    fork_config = build_fork_run_config(
         scenario_cls=scenario_cls,
-        scenario_config=merged_scenario_config,
-        default_provider=subprocess_provider,
-        valid_providers=set(SIMULATION_PROVIDERS),
-    )
-
-    require_reachable_models(
-        scenario_cls=scenario_cls,
-        scenario_config=validated.scenario_config,
-        agent_overrides=validated.normalized_agent_overrides,
+        source_scenario_config=source_first_event.scenario_config,
+        knobs=request.knobs,
+        after_round=request.after_round,
+        rounds_after=request.rounds_after,
+        source_agents=source_agents,
+        replaced_agent_id=request.replaced_agent_id,
+        replacement_model=request.model,
+        replacement_provider=request.provider,
         default_model=subprocess_model,
         default_provider=subprocess_provider,
-        first_round=entry_round,
     )
 
-    new_run_dir = claim_run_dir(
+    cloned = await clone_source_at_boundary(
+        source_run_dir=request.source_run_dir,
         runs_dir=request.runs_dir,
         scenario_name=request.scenario_name,
-    )
-    new_log_path = event_log_path(run_dir=new_run_dir, scenario_name=request.scenario_name)
-    await copy_run_at_event(
-        source_dir=request.source_run_dir,
-        target_dir=new_run_dir,
-        jsonl_path_within_run=Path(new_log_path.name),
         truncate_after_offset=location.end_offset,
     )
 
-    new_run_id = compose_run_id(
-        scenario_name=request.scenario_name,
-        run_dir_name=new_run_dir.name,
-    )
-
-    rewrite_run_jsonl(
-        log_path=new_log_path,
-        new_run_id=new_run_id,
-        message_edits={},
-        should_drop_event=drop_simulation_ended,
-    )
-
-    rewritten_events = await load_events(log_path=new_log_path)
+    rewritten_events = await load_events(log_path=cloned.log_path)
     build_rewind_state_at_event(
         events=rewritten_events,
         target_event_id=boundary.target_event_id,
@@ -868,13 +1015,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         agent_filters={},
     )
 
-    config_path = new_run_dir / "replace_config.json"
-    config_path.write_bytes(orjson.dumps(validated.scenario_config))
-
-    patch_simulation_started_scenario_config(
-        log_path=new_log_path,
-        scenario_config=validated.scenario_config,
-    )
+    config_path = write_fork_run_config(cloned=cloned, scenario_config=fork_config.scenario_config)
 
     source_run_id = compose_run_id(
         scenario_name=request.scenario_name,
@@ -893,7 +1034,7 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         source_run_id=source_run_id,
         source_run_dir=str(request.source_run_dir),
         round_start=entry_round,
-        rounds_after_swap=effective_rounds_after_swap,
+        rounds_after_swap=fork_config.rounds_after_swap,
         target_event_id=boundary.target_event_id,
         replaced_agent_id=request.replaced_agent_id,
         replacement_model=request.model,
@@ -904,30 +1045,15 @@ async def prepare_replace_agent_run(request: ReplaceAgentRequest) -> PreparedFor
         history_floor_round=request.history_floor_round,
         replaced_at=time.time(),
     )
-    manifest_path = new_run_dir / REPLACE_MANIFEST_FILENAME
+    manifest_path = cloned.new_run_dir / REPLACE_MANIFEST_FILENAME
     manifest_path.write_bytes(orjson.dumps(manifest.model_dump()))
 
-    stdout_log = stdout_log_path(run_dir=new_run_dir, scenario_name=request.scenario_name)
-    cmd = (
-        sys.executable,
-        "-m",
-        "glossogen",
-        "run",
-        request.scenario_name,
-        "--model",
-        subprocess_model,
-        "--provider",
-        subprocess_provider,
-        "--resume",
-        str(new_run_dir),
-        "--config",
-        str(config_path),
-    )
-    return PreparedForkRun(
-        new_run_id=new_run_id,
-        new_run_dir=new_run_dir,
-        launch_cmd=cmd,
-        stdout_log_path=stdout_log,
+    return prepared_fork_run(
+        cloned=cloned,
+        scenario_name=request.scenario_name,
+        model=subprocess_model,
+        provider=subprocess_provider,
+        config_path=config_path,
     )
 
 

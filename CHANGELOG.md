@@ -20,6 +20,22 @@ the commit log.
   one GRPO step.
   [Training a model with RL](docs/rl-training.md) gives the commands for a
   training run and the results of our runs.
+- **A run can start with agents that carry histories from an earlier run of any
+  scenario.** `glossogen run` takes `--history-from-run <run dir>`, one
+  `--history-seat SEAT=SOURCE_AGENT` for each agent that takes a history, and
+  `--history-through-round N`. The earlier run must have completed round N.
+  Without `--history-through-round`, N is its last round, and it must have
+  ended with `scenario_complete`. Each named agent starts with the history of
+  `SOURCE_AGENT` in the earlier run up to the end of round N, without its
+  thinking when the agent runs another model. One user message follows that
+  history. It holds the agent's system prompt and initial prompt in the new
+  scenario, and its template is `history_transfer_prompt.jinja`. The run saves
+  each named agent's history and a `history_transfer_manifest.json`.
+  `--resume`, `protocol_probe` and `protocol_explanation` put the saved history
+  back in front of the agent's turns. `replace-agent`, `fork-at-round` and
+  `cross-run-replace-agent` cannot fork such a run.
+- `glossogen.testing.scripted_agent.observe_requests` wraps a scripted model.
+  It passes each request to a function before the model answers it.
 - **A run can record a self-hosted model's token ids in its event log.** With
   the `record_token_ids` knob on, each request of a `self-hosted` agent asks the
   server for `return_token_ids`, and each `llm_response_received` event holds
@@ -75,8 +91,21 @@ the commit log.
   virtual clock, each `act` list costs a fixed number of virtual seconds whatever
   its length, in place of its own tokens. The rest of the response is charged by
   its tokens as before.
+- `spot_the_intersection` knobs `postmortem_mode` and
+  `postmortem_character_limit` set who posts in the discussion phase and how many
+  characters each viewer may send in one phase. `whole_team` lets every viewer
+  post. `single_author` and `rotating_author` let one viewer post. In
+  `chosen_partner` each viewer messages one teammate it picks, on a channel the
+  two share. Every shipped preset sets `whole_team` and `-1`. See its
+  [README](src/glossogen/scenarios/spot_the_intersection/README.md#discussion-phase).
 
 ### Changed
+- `AutonomousSupervisor` takes `list_offered_tool_definitions` in place of
+  `list_tool_definitions`. The argument's type is `ToolDefinitionLister`, in
+  `glossogen.runtime.agent_tool_specs`. A `ToolDefinitionLister` takes
+  `runtime` and `agent_id`, and returns that agent's tool definitions in the
+  order that the runner sends them. The pydantic-ai runner's lister is
+  `glossogen.runners.agent_tools.list_offered_tool_definitions`.
 - **Moved modules: imports in scenario and metric packages change.** The old
   paths are gone, with no aliases left behind. For scenario and metric authors:
 
@@ -413,12 +442,19 @@ the commit log.
 
 ### Fixed
 - The `tool_names` and `tool_definitions` of `agent_registered` list an
-  agent's tools in the order that the model receives them. Until this change,
-  they listed the tools in alphabetical order. A script that rebuilt a prompt
-  from the event log therefore put the tools in a different order from the one
-  that the model received. ATIF trajectories listed the tools in alphabetical
-  order too. Event logs written before this change keep the alphabetical
-  order.
+  agent's tools in the order that the model receives them. From v0.1.14 to
+  v0.31.18, they listed the tools in alphabetical order. A script that rebuilt
+  a prompt from the event log could therefore put the tools in a different
+  order from the one that the model received. The two orders differ for 110 of
+  the 150 agents in the built-in presets, counting an agent once for each
+  preset. The count compares each agent's tools, in the order that the model
+  receives them, with the same tools sorted. ATIF trajectories listed the tools
+  in alphabetical order too. Event logs written by v0.1.14 to v0.31.18 keep the
+  alphabetical order. Event logs written before v0.1.14 keep their own order:
+  the base tools, then the tools that the agent's config listed. An ATIF
+  trajectory takes a seat's tools from the seat's first `agent_registered`
+  event. After a resume, a fork-at-round or a replace-agent run, an older
+  version can have logged that event.
 - `glossogen new-scenario` counts the built-in scenarios package when it checks
   that the new folder is loaded, so `--target-dir src/glossogen/scenarios` in a
   checkout no longer asks for a `[tool.glossogen] scenarios` entry. Its next

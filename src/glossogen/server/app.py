@@ -7,17 +7,22 @@ assembly itself lives in :mod:`glossogen.server.app_factory`.
 `glossogen serve` has loaded the scenario catalog before uvicorn imports this
 module. Run directly by uvicorn, as `make dev` does, this module loads it itself,
 from the sources the working directory and the environment configure.
+
+Importing it also attaches the filter that keeps `?token=` credentials out of
+uvicorn's access log, so every way of starting the server gets it.
 """
 
 from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.scenario_contract.scenario_sources import (
     load_configured_scenario_catalog_unless_loaded,
 )
+from glossogen.server.access_log_redaction import redact_credentials_in_access_log
 from glossogen.server.app_factory import create_app
 from glossogen.server.identity.identity_provider_loader import load_identity_provider
 from glossogen.server.server_runtime_config import load_server_runtime_config
 
 load_env_from_working_directory()
+redact_credentials_in_access_log()
 load_configured_scenario_catalog_unless_loaded()
 app = create_app(
     identity_provider=load_identity_provider(),

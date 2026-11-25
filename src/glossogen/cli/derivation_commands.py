@@ -17,7 +17,6 @@ from glossogen.model_catalog.provider_catalog import SIMULATION_PROVIDERS
 from glossogen.models.event import (
     AgentRegistered,
     ChannelCreated,
-    RoundAdvanced,
     RunStatus,
     SimulationStarted,
 )
@@ -28,6 +27,7 @@ from glossogen.run_derivation.cross_run_replace_agent import (
 from glossogen.run_derivation.cross_run_replace_agent import cross_run_replace_agent_in_run
 from glossogen.run_derivation.replace_agent import ReplaceAgentRequest as ReplaceAgentCoreRequest
 from glossogen.run_derivation.replace_agent import replace_agent_in_run
+from glossogen.run_replay.message_rewind import last_advanced_round
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.scenario_contract.loader import get_scenario_class
@@ -623,11 +623,7 @@ async def _resolve_source_b_max_round(source_b_run_dir: Path, scenario_name: str
     Raises ``SystemExit`` if source B has no ``RoundAdvanced`` events.
     """
     log_path = event_log_path(run_dir=source_b_run_dir, scenario_name=scenario_name)
-    events = await load_events(log_path=log_path)
-    max_round = 0
-    for event in events:
-        if isinstance(event, RoundAdvanced) and event.round_number > max_round:
-            max_round = event.round_number
+    max_round = last_advanced_round(events=await load_events(log_path=log_path))
     if max_round == 0:
         raise SystemExit(
             f"cross-run-replace-agent: source B run {source_b_run_dir} has no RoundAdvanced events"

@@ -37,6 +37,7 @@ from glossogen.run_replay.message_history_builder import (
     build_message_history,
     resolve_history_timestamp,
 )
+from glossogen.run_replay.transferred_history import with_transferred_history
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.scenario_contract.measurement import Measurement
 from glossogen.scenario_contract.metric_protocol import Metric
@@ -160,6 +161,12 @@ class ProtocolProbeMetric(Metric):
                         history_floor_round=None,
                         filter_below_round=None,
                         split_parallel_tool_calls=agent_config.provider == Provider.SELF_HOSTED,
+                    )
+                    history = await with_transferred_history(
+                        run_dir=run_dir,
+                        events=events,
+                        agent_id=agent_config.agent_id,
+                        own_history=history,
                     )
                     if not history:
                         logger.warning(

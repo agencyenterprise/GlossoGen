@@ -1,9 +1,10 @@
 """The tools the runtime offers an agent, independent of the agent framework.
 
-A runner binds these specs to its framework's tool type; the supervisor records
-the definitions a runner derives from them on ``AgentRegistered``, in the order
-that the runner sends them. Each executor takes ``agent_id`` first and refuses a call
-by raising ``ValueError``.
+A runner binds these specs to its framework's tool type. The runner's package
+also supplies a ``ToolDefinitionLister``, which lists the definitions that the
+runner sends each agent. The supervisor records that list on ``AgentRegistered``.
+Each executor takes ``agent_id`` first and refuses a call by raising
+``ValueError``.
 """
 
 from collections.abc import Awaitable, Callable
@@ -16,7 +17,6 @@ from glossogen.models.communication_tool_names import (
     READ_CHANNEL_TOOL_NAME,
     SEND_MESSAGE_TOOL_NAME,
 )
-from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
 from glossogen.models.tool_definition import RecordedToolDefinition
 from glossogen.runtime.communication_tools import (
     GET_CHANNEL_MEMBERS_DESCRIPTION,
@@ -82,10 +82,11 @@ def tool_specs(runtime: SimulationRuntime) -> list[ToolSpec]:
 
 
 def offered_tool_specs(runtime: SimulationRuntime, agent_id: str) -> list[ToolSpec]:
-    """The specs ``agent_id`` is offered, in listing order, without ``read_notifications``.
+    """The specs that ``agent_id`` is offered, in the order of ``tool_specs``.
 
-    A base tool the scenario hides from the agent is left out, and a scenario
-    tool is kept only when the agent's ``tool_names`` list it.
+    ``read_notifications`` is not among them, because the runner builds it. A base
+    tool that the scenario hides from the agent is left out. A scenario tool is
+    kept only when the agent's ``tool_names`` lists it.
     """
     offered: list[ToolSpec] = []
     for spec in tool_specs(runtime=runtime):
@@ -98,23 +99,18 @@ def offered_tool_specs(runtime: SimulationRuntime, agent_id: str) -> list[ToolSp
     return offered
 
 
-def offered_tool_names(runtime: SimulationRuntime, agent_id: str) -> list[str]:
-    """The names of the tools ``agent_id`` is offered, in the order that the model receives them.
-
-    The runner sends the offered specs in listing order and ``read_notifications`` last.
-    """
-    names = [spec.name for spec in offered_tool_specs(runtime=runtime, agent_id=agent_id)]
-    return [*names, READ_NOTIFICATIONS_TOOL_NAME]
-
-
 class ToolDefinitionLister(Protocol):
-    """Lists the tools an agent can be offered, with the schema its framework sends the model.
+    """Lists the tools that an agent is offered, in the order that its runner sends them.
 
-    The entry point supplies one, so the supervisor records on ``AgentRegistered``
-    what the runner it built will send.
+    Each definition holds the schema that the runner's framework sends the model.
+    The entry point passes the supervisor a runner factory and the matching
+    lister. The supervisor records the lister's list on ``AgentRegistered``, so
+    the event shows what the runner sends.
     """
 
-    def __call__(self, runtime: SimulationRuntime) -> list[RecordedToolDefinition]: ...
+    def __call__(
+        self, runtime: SimulationRuntime, agent_id: str
+    ) -> list[RecordedToolDefinition]: ...
 
 
 def select_tool_definitions(

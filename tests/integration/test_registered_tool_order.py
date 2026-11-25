@@ -1,22 +1,16 @@
 """The run records each agent's tools in the order its model receives them."""
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 from pydantic_ai.messages import ModelMessage
-from pydantic_ai.models.function import (
-    AgentInfo,
-    BuiltinToolCallsReturns,
-    DeltaThinkingCalls,
-    DeltaToolCalls,
-    FunctionModel,
-)
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from glossogen.models.communication_tool_names import LIST_CHANNELS_TOOL_NAME
 from glossogen.models.event import AgentRegistered
 from glossogen.testing import simulation_harness
-from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn
+from glossogen.testing.scripted_agent import SayTurn, ScriptedTurn, observe_requests
 from glossogen.testing.simulation_harness import never_times_out, run_simulation
 from glossogen.testing.smoke_scenario import (
     FIRST_AGENT_ID,
@@ -45,16 +39,12 @@ class ToolOrderRecorder:
         seen: list[str] = []
         self.first_request_tools.append(seen)
 
-        async def stream(
-            messages: list[ModelMessage], info: AgentInfo
-        ) -> AsyncIterator[str | DeltaToolCalls | DeltaThinkingCalls | BuiltinToolCallsReturns]:
+        def record(messages: list[ModelMessage], info: AgentInfo) -> None:
+            _ = messages
             if not seen:
                 seen.extend(tool.name for tool in info.function_tools)
-            assert scripted.stream_function is not None
-            async for chunk in scripted.stream_function(messages, info):
-                yield chunk
 
-        return FunctionModel(stream_function=stream)
+        return observe_requests(model=scripted, observer=record)
 
 
 async def test_each_registration_lists_the_tools_in_the_order_the_model_receives_them(

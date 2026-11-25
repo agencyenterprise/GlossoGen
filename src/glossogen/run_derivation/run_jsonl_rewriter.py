@@ -1,11 +1,9 @@
-"""Shared JSONL rewrite helper for derived runs (fork, replace-agent).
+"""Rewriting the cloned JSONL of a fork.
 
-Both the fork and replace-agent flows copy a source run directory and
-truncate its JSONL at a target event, then rewrite it to (a) update the
-embedded ``run_id``, (b) optionally apply text edits to ``message_sent``
-events, and (c) drop a subset of events so derived agents start from a
-clean state. The drop predicate is the only thing that varies between the
-two flows.
+The fork flows (replace-agent, cross-run replace-agent, fork-at-round) copy a
+source run directory with its JSONL truncated at the boundary, then rewrite the
+copy to carry the new ``run_id``, drop the source's ``simulation_ended`` markers,
+and record the fork's validated config in its ``simulation_started``.
 """
 
 import logging
@@ -21,8 +19,7 @@ def drop_simulation_ended(event_dict: dict[str, Any]) -> bool:
     """Drop ``simulation_ended`` events from a fork's cloned log.
 
     A source that was killed or crashed and later resumed carries a mid-log
-    end marker; a fork past the source's final round is truncated just before
-    the last one. Either way an end marker inside a clone describes the
+    end marker, which a clone cut after it keeps. That marker describes the
     source, not the fork, and a stale line would trip every orchestration
     that gates evaluation on ``simulation_ended`` while the fork still runs.
     """
@@ -78,11 +75,10 @@ def patch_simulation_started_scenario_config(
 ) -> None:
     """Overwrite the first ``simulation_started`` event's ``scenario_config``.
 
-    Derived runs (fork, replace-agent) clone a source repo at an old commit
-    where the JSONL may predate later schema additions or backfills. After
-    validation produces an authoritative merged config, this helper writes
-    it into the cloned JSONL so downstream readers (evaluate, UI) see a
-    config that matches the new run's actual configuration.
+    A fork's cloned JSONL opens with the source's ``simulation_started``, which
+    records the source's config. This writes the fork's validated config over
+    it (merged knobs, the fork's ``round_count`` and pinned ``model_overrides``),
+    so readers of the log (evaluate, the UI) see the config the fork runs under.
     """
     patched = False
 

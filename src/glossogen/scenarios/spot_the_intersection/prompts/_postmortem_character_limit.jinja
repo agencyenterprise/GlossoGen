@@ -1,0 +1,1 @@
+{% if postmortem_character_limit > 0 and not (postmortem_mode == "single_author" and seat_index != 0) %} You may send at most {{ postmortem_character_limit }} characters in each discussion phase{% if postmortem_mode == "rotating_author" %} you post in{% endif %}. A message that would take you over that limit is not sent.{% endif %}

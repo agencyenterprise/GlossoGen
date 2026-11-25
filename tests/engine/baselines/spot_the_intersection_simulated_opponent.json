@@ -64,7 +64,9 @@
      0.85
     ],
     "messaging": "broadcast",
-    "team_characters": "total"
+    "team_characters": "total",
+    "postmortem_mode": "whole_team",
+    "postmortem_character_limit": -1
    },
    "provider": "anthropic"
   },
