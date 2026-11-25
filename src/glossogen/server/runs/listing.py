@@ -30,9 +30,11 @@ from glossogen.db.queries import list_runs_for_group as db_list_runs_for_group
 from glossogen.models.event import RunStatus
 from glossogen.run_storage.knob_filter import KnobFilter, matches_knob_filters
 from glossogen.run_storage.run_discovery import (
+    CompletedRunFilterFields,
     RunDescriptor,
     build_summary,
     discover_run_descriptors,
+    read_completed_run_filter_fields,
     read_scenario_config,
 )
 from glossogen.run_storage.run_identity import compose_run_id
@@ -154,11 +156,11 @@ async def enumerate_run_descriptors(
     ]
 
 
-async def _build_summaries(
+async def _build_summaries_in_order(
     runs_dir: Path,
     descriptors: list[RunDescriptor],
-) -> list[RunSummary]:
-    """Enrich descriptors into summaries concurrently, dropping invalid runs."""
+) -> list[RunSummary | None]:
+    """Enrich descriptors into summaries concurrently, one entry per descriptor, None for an invalid run."""
     tasks = [
         asyncio.create_task(
             build_summary(
@@ -169,7 +171,15 @@ async def _build_summaries(
         )
         for descriptor in descriptors
     ]
-    results = await asyncio.gather(*tasks)
+    return await asyncio.gather(*tasks)
+
+
+async def _build_summaries(
+    runs_dir: Path,
+    descriptors: list[RunDescriptor],
+) -> list[RunSummary]:
+    """Enrich descriptors into summaries concurrently, dropping invalid runs."""
+    results = await _build_summaries_in_order(runs_dir=runs_dir, descriptors=descriptors)
     return [summary for summary in results if summary is not None]
 
 
@@ -288,25 +298,115 @@ def _indexable_scenario(scenarios: list[str]) -> str | None:
     return None
 
 
-def _apply_enriched_filters(
-    summaries: list[RunSummary],
+def _matches_enriched_filters(
+    run_status: RunStatus,
+    agent_ids: frozenset[str],
     status: RunStatus | None,
     contains_agent_id: str | None,
-) -> list[RunSummary]:
-    """Apply the filters that need a built summary rather than a descriptor.
+) -> bool:
+    """Whether a run with this status and these agents passes the status and agent filters."""
+    if contains_agent_id is not None and contains_agent_id not in agent_ids:
+        return False
+    return status is None or run_status == status
 
-    Knob conditions are not among them: they read the recorded config, which
-    :func:`_apply_descriptor_filters` reads without building a summary.
+
+def _summary_agent_ids(summary: RunSummary) -> frozenset[str]:
+    """The ids of the agents a summary lists."""
+    return frozenset(agent.agent_id for agent in summary.agent_models)
+
+
+class _EnrichedFilterMatch(NamedTuple):
+    """A run that passed the status and agent filters, with its summary's sort key.
+
+    ``summary`` is set when deciding the match took building the run's summary,
+    so the page does not build it twice.
     """
-    if contains_agent_id is not None:
-        summaries = [
-            summary
-            for summary in summaries
-            if any(agent.agent_id == contains_agent_id for agent in summary.agent_models)
-        ]
-    if status is not None:
-        summaries = [summary for summary in summaries if summary.status == status]
-    return summaries
+
+    key: _KeysetKey
+    descriptor: RunDescriptor
+    summary: RunSummary | None
+
+
+def _read_completed_filter_fields_sync(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+) -> list[CompletedRunFilterFields | None]:
+    """Read each descriptor's completed-run filter fields (blocking), one entry per descriptor."""
+    return [
+        read_completed_run_filter_fields(
+            scenario_name=descriptor.scenario_name,
+            timestamp_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
+        )
+        for descriptor in descriptors
+    ]
+
+
+async def _match_enriched_filters(
+    descriptors: list[RunDescriptor],
+    runs_dir: Path,
+    status: RunStatus | None,
+    contains_agent_id: str | None,
+) -> list[_EnrichedFilterMatch]:
+    """Select the runs passing the status and agent filters, building summaries only where needed.
+
+    A completed run answers from its summary cache, the same fields its summary
+    would carry, so the cohort is filtered without reading each run's labels,
+    note, report and evaluation manifest. A run without a readable cache (one
+    that has not ended, or whose cache is stale or broken) has its full summary
+    built, as before, and is dropped when that summary is None.
+    """
+    fields = await asyncio.to_thread(_read_completed_filter_fields_sync, descriptors, runs_dir)
+    matches: list[_EnrichedFilterMatch] = []
+    unread: list[RunDescriptor] = []
+    for descriptor, run_fields in zip(descriptors, fields, strict=True):
+        if run_fields is None:
+            unread.append(descriptor)
+            continue
+        if _matches_enriched_filters(
+            run_status=run_fields.status,
+            agent_ids=run_fields.agent_ids,
+            status=status,
+            contains_agent_id=contains_agent_id,
+        ):
+            matches.append(
+                _EnrichedFilterMatch(
+                    key=_KeysetKey(
+                        timestamp=run_fields.timestamp,
+                        run_dir_name=descriptor.run_dir_name,
+                        scenario_name=run_fields.scenario_name,
+                    ),
+                    descriptor=descriptor,
+                    summary=None,
+                )
+            )
+    built = await _build_summaries_in_order(runs_dir=runs_dir, descriptors=unread)
+    for descriptor, summary in zip(unread, built, strict=True):
+        if summary is None:
+            continue
+        if _matches_enriched_filters(
+            run_status=summary.status,
+            agent_ids=_summary_agent_ids(summary=summary),
+            status=status,
+            contains_agent_id=contains_agent_id,
+        ):
+            matches.append(
+                _EnrichedFilterMatch(
+                    key=_summary_key(summary=summary), descriptor=descriptor, summary=summary
+                )
+            )
+    return matches
+
+
+async def _summary_for_match(runs_dir: Path, match: _EnrichedFilterMatch) -> RunSummary | None:
+    """The match's summary, built now unless deciding the match already built it."""
+    if match.summary is not None:
+        return match.summary
+    descriptor = match.descriptor
+    return await build_summary(
+        scenario_name=descriptor.scenario_name,
+        timestamp_dir=runs_dir / descriptor.scenario_name / descriptor.run_dir_name,
+        evaluation_content_hash=descriptor.evaluation_content_hash,
+    )
 
 
 async def list_runs_page(
@@ -335,9 +435,10 @@ async def list_runs_page(
     whose ``scenario/run_dir_name`` id contains the substring (case-insensitive).
     ``knob_filters`` are AND-matched against each run's recorded
     ``scenario_config``, read without enrichment, so they stay on the cheap
-    branch. ``status`` and ``contains_agent_id`` depend on enriched fields, so
-    when either is set every descriptor-matching candidate is enriched and
-    filtered before the page is sliced.
+    branch. ``status`` and ``contains_agent_id`` depend on enriched fields: when
+    either is set, completed runs are matched from their summary cache and the
+    rest are enriched, then the matches are ordered by their summaries' keys and
+    only the page is enriched.
     """
     descriptors = await enumerate_run_descriptors(
         pool=pool,
@@ -372,25 +473,25 @@ async def list_runs_page(
         await heal_label_mirror(pool=pool, group_id=group_id, descriptors=window, summaries=page)
         return PaginatedRuns(runs=page, total=total, next_cursor=next_cursor)
 
-    summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
-    summaries = _apply_enriched_filters(
-        summaries=summaries,
+    matches = await _match_enriched_filters(
+        descriptors=descriptors,
+        runs_dir=runs_dir,
         status=status,
         contains_agent_id=contains_agent_id,
     )
-    summaries = sorted(summaries, key=_summary_key, reverse=True)
-    total = len(summaries)
+    matches = sorted(matches, key=lambda match: match.key, reverse=True)
+    total = len(matches)
     if after_key is not None:
-        summaries = [s for s in summaries if _summary_key(s) < after_key]
-    window_summaries = summaries[:limit]
-    has_more = len(summaries) > limit
-    next_cursor = (
-        _encode_cursor(_summary_key(window_summaries[-1]))
-        if has_more and window_summaries
-        else None
+        matches = [match for match in matches if match.key < after_key]
+    window = matches[:limit]
+    has_more = len(matches) > limit
+    next_cursor = _encode_cursor(window[-1].key) if has_more and window else None
+    built = await asyncio.gather(
+        *(_summary_for_match(runs_dir=runs_dir, match=match) for match in window)
     )
-    # Heal only the returned window, though every candidate was enriched: the
-    # descriptor dict covers them all, and the window is the bounded part.
+    window_summaries = [summary for summary in built if summary is not None]
+    # Heal only the returned window: the descriptor list covers every candidate,
+    # and the window is the bounded part.
     await heal_label_mirror(
         pool=pool, group_id=group_id, descriptors=descriptors, summaries=window_summaries
     )
@@ -412,9 +513,9 @@ async def list_runs_matching_filters(
 
     The filters mean what they mean in :func:`list_runs_page`, because both call
     :func:`_apply_descriptor_filters` for the cheap ones and
-    :func:`_apply_enriched_filters` for the rest. What differs is that every
-    match is enriched rather than only a page of them, since an export needs the
-    full summary of each run it covers.
+    :func:`_match_enriched_filters` for status and agent. What differs is that
+    every match is enriched rather than only a page of them, since an export
+    needs the full summary of each run it covers.
     """
     descriptors = await enumerate_run_descriptors(
         pool=pool,
@@ -430,17 +531,24 @@ async def list_runs_matching_filters(
         run_id_contains=run_id_contains,
         knob_filters=knob_filters,
     )
-    summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
-    # Every match just read its labels.json for enrichment, so repair the
+    if status is None and contains_agent_id is None:
+        summaries = await _build_summaries(runs_dir=runs_dir, descriptors=descriptors)
+    else:
+        matches = await _match_enriched_filters(
+            descriptors=descriptors,
+            runs_dir=runs_dir,
+            status=status,
+            contains_agent_id=contains_agent_id,
+        )
+        built = await asyncio.gather(
+            *(_summary_for_match(runs_dir=runs_dir, match=match) for match in matches)
+        )
+        summaries = [summary for summary in built if summary is not None]
+    # Every returned run just read its labels.json for enrichment, so repair the
     # mirror across all of them, not only a page. Steady-state this plans
     # nothing; it cannot rescue a run a stale mirror already filtered out.
     await heal_label_mirror(
         pool=pool, group_id=group_id, descriptors=descriptors, summaries=summaries
-    )
-    summaries = _apply_enriched_filters(
-        summaries=summaries,
-        status=status,
-        contains_agent_id=contains_agent_id,
     )
     return sorted(summaries, key=_summary_key, reverse=True)
 
