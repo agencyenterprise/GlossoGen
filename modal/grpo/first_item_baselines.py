@@ -11,7 +11,7 @@ the repository root:
 
     VIRTUAL_ENV= uv run --no-sync python modal/grpo/first_item_baselines.py \\
       --game-config modal/grpo/signal_game_shapes.json --games-per-seed 6 \\
-      --last-step 9 --seeds-per-step 4 --held-out-seeds 42 43 44
+      --last-step 9 --seeds-per-step 4 --held-out-seeds $(seq 45 56)
 """
 
 import argparse

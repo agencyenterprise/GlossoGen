@@ -20,7 +20,7 @@ VIRTUAL_ENV= uv run --no-sync python modal/grpo/grpo_loop.py train --app $GRPO_A
 VIRTUAL_ENV= uv run --no-sync python modal/grpo/grpo_loop.py eval --app $GRPO_APP_NAME \
   --run first-item --runs-dir runs --records-dir ~/grpo-records \
   --game-config modal/grpo/signal_game_shapes.json --concurrency 12 \
-  --step 10 --games-per-seed 6 --seeds 42 43 44
+  --step 10 --games-per-seed 6 --seeds $(seq 45 56)
 VIRTUAL_ENV= uv run --no-sync modal app stop $GRPO_APP_NAME --yes
 ```
 
@@ -28,11 +28,13 @@ Run them from the repository root. For the base model's score on the same seeds,
 with `--step 0`. `grpo_loop.py` is the loop that plays the games and sends each batch to the
 trainer, and it runs on your machine. Keep the machine awake while `train` runs.
 
-| Run | Time per training step | Ten steps |
+| Runs under [What to expect](#what-to-expect) | Time per training step | Ten steps |
 | --- | --- | --- |
-| The run under [What to expect](#what-to-expect), 20 Nov 2026 | 15 to 24 minutes | 3.2 hours |
-| Another ten-step run on `first_item`, 19 Nov 2026 | 33 to 59 minutes | 7.3 hours |
-| Step 0 under [What a step prints](#what-a-step-prints), 23 Nov 2026 | 40.5 minutes | |
+| `tutorial-check`, with none of the other three runs' apps running | 15.9 to 40.5 minutes | 3.7 hours |
+| `first-item-rep1` to `first-item-rep3`, while the other two of these runs and one evaluation app ran | 13.3 to 39.0 minutes | 3.6 to 4.4 hours |
+
+The first step includes the policy server's start. Steps 10 to 29 of `first-item-rep3` took 20.7
+to 48.4 minutes each. An evaluation of 72 games took 30 to 50 minutes.
 
 ## What you need
 
@@ -99,13 +101,13 @@ that ends without `simulation_ended` is left out of the batch.
 Each game's event log lands in `--runs-dir`, under `signal_game/`. A training game's labels are
 `grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `seed=<seed>` and `game=<n>`. An evaluation
 game's labels are the same without `reward=`, and with `grpo_eval` in place of `grpo`. Ten steps
-and one evaluation at the sizes above make 258 run directories. The loop's own records are in
+and one evaluation at the sizes above make 312 run directories. The loop's own records are in
 `<records dir>/<run>/`:
 
 | Path | What it holds |
 | --- | --- |
 | `steps.jsonl` | one line per training step |
-| `eval.jsonl` | one line per evaluation: the rounds won, and the first-item finishes out of the player-rounds |
+| `eval.jsonl` | one line per evaluation: the rounds won and the player-rounds that ended on the first item, for each game grouped by seed, and in total |
 | `configs/` | each seed's game config |
 | `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log` |
 
@@ -174,80 +176,184 @@ batch.
 
 ## What to expect
 
-The table comes from one ten-step run on 20 Nov 2026. That run used an earlier version of
-`grpo_loop.py`, with another command line. A proxy, a program between the games and vLLM,
-recorded the token ids of each request. The run used the same seeds, flag values and trainer
-settings as the commands above, and the same game config without `record_token_ids`. The
-held-out seeds, 42 to 44, are seeds that no training step plays.
+The commands above ran four times from 23 to 25 Nov 2026, as the runs `tutorial-check`,
+`first-item-rep1`, `first-item-rep2` and `first-item-rep3`. `first-item-rep3` ran them with
+`--last-step 19` and then continued training to step 29. The learning rate does not depend on the
+last step, so its steps 0 to 9 used the same settings as a ten-step run.
 
-| Games | Ended on the first item | Random square | Start square |
-| --- | --- | --- | --- |
-| Step 0, seeds 1000 to 1003, the base model | 83 of 480 | 83 | 84 |
-| Steps 8 and 9, seeds 1032 to 1039 | 210 of 960 | 161 | 192 |
-| Held-out seeds 42 to 44, adapter 10 | 96 of 360 | 67 | 96 |
-| Held-out seeds 42 to 44, the base model | 65 of 360 | 67 | 96 |
+A run's count is the number of player-rounds that ended on the first item. A run learned when its
+count over steps 5 to 9 was more than 54 above the base model's count. 54 is twice the standard
+deviation of the difference between two such counts (see
+[How much the counts vary by chance](#how-much-the-counts-vary-by-chance)). Two of the four runs
+learned within ten steps. Adapter 10 is the adapter after step 9.
 
-### The baselines
+| Run | Steps 5 to 9, of 2,400 player-rounds | Adapter 10 on seeds 45 to 56, of 1,440 |
+| --- | --- | --- |
+| `first-item-rep1` | 536 | 322 |
+| `first-item-rep2` | 523 | 309 |
+| `first-item-rep3` | 422 | 246 |
+| `tutorial-check` | 419 | 221 |
+| The base model | 445 | 234, 256, 266 and 257 |
 
-The two baseline columns count the player-rounds that would end on the first item. The
-random-square count is the expected count when each player ends on a random square of its grid.
-A grid can hold its first item on more than one square, because each square's item is drawn on
-its own. The start-square count is the count when each player stays on its start square. Both
-counts depend on the seeds' boards, so they differ from step to step.
-[first_item_baselines.py](../modal/grpo/first_item_baselines.py) prints them for each step:
+A run's count for each step is `first_item` in its `steps.jsonl`. Steps 5 to 9 play seeds 1020 to
+1039. The base model's 445 is its count on those seeds, in one evaluation of `tutorial-check`'s
+adapter 0 (see [During training](#during-training)). No training step plays seeds 45 to 56, and each
+count on them comes from one evaluation of 72 games. The base model's counts there are adapter 0 of
+`tutorial-check` (234), `first-item-rep1` (256), `first-item-rep2` (266) and `first-item-rep3`
+(257).
+
+Runs of the same commands differ because no random seed is fixed for them. The policy samples
+every answer at temperature 1.0. The trainer draws the adapter's A matrices at random and sets its
+B matrices to 0. So adapter 0 leaves the base model's outputs unchanged, but the later adapters
+depend on the A matrices.
+
+### How much the counts vary by chance
+
+Two evaluations of the same model on the same seeds give different counts. The binomial standard
+deviation treats each player-round as an independent draw. For a count near 445 of 2,400, it is
+about 19, and the difference of two such counts has a standard deviation of about 27. For a count
+near 250 of 1,440, these are about 14 and 20. The player-rounds of one game share its grids and its
+history, so the binomial value can understate the spread.
+
+The base model has played seeds 1000 to 1003 five times: at step 0 of each of the four runs, and in
+the evaluation of adapter 0. Those five counts, each out of 480 player-rounds, have a standard
+deviation of 8.5, and the binomial value is 8.1. On these seeds the two values are close, though
+five counts give only a rough estimate. Twice the standard deviation of a difference is about 54 for
+steps 5 to 9 and about 40 on seeds 45 to 56.
+
+| Run | Steps 5 to 9, minus the base model | Adapter 10 minus its own adapter 0, on seeds 45 to 56 |
+| --- | --- | --- |
+| `first-item-rep1` | +91 | +66 |
+| `first-item-rep2` | +78 | +43 |
+| `first-item-rep3` | −23 | −11 |
+| `tutorial-check` | −26 | −13 |
+
+### Training longer
+
+`first-item-rep3` ran `train` with `--last-step 19`, and then with `--first-step 20 --last-step 29`,
+which resumes from adapter 20 on the volume. Over steps 10 to 19, its players ended on the first
+item in 69 to 122 of 480 player-rounds per step. Over steps 20 to 29, they did so in 126 to 210.
+
+On the grids of steps 10 to 29, players who ended on random squares would end on the first item in
+76 to 95 per step, and players who stayed on their start squares in 42 to 126 (see [Random-square
+and start-square baselines](#random-square-and-start-square-baselines)). Steps 10 to 29 took 9.5
+hours.
+
+On seeds 45 to 56, the players of adapter 20 ended on the first item in 346 of 1,440 player-rounds,
+and those of adapter 30 in 632. With the run's adapter 0, they did so in 257. This is one run, so it
+does not show how often a run learns within 30 steps.
+
+### Rounds won after training longer
+
+With adapter 30, the players won 131 of 720 rounds, and with adapter 0, 88. Both players ended on
+a blue circle in 74 of those 131 rounds, and in 10 of the 88 rounds won with adapter 0.
+
+A round is won when both players end on the same item. The blue circle is the first item of any grid
+that holds one. So when both grids hold a blue circle, two players who each end on their first item
+end on the same item.
+
+### What `first_item` rewards
+
+Each item is a colour and a shape, such as `blue star`. The game config uses the colours red, blue
+and green, and the shapes circle, triangle and star. A grid's alphabetically first item is
+therefore a blue item whenever the grid holds one. Each square's item is drawn independently from
+the 9 items, with repeats allowed, so a grid of 9 squares holds no blue item with probability
+(2/3)^9, about 3%.
+
+A player scores 1 when it ends a round on a square that holds its grid's first item, such as
+`blue circle`. A blue item of another shape on the same grid does not score.
+
+### During training
+
+Step k plays seeds 1000 + 4k to 1003 + 4k, so the grids change from step to step. Compare each
+step with the base model on the same seeds. The base model's column below comes from one
+evaluation of adapter 0 on the training seeds:
+
+```bash
+VIRTUAL_ENV= uv run --no-sync python modal/grpo/grpo_loop.py eval --app $GRPO_APP_NAME \
+  --run first-item --runs-dir runs --records-dir ~/grpo-records \
+  --game-config modal/grpo/signal_game_shapes.json --concurrency 12 \
+  --step 0 --games-per-seed 6 --seeds $(seq 1000 1039)
+```
+
+`first_item_by_seed` in `eval.jsonl` holds each game's count. A step's count is the sum over its
+four seeds. The 240 games took 1.7 hours.
+
+| Step | Base model | `first-item-rep1` | `first-item-rep2` | `first-item-rep3` | `tutorial-check` |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 68 | 76 | 74 | 85 | 89 |
+| 1 | 79 | 74 | 88 | 80 | 72 |
+| 2 | 85 | 77 | 76 | 87 | 71 |
+| 3 | 77 | 89 | 93 | 89 | 87 |
+| 4 | 97 | 111 | 101 | 100 | 89 |
+| 5 | 77 | 72 | 94 | 67 | 65 |
+| 6 | 89 | 115 | 94 | 74 | 83 |
+| 7 | 98 | 120 | 117 | 111 | 106 |
+| 8 | 94 | 128 | 120 | 90 | 91 |
+| 9 | 87 | 101 | 98 | 80 | 74 |
+
+Each count is out of 480 player-rounds. Every run plays adapter 0 at step 0, so the five counts of
+step 0 all come from the base model. They range from 68 to 89.
+
+A player-round without a move is one in which the player made no move, so it ended the round on
+its start square. The two runs that did not learn within ten steps had more of them. Over steps 5
+to 9, `tutorial-check` and `first-item-rep3` averaged 136 and 116 per step. `first-item-rep1` and
+`first-item-rep2` averaged 102 and 105. With two runs in each group, this does not show that these
+player-rounds predict learning. `steps.jsonl` holds the count as `player_rounds_without_move`.
+
+### Random-square and start-square baselines
+
+[first_item_baselines.py](../modal/grpo/first_item_baselines.py) prints two counts of
+player-rounds that end on the first item, one line per step. The first is the expected count if
+each player ended on a random square. The second is the count if each player stayed on its start
+square. Summed over steps 5 to 9, its lines give 396 and 432. On seeds 45 to 56, the counts are
+241 and 216.
 
 ```bash
 VIRTUAL_ENV= uv run --no-sync python modal/grpo/first_item_baselines.py \
   --game-config modal/grpo/signal_game_shapes.json --games-per-seed 6 \
-  --last-step 9 --seeds-per-step 4 --held-out-seeds 42 43 44
+  --last-step 9 --seeds-per-step 4 --held-out-seeds $(seq 45 56)
 ```
 
-### During training
+### Runs with the `win` reward
 
-At step 0, the base model ended on the first item in 83 of 480 player-rounds, and the
-start-square baseline was 84. At steps 8 and 9, the policy ended on it in 210 of 960, and the
-start-square baseline was 192. Across steps 0 to 9, the start-square baseline ranges from 42 to
-108 of 480, so compare each step with its own baselines.
+Before the four runs above, two runs trained with the `win` reward, for 10 and 12 steps. Neither won
+more rounds than the base model. On seeds 42 to 44, which no training step plays, the 10-step run
+won 20 of 180 rounds, the 12-step run won 19, and the base model won 22. On those seeds, players who
+stay on their start squares would win 24 of 180, and players who end on random squares would win 20.
 
-Six runs have played step 0 on seeds 1000 to 1003 with the base model. They ended on the first
-item in 79, 83, 84, 85, 89 and 93 of 480 player-rounds, so two runs of the same model on the same
-seeds can differ by 14. In the training steps of the table's run, the player-rounds without a
-move went from 120 of 480 at step 0 to 89 of 480 at step 9. The moves per player-round stayed
-between 1.6 and 1.9.
-
-### On the held-out seeds
-
-Adapter 10 ended on the first item in 96 of 360 player-rounds, and the base model in 65. The
-start-square baseline is 96. The evaluation does not count moves. Each count comes from one
-evaluation of 18 games. The base model's count comes from the evaluation of adapter 0 in a `win`
-run on 18 Nov 2026.
-
-On the same seeds, other adapters ended on the first item in these numbers of player-rounds:
-
-| Adapter | Ended on the first item |
-| --- | --- |
-| Trained on `first_item` for 10 steps, on prompts rebuilt from the log's text | 104 of 360 |
-| Trained on `win` for 10 steps | 85 of 360 |
-| Trained on `win` for 12 steps | 91 of 360 |
+The 10-step run used learning rate 1e-4, and the 12-step run 2e-5. Both trained on prompts rebuilt
+from the log's text, so they do not show whether `win` can train the model on logged token ids.
 
 ## Before a long run
 
+**Before you start another run, compare yours with the base model.** If your run's count over
+steps 5 to 9 is not more than 54 above 445, continue training it with
+`--first-step 10 --last-step 29`, as in [Resuming after a stop](#resuming-after-a-stop). Two of the
+four runs under [What to expect](#what-to-expect) did not learn in ten steps. One of them continued
+training to step 29. On seeds 45 to 56, its players ended on the first item in 632 of 1,440
+player-rounds with adapter 30, and in 257 with adapter 0 (see [Training longer](#training-longer)).
+
+That run ran steps 10 to 29 in two commands, and one command runs the same steps. Its steps 10 to 29
+took 9.5 hours. A new ten-step run took 3.6 to 4.4 hours, and 2 of 4 runs learned within ten steps.
+
 **Train on the logged token ids, never on prompts rebuilt from the log's text.** The loop refuses
 a game config without `record_token_ids`. On 20 Nov 2026, the 2,223 prompts of one step were
-rebuilt from the event log's text, with the tools in the order that the model receives them.
-240 of the 2,223 rebuilt prompts differed from vLLM's prompts. 10 of the 48 players had a move
-refused. The model received each refusal's error as JSON, and the log holds it as plain text.
+rebuilt from the event log's text, with the tools in the order that the model receives them. Even
+so, 240 of the 2,223 rebuilt prompts differed from vLLM's prompts. One cause is a refused move: 10
+of the 48 players had one. The model received each refusal's error as JSON, and the log holds it as
+plain text, so each later prompt of those players differed.
 
-**Before you train on a new reward, check how many answer tokens get a nonzero advantage.** An
-answer token with advantage 0 changes the adapter only through the k3 term. Step 0's line in
-`steps.jsonl` holds `trainer.advantaged_tokens` and `trainer.marked_tokens`. At step 0 on these
-seeds, 45% and 51% of the answer tokens had a nonzero advantage under `win`, in two runs. Under
-`first_item`, 58% to 65% had one, in four runs.
+**Before you train on a new reward, check that answer tokens get a nonzero advantage.** An answer
+token with advantage 0 changes the adapter only through the k3 term. The share of answer tokens with
+a nonzero advantage is `trainer.advantaged_tokens` divided by `trainer.marked_tokens`, in step 0's
+line in `steps.jsonl`. A share near 0 means that the reward gives nearly every player of a seed the
+same score.
 
-The two `win` runs won 20 of 180 held-out rounds after 10 steps and 19 after 12 steps, and the
-base model won 22. On those seeds, players who stay on their start squares would win 24 of 180,
-and players who end on random squares would win 20. Both runs trained on prompts rebuilt from the
-log's text, and the 12-step run used learning rate 2e-5.
+At step 0 on seeds 1000 to 1003, 45% and 51% of the answer tokens had a nonzero advantage in the two
+`win` runs. Under `first_item`, 41% to 65% had one, in seven runs: the four under [What to
+expect](#what-to-expect) and three earlier runs. Within that range, the share did not tell which
+runs would learn: `first-item-rep2` had 41% and learned, and `tutorial-check` had 65% and did not.
 
 **Keep the policy server on an H200 or an H100.** On 18 Nov 2026, with LoRA on, vLLM 0.31 failed
 twice while capturing CUDA graphs: once on a B200, and once on a GPU whose type was not recorded.

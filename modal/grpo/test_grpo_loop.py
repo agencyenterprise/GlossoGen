@@ -11,7 +11,7 @@ import ast
 import json
 from pathlib import Path
 
-from grpo_loop import FinishedGame, Game, seed_advantages
+from grpo_loop import FinishedGame, Game, counts_by_seed, first_item_count, seed_advantages
 from signal_game_rewards import PlayerRound, Reward, game_outcome, player_score
 from token_sequences import answer_rounds, game_sequences
 
@@ -199,6 +199,20 @@ def test_an_advantage_is_the_score_minus_the_mean_of_the_seed() -> None:
         ("signal_game/2", "player_a"): -0.5,
         ("signal_game/1", "player_b"): 0.0,
         ("signal_game/2", "player_b"): 0.0,
+    }
+
+
+def test_counts_by_seed_lists_each_game_in_game_order() -> None:
+    on_first_item = finished_game(run_id="signal_game/1", final_square_a=(1, 1))
+    elsewhere = finished_game(run_id="signal_game/2", final_square_a=(2, 2))
+    finished = [
+        on_first_item._replace(game=Game(seed=1001, game=1, run_id="signal_game/1", returncode=0)),
+        elsewhere._replace(game=Game(seed=1000, game=2, run_id="signal_game/2", returncode=0)),
+        on_first_item._replace(game=Game(seed=1000, game=1, run_id="signal_game/3", returncode=0)),
+    ]
+    assert counts_by_seed(finished=finished, count=first_item_count) == {
+        "1000": [1, 0],
+        "1001": [1],
     }
 
 

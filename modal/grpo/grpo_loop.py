@@ -29,6 +29,7 @@ import re
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -130,10 +131,15 @@ class StepRecord(NamedTuple):
 
 
 class EvalRecord(NamedTuple):
-    """What one adapter scored on held-out seeds."""
+    """What one adapter scored on the evaluated seeds.
+
+    ``won_by_seed`` and ``first_item_by_seed`` hold each finished game's rounds won and
+    first-item finishes, in game order, grouped by seed.
+    """
 
     step: int
     won_by_seed: dict[str, list[int]]
+    first_item_by_seed: dict[str, list[int]]
     won: int
     rounds: int
     first_item: int
@@ -377,12 +383,24 @@ def trainer(*, app_name: str, run_name: str) -> Any:
     return modal.Cls.from_name(app_name, "Trainer")(run_name=run_name)
 
 
-def won_by_seed(*, finished: list[FinishedGame]) -> dict[str, list[int]]:
-    """The rounds won in each finished game, grouped by seed."""
+def counts_by_seed(
+    *, finished: list[FinishedGame], count: Callable[[GameOutcome], int]
+) -> dict[str, list[int]]:
+    """``count`` of each finished game's outcome, in game order, grouped by seed."""
     grouped: dict[str, list[int]] = defaultdict(list)
     for game in sorted(finished, key=lambda game: (game.game.seed, game.game.game)):
-        grouped[str(game.game.seed)].append(len(game.outcome.won_rounds))
+        grouped[str(game.game.seed)].append(count(game.outcome))
     return dict(grouped)
+
+
+def rounds_won(outcome: GameOutcome) -> int:
+    """The number of rounds that the game's players won."""
+    return len(outcome.won_rounds)
+
+
+def first_item_count(outcome: GameOutcome) -> int:
+    """The number of the game's player-rounds that ended on the player's first item."""
+    return len(outcome.first_item_finishes)
 
 
 async def run_step(
@@ -417,10 +435,10 @@ async def run_step(
         games=len(games),
         finished=len(finished),
         rounds=rounds,
-        won=sum(len(game.outcome.won_rounds) for game in finished),
-        first_item=sum(len(game.outcome.first_item_finishes) for game in finished),
+        won=sum(rounds_won(game.outcome) for game in finished),
+        first_item=sum(first_item_count(game.outcome) for game in finished),
         player_rounds=player_rounds,
-        won_by_seed=won_by_seed(finished=finished),
+        won_by_seed=counts_by_seed(finished=finished, count=rounds_won),
         moves_per_player_round=sum(game.outcome.moves for game in finished) / max(1, player_rounds),
         player_rounds_without_move=sum(
             game.outcome.player_rounds_without_move for game in finished
@@ -509,10 +527,11 @@ async def evaluate(
     rounds = sum(len(game.outcome.rounds) for game in finished)
     record = EvalRecord(
         step=step,
-        won_by_seed=won_by_seed(finished=finished),
-        won=sum(len(game.outcome.won_rounds) for game in finished),
+        won_by_seed=counts_by_seed(finished=finished, count=rounds_won),
+        first_item_by_seed=counts_by_seed(finished=finished, count=first_item_count),
+        won=sum(rounds_won(game.outcome) for game in finished),
         rounds=rounds,
-        first_item=sum(len(game.outcome.first_item_finishes) for game in finished),
+        first_item=sum(first_item_count(game.outcome) for game in finished),
         player_rounds=sum(
             len(game.outcome.rounds) * len(game.outcome.players) for game in finished
         ),
