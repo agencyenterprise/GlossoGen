@@ -12,6 +12,27 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Qwen3.8-27B trains on signal_game with platoon 0.6.0.** `modal/platoon/`
+  is a uv project of its own, because platoon's tinker-cookbook needs a
+  transformers release that needs huggingface-hub below 2, and GlossoGen
+  needs huggingface-hub 2.4 or later. Its harness plays one GlossoGen game per
+  platoon episode, with one platoon agent per seat. Its credit estimator,
+  `glossogen-round-baseline`, gives each round's answers the seat's score in
+  that round minus the seat's mean in that round over the seed's games, and
+  subtracts a KL penalty to the frozen base model. A run stops when a group's
+  mean KL estimate passes 0.3. The training config lets games run up to 3
+  policy versions ahead of training, with platoon's CISPO loss, gradient
+  clipping at norm 1 and an evaluation on held-out seeds every 5 steps. Two
+  more configs give player_b a frozen partner, or an adapter of its own.
+  `external_seats` sends a seat to a model outside platoon. See
+  [Training a model with RL](docs/rl-training.md).
+- **A Tinker-API service trains LoRA adapters for platoon on Modal.**
+  `modal/platoon/tinker_service` implements the routes of the Tinker API that
+  platoon's training calls. It trains one PEFT LoRA adapter per policy and
+  samples with vLLM, which loads each new adapter at runtime.
+  `modal/platoon/platoon_app.py` runs it on two H200 GPUs. Its CPU tests drive
+  it with the Tinker SDK and with `platoon train` on real GlossoGen games; it
+  has not run on a GPU.
 - **Claude Code can analyze a group of runs with the `analyze-runs` skill.**
   `glossogen install-skill` copies the skill into a project's `.claude/skills/`,
   and this repository links it there. The skill has Claude check the runs
@@ -888,6 +909,9 @@ the commit log.
   See [docs/analysis.md](docs/analysis.md).
 
 ### Removed
+- `modal/grpo/`, the GRPO loop, its Modal trainer and its tests. The
+  signal_game rewards, the game config and the first-item baselines are in
+  `modal/platoon/`.
 - The simulation MCP server, its transports, the per-agent `tools/list` filter
   and `AgentRunner.start`'s `mcp_server_url` / `mcp_server_object` arguments.
   The run browser's MCP server at `/mcp` is unchanged.

@@ -1,0 +1,18 @@
+# player_a trains; player_b plays the frozen base model through the same Tinker-API service.
+# For a partner outside platoon, keep signal_game.yaml and set environments.0.harness_options.external_seats instead.
+extends: signal_game.yaml
+
+policies:
+  partner:
+    model_name: Qwen/Qwen3.8-27B
+    renderer_name: chat_template
+    renderer_kwargs: {tool_call_parser: auto, enable_thinking: false, preserve_thinking: false}
+    sample_timeout_seconds: 900
+    trainable: false
+
+agents:
+  roles:
+    player_b: {policy: partner}
+
+stats:
+  trial_name: first-item-frozen-partner

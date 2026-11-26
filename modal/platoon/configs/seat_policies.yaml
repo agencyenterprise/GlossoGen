@@ -1,0 +1,16 @@
+# Each seat trains its own LoRA adapter: player_a the policy main, player_b the policy seat_b (experimental in platoon).
+extends: signal_game.yaml
+
+policies:
+  seat_b:
+    model_name: Qwen/Qwen3.8-27B
+    renderer_name: chat_template
+    renderer_kwargs: {tool_call_parser: auto, enable_thinking: false, preserve_thinking: false}
+    sample_timeout_seconds: 900
+
+agents:
+  roles:
+    player_b: {policy: seat_b}
+
+stats:
+  trial_name: first-item-seat-policies

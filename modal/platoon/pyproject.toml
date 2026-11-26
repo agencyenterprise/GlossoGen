@@ -1,0 +1,33 @@
+[project]
+name = "glossogen-platoon"
+version = "0.1.0"
+description = "Reinforcement learning on GlossoGen's signal_game with platoon, and a Tinker-API service for self-hosted training."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    # platoon pins tinker 0.16.1 and tinker-cookbook below 0.4, whose transformers needs huggingface-hub below 2.
+    # GlossoGen needs huggingface-hub 2.4 or later, so this project has an environment of its own.
+    "platoon[tinker]==0.6.0",
+    "aiohttp>=3.13",
+    "peft>=0.18",
+    "pydantic>=2.12",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.3",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+# Installed editable into this project's environment, so that `platoon` finds the packages a config names.
+# glossogen_side runs in GlossoGen's environment instead, from this folder.
+[tool.hatch.build.targets.wheel]
+packages = ["glossogen_platoon", "tinker_service"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
