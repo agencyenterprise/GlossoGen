@@ -145,12 +145,15 @@ class LLMResponseReceived(EventBase):
     provider identifiers, which is what a reconstructed history sends back.
     It defaults to empty so logs recorded before parts were logged still parse.
 
-    The four token id fields are set when the run's ``record_token_ids`` knob is
-    on and the agent's model is self-hosted, and are left out of the JSON
-    otherwise. ``token_ids`` are the ids of the tokens that the model wrote, as
-    the server returned them. ``token_ids_index`` counts the agent's recorded
-    responses from 0, and starts again at 0 when the agent's runner starts again,
-    after a resume or a swap. The request's prompt is the first
+    The four token id fields and ``token_logprobs`` are set when the run's
+    ``record_token_ids`` knob is on and the agent's model is self-hosted, and are
+    left out of the JSON otherwise. ``token_ids`` are the ids of the tokens that
+    the model wrote, as the server returned them, and ``token_logprobs`` holds the
+    log-probability that the server gave each of them, one per id. An event can
+    hold ``token_ids`` without ``token_logprobs``.
+    ``token_ids_index`` counts the agent's recorded responses from 0, and starts
+    again at 0 when the agent's runner starts again, after a resume or a swap.
+    The request's prompt is the first
     ``prompt_prefix_tokens`` ids of the agent's previous recorded prompt and
     answer, followed by ``prompt_tail_ids``; at index 0 the prefix is empty.
     ``glossogen.run_storage.recorded_token_ids`` rebuilds the full prompts.
@@ -168,6 +171,7 @@ class LLMResponseReceived(EventBase):
     prompt_prefix_tokens: int | None = Field(default=None, exclude_if=_is_unset)
     prompt_tail_ids: list[int] | None = Field(default=None, exclude_if=_is_unset)
     token_ids: list[int] | None = Field(default=None, exclude_if=_is_unset)
+    token_logprobs: list[float] | None = Field(default=None, exclude_if=_is_unset)
 
 
 class ToolCallInvoked(EventBase):

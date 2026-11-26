@@ -47,7 +47,12 @@ from glossogen.llm.pydantic_ai_model_factory import (
     build_pydantic_ai_model,
 )
 from glossogen.llm.run_usage_projection import simulation_token_usage
-from glossogen.llm.self_hosted_chat_model import PROMPT_TOKEN_IDS_DETAIL, TOKEN_IDS_DETAIL
+from glossogen.llm.self_hosted_chat_model import (
+    PROMPT_TOKEN_IDS_DETAIL,
+    TOKEN_IDS_DETAIL,
+    TOKEN_LOGPROBS_DETAIL,
+    TokenLogprobsMismatch,
+)
 from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_config import AgentConfig
 from glossogen.models.event import (
@@ -204,10 +209,12 @@ class _ThinkingAccumulator:
 
 
 class _ResponseTokenIds(NamedTuple):
-    """The token ids of one response's prompt and answer, as the server returned them."""
+    """The token ids of one response's prompt and answer, and the logprob of each answer token,
+    as the server returned them."""
 
     prompt_ids: list[int]
     token_ids: list[int]
+    token_logprobs: list[float]
 
 
 class _StreamingState:
@@ -216,7 +223,7 @@ class _StreamingState:
     Tracks accumulated reasoning parts and pending tool calls. Whether the
     agent should stop is ``RunTermination``'s, set by ``read_notifications``.
     ``token_id_log`` lives as long as the agent's runner, across cycles, and
-    ``response_token_ids`` holds the ids of the response not logged yet.
+    ``response_token_ids`` holds the token ids and logprobs of the response not logged yet.
     """
 
     def __init__(self, token_id_log: TokenIdLog) -> None:
@@ -262,14 +269,20 @@ class _StreamingState:
         )
 
     def note_token_ids(self, details: dict[str, Any] | None) -> None:
-        """Keep the token ids that a self-hosted model's response carries, if it carries them."""
+        """Keep the token ids and logprobs that a self-hosted model's response carries, if it
+        carries token ids. Token ids without logprobs raise ``TokenLogprobsMismatch``."""
         if details is None:
             return
         prompt_ids = details.get(PROMPT_TOKEN_IDS_DETAIL)
         token_ids = details.get(TOKEN_IDS_DETAIL)
         if prompt_ids is None or token_ids is None:
             return
-        self.response_token_ids = _ResponseTokenIds(prompt_ids=prompt_ids, token_ids=token_ids)
+        token_logprobs = details.get(TOKEN_LOGPROBS_DETAIL)
+        if token_logprobs is None:
+            raise TokenLogprobsMismatch("A response carries token ids and no logprobs")
+        self.response_token_ids = _ResponseTokenIds(
+            prompt_ids=prompt_ids, token_ids=token_ids, token_logprobs=token_logprobs
+        )
 
     def discard_since_attempt_start(self) -> None:
         """Drop what the current attempt accumulated and has not logged."""
@@ -1086,6 +1099,7 @@ class PydanticAIRunner(AgentRunner):
             logged = state.token_id_log.record(
                 prompt_ids=response_token_ids.prompt_ids,
                 token_ids=response_token_ids.token_ids,
+                token_logprobs=response_token_ids.token_logprobs,
             )
             event = event.model_copy(
                 update={
@@ -1093,6 +1107,7 @@ class PydanticAIRunner(AgentRunner):
                     "prompt_prefix_tokens": logged.prompt_prefix_tokens,
                     "prompt_tail_ids": logged.prompt_tail_ids,
                     "token_ids": logged.token_ids,
+                    "token_logprobs": logged.token_logprobs,
                 }
             )
         state.spawn_log_task(event_logger.log(event))

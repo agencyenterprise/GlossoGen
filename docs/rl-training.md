@@ -170,7 +170,8 @@ In step k:
 2. The loop plays 6 games on each of the step's 4 seeds, seeds 1000 + 4k to 1003 + 4k. The model
    plays both seats of every game at temperature 1.0, so the 6 games of a seed differ. Every game
    runs with `record_token_ids=true`, so its event log holds the token ids of every prompt and
-   answer.
+   answer, and the logprob of each answer token. The loop trains on the ids and does not use the
+   logprobs.
 3. The reward gives each player a score of 0 or 1 in each round. A player's advantage in a round
    is its score minus the mean score of its seat in that round, over the seed's finished games.
 4. The loop builds each player's prompts and answers from the logged token ids. It marks every

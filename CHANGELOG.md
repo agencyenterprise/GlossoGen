@@ -12,6 +12,16 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **`record_token_ids` also records the logprob of each answer token.** Each
+  request of a self-hosted agent asks the server for `logprobs` as well as
+  `return_token_ids`, and each `llm_response_received` event holds
+  `token_logprobs`, one value per id in `token_ids`. A response that carries
+  token ids without one logprob per answer token raises `TokenLogprobsMismatch`,
+  which fails the agent's run cycle; the runner logs `agent_run_cycle_failed`
+  and starts the cycle again. `glossogen.run_storage.recorded_token_ids`
+  returns the logprobs as `RecordedTokenIds.token_logprobs`, a new field, which
+  is None for an event that holds token ids without logprobs. See
+  [Running simulations](docs/running-simulations.md).
 - **Qwen3.8-27B can be trained by reinforcement learning on signal_game.**
   `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
   serves each new adapter. It also holds the loop that runs on your machine.

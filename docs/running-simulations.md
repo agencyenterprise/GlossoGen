@@ -210,22 +210,42 @@ each request on to the server. The proxy can store each request under its run
 and agent. For example, a proxy in front of vLLM can add `return_token_ids` to a
 request, and vLLM then returns the token ids of the prompt and of the answer.
 
-`record_token_ids=true` records those token ids in the run's own event log, with
-no proxy. Each request of a self-hosted agent then asks the server for
-`return_token_ids`, and each `llm_response_received` event holds the ids that the
-server returned. The knob has no effect on agents under other providers, and the
-server has to support the option, as vLLM does.
+`record_token_ids=true` records those token ids and the logprob of each answer
+token in the run's own event log, with no proxy. Each request of a self-hosted agent
+then asks the server for `return_token_ids` and `logprobs`, and each
+`llm_response_received` event holds the ids and logprobs that the server returned.
+A response that carries token ids without one logprob per answer token fails the
+agent's run cycle: the runner logs `agent_run_cycle_failed` and starts the cycle
+again. The knob has no effect on agents under other providers, and the server has
+to support both options, as vLLM does.
 
 ```bash
 glossogen run signal_game --provider self-hosted ... record_token_ids=true
 ```
 
-An event stores the answer's ids in `token_ids`. It stores the prompt as the length
+An event stores the answer's ids in `token_ids`, and their logprobs, in the same
+order, in `token_logprobs`. It stores the prompt as the length
 of the prefix that it shares with the agent's previous recorded prompt and answer,
 `prompt_prefix_tokens`, and the rest of its ids, `prompt_tail_ids`. So a prompt that
 repeats the previous request adds only its new tokens to the log.
-`glossogen.run_storage.recorded_token_ids` rebuilds the full prompts of one agent.
-Without the knob, the events hold none of these fields.
+`glossogen.run_storage.recorded_token_ids` rebuilds the full prompts of one agent,
+with each answer's ids and logprobs. Without the knob, the events hold none of these
+fields.
+
+**Which logprobs vLLM returns.** vLLM's `--logprobs-mode` sets whether logprobs
+are taken before or after temperature and the sampling filters. The default,
+`raw_logprobs`, takes them before. With temperature 1
+and no top-k, top-p, min-p or penalties, the two are the same.
+
+**Forced tokens log a logprob near 0.** A constraint that the server applies while
+sampling is part of the distribution that the logprobs come from. pydantic-ai marks
+a tool `strict` when its schema allows it, and when a request holds a strict tool,
+vLLM constrains the model's tool calls with a grammar. In signal_game, `move` and
+`end_round` are strict. In a player's first request, the model alone calls
+`read_notifications` with no argument, and the grammar forces a `wait_for`
+parameter into that call. The first token of the parameter is logged near 0, while
+the model scored without the grammar gives it about −8. A trainer that compares
+these logprobs with its own sees the difference at such tokens.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
