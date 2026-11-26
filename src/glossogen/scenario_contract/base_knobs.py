@@ -97,8 +97,14 @@ class BaseKnobs(BaseModel):
 
     ``record_token_ids`` asks a self-hosted model's server for the token ids of
     each request and answer, with vLLM's ``return_token_ids`` request option,
-    and logs them on each ``LLMResponseReceived``. It has no effect on agents
-    under other providers. Off by default, so a run's log does not grow.
+    and for the logprob of each answer token, with the ``logprobs`` option. It
+    logs both on each ``LLMResponseReceived``, in ``token_ids`` and
+    ``token_logprobs``. A response with token ids fails the request unless each
+    answer token has one finite logprob above -9999, and the runner retries the
+    request under its retry policy. ``docs/rl-training.md`` describes the
+    fields and which distribution the logprobs come from. The knob has no
+    effect on agents under providers other than ``self-hosted``. Off by
+    default, which keeps these fields out of a run's log.
 
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and

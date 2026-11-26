@@ -26,8 +26,11 @@ from glossogen.llm.pydantic_ai_model_factory import (
 )
 from glossogen.llm.self_hosted_chat_model import (
     PROMPT_TOKEN_IDS_DETAIL,
+    PYDANTIC_AI_LOGPROBS_DETAIL,
     TOKEN_IDS_DETAIL,
+    TOKEN_LOGPROBS_DETAIL,
     SelfHostedChatModel,
+    TokenLogprobsMismatch,
 )
 from glossogen.model_catalog.provider_catalog import (
     SELF_HOSTED_API_KEY_VAR,
@@ -243,29 +246,44 @@ async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_hea
     assert sent == [("signal_game/1795184024", "player_b")] * 2
 
 
-async def test_a_response_keeps_the_token_ids_that_the_server_returned() -> None:
-    """With the knob on, the request asks vLLM for token ids, and the response keeps them."""
-    sent: list[dict[str, object]] = []
+def logprob_entries(values: list[float]) -> dict[str, object]:
+    """A choice's ``logprobs`` as the OpenAI API returns them, one entry per answer token."""
+    return {
+        "content": [
+            {"token": f"t{index}", "logprob": value, "bytes": [116], "top_logprobs": []}
+            for index, value in enumerate(values)
+        ]
+    }
+
+
+async def run_with_token_ids(
+    sent: list[dict[str, object]], token_ids: list[int], logprobs: dict[str, object] | None
+) -> ModelResponse:
+    """Run one turn against a server that returns ``token_ids`` and, unless None, ``logprobs``."""
 
     def respond(request: httpx2.Request) -> httpx2.Response:
         sent.append(json.loads(s=request.content))
+        choice: dict[str, object] = {
+            "index": 0,
+            "message": {"role": "assistant", "content": "Done."},
+            "finish_reason": "stop",
+            "token_ids": token_ids,
+        }
+        if logprobs is not None:
+            choice["logprobs"] = logprobs
+        body = {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": MODEL,
+            "prompt_token_ids": [11, 12, 13],
+            "choices": [choice],
+        }
+        # Written by hand because httpx refuses NaN, which a server other than vLLM can send.
         return httpx2.Response(
             status_code=200,
-            json={
-                "id": "chatcmpl-1",
-                "object": "chat.completion",
-                "created": 0,
-                "model": MODEL,
-                "prompt_token_ids": [11, 12, 13],
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": "Done."},
-                        "finish_reason": "stop",
-                        "token_ids": [21, 22],
-                    }
-                ],
-            },
+            content=json.dumps(obj=body, allow_nan=True).encode(),
+            headers={"content-type": "application/json"},
         )
 
     model = SelfHostedChatModel(
@@ -288,12 +306,57 @@ async def test_a_response_keeps_the_token_ids_that_the_server_returned() -> None
             record_token_ids=True,
         ),
     )
-
     result = await agent.run(user_prompt="Your move.")
-
-    assert sent[0][RETURN_TOKEN_IDS_OPTION] is True
     response = result.all_messages()[-1]
     assert isinstance(response, ModelResponse)
+    return response
+
+
+async def test_a_response_keeps_the_token_ids_and_logprobs_that_the_server_returned() -> None:
+    """With the knob on, the request asks vLLM for token ids and logprobs, and the response keeps
+    the ids and one logprob per answer token, without pydantic-ai's per-token text and bytes."""
+    sent: list[dict[str, object]] = []
+
+    response = await run_with_token_ids(
+        sent=sent, token_ids=[21, 22], logprobs=logprob_entries(values=[-0.5, -1.25])
+    )
+
+    assert sent[0][RETURN_TOKEN_IDS_OPTION] is True
+    assert sent[0]["logprobs"] is True
     assert response.provider_details is not None
     assert response.provider_details[PROMPT_TOKEN_IDS_DETAIL] == [11, 12, 13]
     assert response.provider_details[TOKEN_IDS_DETAIL] == [21, 22]
+    assert response.provider_details[TOKEN_LOGPROBS_DETAIL] == [-0.5, -1.25]
+    assert PYDANTIC_AI_LOGPROBS_DETAIL not in response.provider_details
+
+
+@pytest.mark.parametrize(
+    "logprobs",
+    [
+        None,
+        logprob_entries(values=[-0.5]),
+        logprob_entries(values=[-0.5, -0.5, -0.5]),
+        logprob_entries(values=[-0.5, -9999.0]),
+        logprob_entries(values=[-0.5, float("nan")]),
+    ],
+    ids=[
+        "no logprobs",
+        "one logprob for two token ids",
+        "three logprobs for two token ids",
+        "vLLM's value for a missing logprob",
+        "a logprob that is not a number",
+    ],
+)
+async def test_token_ids_without_one_logprob_per_answer_token_fail_the_request(
+    logprobs: dict[str, object] | None,
+) -> None:
+    with pytest.raises(TokenLogprobsMismatch):
+        await run_with_token_ids(sent=[], token_ids=[21, 22], logprobs=logprobs)
+
+
+async def test_an_answer_without_tokens_needs_no_logprobs() -> None:
+    response = await run_with_token_ids(sent=[], token_ids=[], logprobs=None)
+
+    assert response.provider_details is not None
+    assert response.provider_details[TOKEN_IDS_DETAIL] == []
+    assert response.provider_details[TOKEN_LOGPROBS_DETAIL] == []

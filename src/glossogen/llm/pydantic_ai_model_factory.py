@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from pydantic_ai.models import ModelRequestParameters, infer_model
 from pydantic_ai.models.anthropic import AnthropicModelSettings
-from pydantic_ai.models.openai import OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIChatModelSettings, OpenAIResponsesModelSettings
 from pydantic_ai.profiles.openai import openai_model_profile
 from pydantic_ai.providers.openai import OpenAIProvider as PydanticAIOpenAIProvider
 from pydantic_ai.settings import ModelSettings, ThinkingLevel, merge_model_settings
@@ -138,7 +138,7 @@ def agent_model_settings(
     through its preset knobs. Then :func:`request_identity_settings`, which names
     the run and the agent in the headers of a request to a self-hosted model, and
     :func:`token_id_request_settings`, which asks a self-hosted model's server
-    for token ids when ``record_token_ids`` is on.
+    for token ids and logprobs when ``record_token_ids`` is on.
     """
     return layered_model_settings(
         layers=(
@@ -155,13 +155,15 @@ def agent_model_settings(
 def token_id_request_settings(
     provider: Provider, settings: AgentModelSettings, record_token_ids: bool
 ) -> ModelSettings:
-    """Return the settings that ask a self-hosted model's server for token ids.
+    """Return the settings that ask a self-hosted model's server for token ids and logprobs.
 
     With ``record_token_ids`` on and a ``self-hosted`` model, the request body
     gets vLLM's ``return_token_ids`` option, and vLLM then returns the token ids
-    of the prompt and of the answer. pydantic-ai replaces ``extra_body`` whole
-    when it merges settings, so this layer carries the run's own ``extra_body``
-    keys as well. For every other case the settings are empty.
+    of the prompt and of the answer. The request also asks for ``logprobs``, so
+    the server returns the log-probability of each token of the answer.
+    pydantic-ai replaces ``extra_body`` whole when it merges settings, so this
+    layer carries the run's own ``extra_body`` keys as well. For every other
+    case the settings are empty.
     """
     if provider != Provider.SELF_HOSTED or not record_token_ids:
         return ModelSettings()
@@ -169,7 +171,7 @@ def token_id_request_settings(
     if settings.extra_body is not None:
         extra_body.update(settings.extra_body)
     extra_body[RETURN_TOKEN_IDS_OPTION] = True
-    return ModelSettings(extra_body=extra_body)
+    return OpenAIChatModelSettings(extra_body=extra_body, openai_logprobs=True)
 
 
 def request_identity_settings(provider: Provider, run_id: str, agent_id: str) -> ModelSettings:

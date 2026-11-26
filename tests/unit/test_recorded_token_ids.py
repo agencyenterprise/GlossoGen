@@ -1,4 +1,4 @@
-"""A run with ``record_token_ids`` logs each self-hosted response's token ids, and they read back.
+"""``record_token_ids`` logs each self-hosted response's token ids and logprobs, and they read back.
 
 The runner stores each prompt as the prefix it shares with the agent's previous recorded
 prompt and answer, then the rest of its ids. ``recorded_token_ids`` rebuilds the full
@@ -11,7 +11,11 @@ from typing import NamedTuple
 
 import pytest
 
-from glossogen.llm.self_hosted_chat_model import PROMPT_TOKEN_IDS_DETAIL, TOKEN_IDS_DETAIL
+from glossogen.llm.self_hosted_chat_model import (
+    PROMPT_TOKEN_IDS_DETAIL,
+    TOKEN_IDS_DETAIL,
+    TOKEN_LOGPROBS_DETAIL,
+)
 from glossogen.models.event import (
     LLMResponseReceived,
     SimulationEvent,
@@ -24,6 +28,7 @@ from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.recorded_token_ids import (
     RecordedTokenIds,
     TokenIdLogGap,
+    TokenLogprobCountMismatch,
     recorded_token_ids,
 )
 from glossogen.runners.pydantic_ai_runner import (
@@ -41,10 +46,17 @@ RUN_ID = "signal_game/1"
 
 
 class ServedResponse(NamedTuple):
-    """One response as the server returned it: its prompt's and its answer's token ids."""
+    """One response as the server returned it: its prompt's and its answer's token ids, and the
+    logprob of each answer token."""
 
     prompt_ids: list[int]
     token_ids: list[int]
+    token_logprobs: list[float]
+
+
+def logprobs_for(token_ids: list[int]) -> list[float]:
+    """A distinct logprob for each answer token."""
+    return [-0.25 * (index + 1) for index in range(len(token_ids))]
 
 
 def _usage() -> TokenUsage:
@@ -96,6 +108,7 @@ async def log_responses(log_path: Path, runs: list[list[ServedResponse | None]],
                     details={
                         PROMPT_TOKEN_IDS_DETAIL: response.prompt_ids,
                         TOKEN_IDS_DETAIL: response.token_ids,
+                        TOKEN_LOGPROBS_DETAIL: response.token_logprobs,
                     }
                 )
             runner._flush_response_block(  # pyright: ignore[reportPrivateUsage]
@@ -117,9 +130,19 @@ def logged_responses(events: list[SimulationEvent]) -> list[LLMResponseReceived]
 async def test_each_recorded_prompt_is_rebuilt_whole(tmp_path: Path) -> None:
     """The second prompt repeats the first prompt and answer; the third drops the answer."""
     served = [
-        ServedResponse(prompt_ids=[1, 2, 3], token_ids=[4, 5]),
-        ServedResponse(prompt_ids=[1, 2, 3, 4, 5, 6, 7], token_ids=[8]),
-        ServedResponse(prompt_ids=[1, 2, 9], token_ids=[10, 11]),
+        ServedResponse(
+            prompt_ids=[1, 2, 3], token_ids=[4, 5], token_logprobs=logprobs_for(token_ids=[4, 5])
+        ),
+        ServedResponse(
+            prompt_ids=[1, 2, 3, 4, 5, 6, 7],
+            token_ids=[8],
+            token_logprobs=logprobs_for(token_ids=[8]),
+        ),
+        ServedResponse(
+            prompt_ids=[1, 2, 9],
+            token_ids=[10, 11],
+            token_logprobs=logprobs_for(token_ids=[10, 11]),
+        ),
     ]
     log_path = tmp_path / "signal_game.jsonl"
     await log_responses(text="I move left.", log_path=log_path, runs=[list(served)])
@@ -132,8 +155,8 @@ async def test_each_recorded_prompt_is_rebuilt_whole(tmp_path: Path) -> None:
         (2, [9]),
     ]
     rebuilt = recorded_token_ids(events=events, agent_id=AGENT)
-    assert [(each.prompt_ids, each.token_ids) for each in rebuilt] == [
-        (response.prompt_ids, response.token_ids) for response in served
+    assert [(each.prompt_ids, each.token_ids, each.token_logprobs) for each in rebuilt] == [
+        (response.prompt_ids, response.token_ids, response.token_logprobs) for response in served
     ]
 
 
@@ -146,14 +169,21 @@ async def test_a_response_without_token_ids_logs_no_token_fields(tmp_path: Path)
     assert "token_ids" not in line
     assert "prompt_prefix_tokens" not in line
     assert "prompt_tail_ids" not in line
+    assert "token_logprobs" not in line
     assert recorded_token_ids(events=await load_events(log_path=log_path), agent_id=AGENT) == []
 
 
 async def test_a_restarted_runner_starts_again_from_an_empty_prefix(tmp_path: Path) -> None:
     """A resume or a swap starts a new runner, whose first prompt shares nothing with the log."""
-    first = ServedResponse(prompt_ids=[1, 2], token_ids=[3])
-    second = ServedResponse(prompt_ids=[1, 2, 3, 4], token_ids=[5])
-    after_restart = ServedResponse(prompt_ids=[1, 2, 3, 4, 5, 6], token_ids=[7])
+    first = ServedResponse(
+        prompt_ids=[1, 2], token_ids=[3], token_logprobs=logprobs_for(token_ids=[3])
+    )
+    second = ServedResponse(
+        prompt_ids=[1, 2, 3, 4], token_ids=[5], token_logprobs=logprobs_for(token_ids=[5])
+    )
+    after_restart = ServedResponse(
+        prompt_ids=[1, 2, 3, 4, 5, 6], token_ids=[7], token_logprobs=logprobs_for(token_ids=[7])
+    )
     log_path = tmp_path / "signal_game.jsonl"
     await log_responses(
         text="I move left.", log_path=log_path, runs=[[first, second], [after_restart]]
@@ -172,7 +202,9 @@ async def test_a_restarted_runner_starts_again_from_an_empty_prefix(tmp_path: Pa
 def test_a_discarded_attempt_drops_its_token_ids() -> None:
     state = _StreamingState(token_id_log=TokenIdLog())
     state.mark_attempt_start()
-    state.note_token_ids(details={PROMPT_TOKEN_IDS_DETAIL: [1], TOKEN_IDS_DETAIL: [2]})
+    state.note_token_ids(
+        details={PROMPT_TOKEN_IDS_DETAIL: [1], TOKEN_IDS_DETAIL: [2], TOKEN_LOGPROBS_DETAIL: [-0.5]}
+    )
 
     state.discard_since_attempt_start()
 
@@ -186,8 +218,12 @@ async def test_a_skipped_index_fails_instead_of_rebuilding_a_wrong_prompt(tmp_pa
         log_path=log_path,
         runs=[
             [
-                ServedResponse(prompt_ids=[1], token_ids=[2]),
-                ServedResponse(prompt_ids=[1, 2], token_ids=[3]),
+                ServedResponse(
+                    prompt_ids=[1], token_ids=[2], token_logprobs=logprobs_for(token_ids=[2])
+                ),
+                ServedResponse(
+                    prompt_ids=[1, 2], token_ids=[3], token_logprobs=logprobs_for(token_ids=[3])
+                ),
             ]
         ],
     )
@@ -209,7 +245,13 @@ async def test_only_the_named_agents_responses_are_read(tmp_path: Path) -> None:
     await log_responses(
         text="I move left.",
         log_path=log_path,
-        runs=[[ServedResponse(prompt_ids=[1, 2], token_ids=[3])]],
+        runs=[
+            [
+                ServedResponse(
+                    prompt_ids=[1, 2], token_ids=[3], token_logprobs=logprobs_for(token_ids=[3])
+                )
+            ]
+        ],
     )
     events = await load_events(log_path=log_path)
 
@@ -219,7 +261,9 @@ async def test_only_the_named_agents_responses_are_read(tmp_path: Path) -> None:
 
 async def test_an_empty_response_is_logged_when_it_carries_token_ids(tmp_path: Path) -> None:
     """The model wrote tokens, so the response is logged with its ids even without text."""
-    served = ServedResponse(prompt_ids=[1, 2], token_ids=[3])
+    served = ServedResponse(
+        prompt_ids=[1, 2], token_ids=[3], token_logprobs=logprobs_for(token_ids=[3])
+    )
     log_path = tmp_path / "signal_game.jsonl"
     await log_responses(text="", log_path=log_path, runs=[[served, None]])
 
@@ -227,3 +271,38 @@ async def test_an_empty_response_is_logged_when_it_carries_token_ids(tmp_path: P
     [logged] = logged_responses(events=events)
     assert logged.text is None
     assert logged.token_ids == served.token_ids
+
+
+async def test_a_log_written_before_logprobs_reads_back_without_them(tmp_path: Path) -> None:
+    """A response logged with token ids and no ``token_logprobs`` reads back with None."""
+    served = ServedResponse(prompt_ids=[1, 2], token_ids=[3], token_logprobs=[-0.5])
+    log_path = tmp_path / "signal_game.jsonl"
+    await log_responses(text="I move left.", log_path=log_path, runs=[[served]])
+    events = await load_events(log_path=log_path)
+    older: list[SimulationEvent] = []
+    for event in events:
+        if isinstance(event, LLMResponseReceived):
+            older.append(event.model_copy(update={"token_logprobs": None}))
+        else:
+            older.append(event)
+
+    [rebuilt] = recorded_token_ids(events=older, agent_id=AGENT)
+
+    assert rebuilt.token_ids == [3]
+    assert rebuilt.token_logprobs is None
+
+
+async def test_an_event_with_more_logprobs_than_token_ids_fails_to_read(tmp_path: Path) -> None:
+    served = ServedResponse(prompt_ids=[1, 2], token_ids=[3], token_logprobs=[-0.5])
+    log_path = tmp_path / "signal_game.jsonl"
+    await log_responses(text="I move left.", log_path=log_path, runs=[[served]])
+    events = await load_events(log_path=log_path)
+    edited: list[SimulationEvent] = []
+    for event in events:
+        if isinstance(event, LLMResponseReceived):
+            edited.append(event.model_copy(update={"token_logprobs": [-0.5, -1.0]}))
+        else:
+            edited.append(event)
+
+    with pytest.raises(TokenLogprobCountMismatch):
+        recorded_token_ids(events=edited, agent_id=AGENT)
