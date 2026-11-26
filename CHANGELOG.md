@@ -12,6 +12,10 @@ the commit log.
 ## Unreleased
 
 ### Added
+- A docs page, [Searching runs with Docent](docs/docent.md), gives the steps to
+  run Docent on your own machine, upload a run's ATIF export to it as one agent
+  run with one transcript per agent, and search the run.
+  [ATIF export](docs/atif-export.md) links to it.
 - **`record_token_ids` also records the logprob of each answer token.** Each
   request of a self-hosted agent asks the server for `logprobs` as well as
   `return_token_ids`, and each `llm_response_received` event holds

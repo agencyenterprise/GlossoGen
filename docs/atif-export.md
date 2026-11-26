@@ -24,6 +24,9 @@ It logs one line per trajectory written, with its step count.
 Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.
 
+[Searching runs with Docent](docent.md) has the steps to load these files into
+a local Docent and search the run.
+
 ## Other ways to get it
 
 | Surface | Call |
