@@ -26,6 +26,11 @@ are playing at that point, and the loop stops them.
 on the volume. ``train`` reads it from there, and ``eval --partner`` tests an adapter against any
 partner.
 
+``train`` starts with the step after the last one that ``steps.jsonl`` records. With
+``--eval-every N``, it tests each adapter whose step is a multiple of N once the trainer has saved
+it, on held-out seeds, and appends the test to ``eval.jsonl`` as ``eval`` does. A test that
+``eval.jsonl`` already holds plays nothing.
+
 Run it from the repository root. docs/rl-training.md gives the commands.
 """
 
@@ -37,11 +42,11 @@ from typing import NamedTuple
 
 from game_sets import GameSet, PlayedGames, play_game_set
 from loop_records import (
-    EvalRecord,
     StepOutcome,
     StepRecord,
     append_record,
     eval_record,
+    eval_recorded,
     next_step,
     print_eval,
     print_step,
@@ -70,15 +75,33 @@ MAX_KL = 0.3
 MIN_FINISHED_SHARE = 0.75
 
 
+class EvalPlan(NamedTuple):
+    """The held-out test that ``train`` runs on each adapter whose step is a multiple of
+    ``every``."""
+
+    every: int
+    seeds: list[int]
+    games_per_seed: int
+
+
 class StepPlan(NamedTuple):
-    """What each training step of a ``train`` call plays, how it scores, and whether its games
-    play while the trainer trains the step before."""
+    """What each training step of a ``train`` call plays, how it scores, whether its games play
+    while the trainer trains the step before, and the tests that ``train`` runs."""
 
     reward: Reward
     seeds_per_step: int
     games_per_seed: int
     partner: Partner | None
     overlap: bool
+    evaluation: EvalPlan | None
+
+
+class Overlapped(NamedTuple):
+    """How an overlapped step ended: whether training stops, and the next step's games, None
+    after the last step."""
+
+    stopping: bool
+    next_played: PlayedGames | None
 
 
 def seeds_for(*, step: int, seeds_per_step: int) -> list[int]:
@@ -164,6 +187,21 @@ def stops_training(*, record: StepRecord) -> bool:
     return True
 
 
+async def evaluate_if_due(*, loop: Loop, plan: StepPlan, adapter: int) -> None:
+    """Test ``adapter`` when ``train`` tests it: a step after 0 that is a multiple of
+    ``--eval-every``."""
+    evaluation = plan.evaluation
+    if evaluation is None or adapter == 0 or adapter % evaluation.every != 0:
+        return
+    await evaluate(
+        loop=loop,
+        step=adapter,
+        games_per_seed=evaluation.games_per_seed,
+        seeds=evaluation.seeds,
+        partner=plan.partner,
+    )
+
+
 async def train_in_turn(*, loop: Loop, plan: StepPlan, first_step: int, last_step: int) -> None:
     """Train steps ``first_step`` to ``last_step``, each playing its games, then training."""
     for step in range(first_step, last_step + 1):
@@ -172,16 +210,17 @@ async def train_in_turn(*, loop: Loop, plan: StepPlan, first_step: int, last_ste
         record = await train_on(loop=loop, step=step, plan=plan, played=played)
         if stops_training(record=record):
             return
+        await evaluate_if_due(loop=loop, plan=plan, adapter=step + 1)
 
 
 async def overlapped_step(
     *, loop: Loop, plan: StepPlan, step: int, played: PlayedGames, last_step: int
-) -> PlayedGames | None:
+) -> Overlapped:
     """Train step ``step`` while step ``step + 1``'s games play with adapter ``step``.
 
     Once the trainer has saved adapter ``step + 1``, the policy server loads it and keeps
-    adapter ``step`` for the games that are playing. Returns step ``step + 1``'s games, or None
-    after the last step and when training stops, in which case the playing games are stopped.
+    adapter ``step`` for the games that are playing. When training stops, the playing games are
+    stopped.
     """
     await loop.backend.load_adapter(step=step, keep=[step])
     playing: asyncio.Task[PlayedGames] | None = None
@@ -195,8 +234,8 @@ async def overlapped_step(
         if playing is not None and not stopping:
             await loop.backend.load_adapter(step=step + 1, keep=[step, step + 1])
     if playing is None or stopping:
-        return None
-    return playing.result()
+        return Overlapped(stopping=stopping, next_played=None)
+    return Overlapped(stopping=False, next_played=playing.result())
 
 
 async def train_overlapped(*, loop: Loop, plan: StepPlan, first_step: int, last_step: int) -> None:
@@ -204,24 +243,30 @@ async def train_overlapped(*, loop: Loop, plan: StepPlan, first_step: int, last_
     trains the step before."""
     adapter = adapter_for(step=first_step, overlap=True)
     await loop.backend.load_adapter(step=adapter, keep=[adapter])
-    played: PlayedGames | None = await play_step(loop=loop, step=first_step, plan=plan)
+    played = await play_step(loop=loop, step=first_step, plan=plan)
     for step in range(first_step, last_step + 1):
-        if played is None:
-            return
-        played = await overlapped_step(
+        overlapped = await overlapped_step(
             loop=loop, plan=plan, step=step, played=played, last_step=last_step
         )
+        if overlapped.stopping:
+            return
+        await evaluate_if_due(loop=loop, plan=plan, adapter=step + 1)
+        if overlapped.next_played is None:
+            return
+        played = overlapped.next_played
 
 
 async def train(*, loop: Loop, plan: StepPlan, last_step: int) -> None:
     """Run the training steps after the last one that ``steps.jsonl`` records, to ``last_step``.
 
-    A step that stopped partway reuses the games that ended before the stop (game_sets.py).
+    A step that stopped partway reuses the games that ended before the stop (game_sets.py). A
+    test that a stop cut off runs before the first step.
     """
     first_step = next_step(steps_path=run_folder(settings=loop.settings) / "steps.jsonl")
     if first_step > last_step:
         print(f"steps.jsonl already records steps 0 to {first_step - 1}", flush=True)
         return
+    await evaluate_if_due(loop=loop, plan=plan, adapter=first_step)
     print(f"training steps {first_step} to {last_step}", flush=True)
     if plan.overlap:
         await train_overlapped(loop=loop, plan=plan, first_step=first_step, last_step=last_step)
@@ -236,8 +281,22 @@ async def evaluate(
     games_per_seed: int,
     seeds: list[int],
     partner: Partner | None,
-) -> EvalRecord:
-    """Play adapter ``step`` on the given seeds without training, and record what it scored."""
+) -> None:
+    """Play adapter ``step`` on the given seeds without training, and record what it scored.
+
+    A test that ``eval.jsonl`` already holds, with the same partner, seeds and games per seed,
+    plays nothing.
+    """
+    eval_path = run_folder(settings=loop.settings) / "eval.jsonl"
+    if eval_recorded(
+        eval_path=eval_path,
+        step=step,
+        partner=partner,
+        seeds=seeds,
+        games_per_seed=games_per_seed,
+    ):
+        print(f"eval step {step}: eval.jsonl already holds this test", flush=True)
+        return
     await loop.backend.load_adapter(step=step, keep=[step])
     game_set = GameSet(
         label=EVAL_LABEL,
@@ -250,10 +309,15 @@ async def evaluate(
     )
     played = await play_game_set(loop=loop, game_set=game_set)
     finished = await finished_games(settings=loop.settings, games=played.games)
-    record = eval_record(step=step, partner=partner, finished=finished)
-    append_record(path=run_folder(settings=loop.settings) / "eval.jsonl", record=record)
+    record = eval_record(
+        step=step,
+        partner=partner,
+        seeds=seeds,
+        games_per_seed=games_per_seed,
+        finished=finished,
+    )
+    append_record(path=eval_path, record=record)
     print_eval(record=record, finished=len(finished), games=len(played.games))
-    return record
 
 
 def partner_json(*, partner: Partner | None) -> str:
@@ -308,6 +372,11 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="play each step's games while the trainer trains the step before",
     )
+    train_command.add_argument(
+        "--eval-every", type=int, help="test each adapter whose step is a multiple of this"
+    )
+    train_command.add_argument("--eval-seeds", type=int, nargs="+", help="the tests' seeds")
+    train_command.add_argument("--eval-games-per-seed", type=int, help="the tests' games per seed")
     eval_command = commands.choices["eval"]
     eval_command.add_argument("--step", required=True, type=int)
     eval_command.add_argument("--games-per-seed", required=True, type=int)
@@ -324,14 +393,32 @@ def modal_loop(*, settings: LoopSettings) -> Loop:
     )
 
 
+def eval_plan(*, arguments: argparse.Namespace) -> EvalPlan | None:
+    """The tests that ``train`` runs: none, or the three ``--eval-*`` flags together."""
+    flags = (arguments.eval_every, arguments.eval_seeds, arguments.eval_games_per_seed)
+    if all(flag is None for flag in flags):
+        return None
+    if any(flag is None for flag in flags):
+        raise SystemExit("--eval-every, --eval-seeds and --eval-games-per-seed go together")
+    if arguments.eval_every < 1:
+        raise SystemExit("--eval-every must be at least 1")
+    return EvalPlan(
+        every=arguments.eval_every,
+        seeds=arguments.eval_seeds,
+        games_per_seed=arguments.eval_games_per_seed,
+    )
+
+
 async def run_train(*, loop: Loop, arguments: argparse.Namespace) -> None:
     """The ``train`` command, with the partner that ``init`` saved."""
+    evaluation = eval_plan(arguments=arguments)
     plan = StepPlan(
         reward=Reward(arguments.reward),
         seeds_per_step=arguments.seeds_per_step,
         games_per_seed=arguments.games_per_seed,
         partner=await loop.backend.run_partner(),
         overlap=arguments.overlap,
+        evaluation=evaluation,
     )
     await train(loop=loop, plan=plan, last_step=arguments.last_step)
 

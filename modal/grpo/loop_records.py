@@ -57,13 +57,16 @@ class StepRecord(NamedTuple):
 class EvalRecord(NamedTuple):
     """What one adapter scored on the evaluated seeds.
 
-    ``won_by_seed`` and ``first_item_by_seed`` hold each finished game's rounds won and
-    first-item finishes, in game order, grouped by seed. ``partner`` is the frozen partner that
-    the adapter played with, and ``first_item_by_seat`` splits ``first_item`` by seat.
+    ``seeds`` and ``games_per_seed`` say which games the test played. ``won_by_seed`` and
+    ``first_item_by_seed`` hold each finished game's rounds won and first-item finishes, in game
+    order, grouped by seed. ``partner`` is the frozen partner that the adapter played with, and
+    ``first_item_by_seat`` splits ``first_item`` by seat.
     """
 
     step: int
     partner: Partner | None
+    seeds: list[int]
+    games_per_seed: int
     won_by_seed: dict[str, list[int]]
     first_item_by_seed: dict[str, list[int]]
     won: int
@@ -119,11 +122,20 @@ def step_record(
     )
 
 
-def eval_record(*, step: int, partner: Partner | None, finished: list[FinishedGame]) -> EvalRecord:
+def eval_record(
+    *,
+    step: int,
+    partner: Partner | None,
+    seeds: list[int],
+    games_per_seed: int,
+    finished: list[FinishedGame],
+) -> EvalRecord:
     """The record of a test of adapter ``step`` from its finished games."""
     return EvalRecord(
         step=step,
         partner=partner,
+        seeds=seeds,
+        games_per_seed=games_per_seed,
         won_by_seed=counts_by_seed(finished=finished, count=rounds_won),
         first_item_by_seed=counts_by_seed(finished=finished, count=first_item_count),
         won=sum(rounds_won(game.outcome) for game in finished),
@@ -145,6 +157,32 @@ def next_step(*, steps_path: Path) -> int:
     if steps != list(range(len(steps))):
         raise ValueError(f"{steps_path} records the steps {steps}, not 0 to {len(steps) - 1}")
     return len(steps)
+
+
+def eval_recorded(
+    *,
+    eval_path: Path,
+    step: int,
+    partner: Partner | None,
+    seeds: list[int],
+    games_per_seed: int,
+) -> bool:
+    """Whether ``eval.jsonl`` holds a test of adapter ``step`` with this partner on these
+    games."""
+    if not eval_path.exists():
+        return False
+    wanted = (step, jsonable(partner), seeds, games_per_seed)
+    for line in eval_path.read_text().splitlines():
+        recorded = json.loads(line)
+        test = (
+            recorded.get("step"),
+            recorded.get("partner"),
+            recorded.get("seeds"),
+            recorded.get("games_per_seed"),
+        )
+        if test == wanted:
+            return True
+    return False
 
 
 def jsonable(value: object) -> object:

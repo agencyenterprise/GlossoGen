@@ -79,6 +79,7 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 | `--last-step` | the last step to run. `train` starts with the step after the last one that `steps.jsonl` records, step 0 in a new run |
 | `--seeds-per-step`, `--games-per-seed` | each step plays 6 games on each of 4 seeds, 24 games in all |
 | `--overlap` | optional: each step's games play while the trainer trains the step before, as [Overlapping play and training](#overlapping-play-and-training) explains |
+| `--eval-every`, `--eval-seeds`, `--eval-games-per-seed` | optional, all three together: test each adapter whose step is a multiple of `--eval-every`, as section 4 explains |
 
 The loop, `grpo_loop.py`, runs on your machine, so keep the machine awake until `train` ends. In
 our runs, each of steps 0 to 9 took 13 to 41 minutes. The first step also waits for the policy
@@ -115,6 +116,21 @@ eval step 10: 72/72 games finished, won 82/720 rounds, first item 322/1440 playe
 eval step 0: 72/72 games finished, won 84/720 rounds, first item 256/1440 player-rounds
 ```
 
+`eval` plays nothing for a test that `eval.jsonl` already holds: the same adapter, partner,
+seeds and games per seed. It prints `eval.jsonl already holds this test` instead.
+
+`train` can also run these tests itself. Add these three flags to the `train` command of section 3:
+
+```bash
+  --eval-every 10 --eval-seeds $(seq 45 56) --eval-games-per-seed 6
+```
+
+`train` then tests adapter 10 once the trainer has saved it, and adapters 20, 30 and so on in
+longer runs. Each test plays its games between two training steps, and writes one line to
+`eval.jsonl`, the same line that `eval` writes. A test that a stop cut off runs when `train`
+resumes. Adapter 0 needs its own `eval --step 0`. In our runs, one test of 72 games took 29 to 50
+minutes, so a test every 10 steps adds that much time to each ten steps.
+
 ### 5. Check whether the run learned
 
 Subtract the base model's `first item` count from adapter 10's. For `first-item-rep1`, that is
@@ -135,8 +151,8 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 ```
 
 Then run the `eval` command of section 4 once, with `--step 30`, and compare its count with the
-base model's count from section 4, by the same rule. Do not test `--step 0` again: the loop would
-reuse the games that it played for that test. `first-item-rep3` trained to step 29 in two `train`
+base model's count from section 4, by the same rule. You need not test `--step 0` again: `eval`
+plays nothing for a test that `eval.jsonl` already holds. `first-item-rep3` trained to step 29 in two `train`
 calls, and its steps 10 to 29 took 9.5 hours, 21 to 48 minutes each. Its adapter 30 ended on the
 first item in 632 of 1,440 player-rounds, against 257 for the base model (see
 [Training longer](#training-longer)).
@@ -312,7 +328,7 @@ are in `<records dir>/<run>/`:
 | Path | What it holds |
 | --- | --- |
 | `steps.jsonl` | one line per training step: the printed counts, the rounds won in each game, the first-item count of each seat, the partner, the seats that trained, and the trainer's metrics |
-| `eval.jsonl` | one line per test: the partner, the rounds won and the first-item count of each game, grouped by seed, the first-item count of each seat, and the totals |
+| `eval.jsonl` | one line per test: the adapter, the partner, the seeds and games per seed, the rounds won and the first-item count of each game, grouped by seed, the first-item count of each seat, and the totals |
 | `configs/` | each seed's game config. A run keeps its configs: the loop refuses a game config that would change one |
 | `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log`, and in `abandoned/` the logs of games that a stop cut off |
 | `games.jsonl` | one line per game whose `glossogen run` exited: its step or test, seed, game number, adapter, run id and exit code |

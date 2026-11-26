@@ -12,6 +12,14 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL loop's `train` can test adapters on held-out seeds as it trains.**
+  With `--eval-every N --eval-seeds ... --eval-games-per-seed G`, `train` tests
+  each adapter whose step is a multiple of N once the trainer has saved it, and
+  appends the test to `eval.jsonl` in the line that `eval` writes. Each line of
+  `eval.jsonl` records its seeds and games per seed, and `eval` plays nothing
+  for a test that `eval.jsonl` already holds. A test that a stop cut off runs
+  when `train` resumes. See
+  [Training a model with RL](docs/rl-training.md#4-test-the-adapters).
 - **The RL loop's `train` resumes a stopped run by itself.** `grpo_loop.py
   train` starts with the step after the last one that `steps.jsonl` records,
   and takes no `--first-step`. The loop enters each game whose `glossogen run`

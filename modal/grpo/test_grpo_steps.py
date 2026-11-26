@@ -15,9 +15,10 @@ from typing import Any, NamedTuple
 import pytest
 from adapter_loader import AdapterRequest, LoadedAdapters
 from game_ledger import ABANDONED_LABEL
-from grpo_loop import StepPlan, train
+from grpo_loop import EvalPlan, StepPlan, evaluate, train
 from grpo_records import BASE_MODEL
 from loop_fakes import SAMPLED_LOGPROB, FakeBackend, FakeVllm, ScriptedGameLauncher
+from loop_records import EvalRecord
 from loop_services import GameSpec, Loop, LoopSettings
 from partner import Partner
 from signal_game_rewards import Reward
@@ -114,14 +115,21 @@ def trained_run_ids(*, tested: LoopUnderTest) -> list[str]:
 
 
 def plan(*, partner: Partner | None, overlap: bool) -> StepPlan:
-    """2 games on each of 2 seeds per step, scored on the first item."""
+    """2 games on each of 2 seeds per step, scored on the first item, with no tests."""
     return StepPlan(
         reward=Reward.FIRST_ITEM,
         seeds_per_step=SEEDS_PER_STEP,
         games_per_seed=GAMES_PER_SEED,
         partner=partner,
         overlap=overlap,
+        evaluation=None,
     )
+
+
+def eval_lines(*, tested: LoopUnderTest) -> list[dict[str, Any]]:
+    """The lines of the run's ``eval.jsonl``."""
+    path = tested.loop.settings.records_dir / RUN / "eval.jsonl"
+    return [json.loads(line) for line in path.read_text().splitlines()]
 
 
 def step_lines(*, tested: LoopUnderTest) -> list[dict[str, Any]]:
@@ -362,3 +370,76 @@ async def test_a_resumed_step_refuses_games_that_another_adapter_played(
     again = resumed(tested=tested, monkeypatch=monkeypatch)
     with pytest.raises(ValueError, match="was played by adapter 0"):
         await train(loop=again.loop, plan=plan(partner=None, overlap=False), last_step=3)
+
+
+TESTS = EvalPlan(every=2, seeds=[45, 46], games_per_seed=1)
+
+
+@pytest.mark.parametrize("overlap", [False, True])
+async def test_train_tests_every_second_adapter_as_the_eval_command_does(
+    overlap: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=never_interrupt,
+    )
+    with_tests = plan(partner=None, overlap=overlap)._replace(evaluation=TESTS)
+
+    await train(loop=tested.loop, plan=with_tests, last_step=3)
+
+    lines = eval_lines(tested=tested)
+    assert [(line["step"], line["seeds"], line["games_per_seed"]) for line in lines] == [
+        (2, [45, 46], 1),
+        (4, [45, 46], 1),
+    ]
+    assert all(set(line) == set(EvalRecord._fields) for line in lines)
+    assert [sum(map(len, line["won_by_seed"].values())) for line in lines] == [2, 2]
+    tested_adapters = sorted(game.adapter for game in tested.launcher.played if game.seed < 1000)
+    assert tested_adapters == [2, 2, 4, 4]
+    played = len(tested.launcher.played)
+
+    await evaluate(loop=tested.loop, step=4, games_per_seed=1, seeds=[45, 46], partner=None)
+
+    assert len(tested.launcher.played) == played
+    assert len(eval_lines(tested=tested)) == 2
+
+
+async def test_a_test_that_a_stop_cut_off_runs_when_training_resumes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The loop is cancelled while the second game of adapter 2's test plays."""
+    running: list[asyncio.Task[None]] = []
+
+    def stop_in_the_test(spec: GameSpec) -> bool:
+        if spec.game_set != "grpo_eval_step2" or spec.seed != 46 or running[0].cancelling():
+            return False
+        running[0].cancel()
+        return True
+
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=stop_in_the_test,
+    )
+    with_tests = plan(partner=None, overlap=False)._replace(evaluation=TESTS)
+    running.append(asyncio.create_task(train(loop=tested.loop, plan=with_tests, last_step=3)))
+    with pytest.raises(asyncio.CancelledError):
+        await running[0]
+    assert [line["step"] for line in step_lines(tested=tested)] == [0, 1]
+
+    again = resumed(tested=tested, monkeypatch=monkeypatch)
+    await train(loop=again.loop, plan=with_tests, last_step=3)
+
+    assert [line["step"] for line in eval_lines(tested=again)] == [2, 4]
+    assert [line["step"] for line in step_lines(tested=again)] == [0, 1, 2, 3]
+    retested = [
+        game.seed for game in again.launcher.played if game.adapter == 2 and game.seed < 1000
+    ]
+    assert retested == [46]
