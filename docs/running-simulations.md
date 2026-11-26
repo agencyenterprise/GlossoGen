@@ -214,8 +214,8 @@ With `record_token_ids=true`, GlossoGen writes the token ids of each prompt and
 answer, and the logprob of each answer token, into the run's event log. No proxy
 is needed. The server has to return both, as vLLM does. If it returns no token
 ids, the events hold none of these fields.
-[Token ids in the event log](#token-ids-in-the-event-log) lists the fields that
-the knob adds.
+[Training a model with RL](rl-training.md#token-ids-in-the-event-log) lists the
+fields that the knob adds.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
@@ -224,50 +224,6 @@ rejects the call and the run stalls. The output cap is
 its own, `judge_model_settings.max_tokens`, which never touches an agent. For swap
 and resume runs, where a reconstructed history keeps growing, set
 `"agent_model_settings": {"max_tokens": 2048}` in the config.
-
-#### Token ids in the event log
-
-With `record_token_ids=true`, each request of an agent under `--provider
-self-hosted` asks the server for `return_token_ids` and `logprobs`. Each
-`llm_response_received` event of that agent then holds these fields:
-
-| Field | What it holds |
-| --- | --- |
-| `token_ids_index` | the response's position among the agent's recorded responses, counted from 0 when the agent's runner starts |
-| `token_ids` | the token ids of the model's answer |
-| `token_logprobs` | the logprob of each answer token, in the same order |
-| `prompt_prefix_tokens` | the length of the prompt's prefix: the tokens at its start that match the agent's previous prompt followed by its previous answer |
-| `prompt_tail_ids` | the token ids of the prompt after its prefix |
-
-The server returns `token_ids` and `token_logprobs`, and GlossoGen computes the
-other fields. `glossogen.run_storage.recorded_token_ids` rebuilds the full
-prompts of one agent, with each answer's ids and logprobs.
-
-GlossoGen treats a request as failed in two cases. In the first, the server
-returns token ids but not exactly one logprob for each answer token. In the
-second, the server gives an answer token a logprob that is not a finite number,
-or that is -9999 or lower. vLLM gives -9999 to a token whose logprob it does not
-have. GlossoGen tries the request up to 3 times. If all 3 attempts fail, it logs
-`agent_run_cycle_failed` and starts a new turn. The failed turn counts toward
-`--max-agent-turns`.
-
-vLLM's default `--logprobs-mode` takes logprobs before temperature and the
-sampling filters. A config that sets temperature 1.0, top-p 1.0, top-k -1, min-p
-0 and presence penalty 0 turns every filter and the penalty off, and GlossoGen
-sends those values with every request of an agent. vLLM fills each sampling
-value that a request leaves out from the model's `generation_config.json`.
-Qwen3.8-27B's file sets top-k 20 and top-p 0.95, so a request without them
-samples with those filters on. With the filters off, the logged logprobs are
-those of the distribution that the server sampled from. With another
-temperature or filter, they differ from it.
-
-pydantic-ai marks a tool `strict` when the tool's schema allows it. vLLM then
-uses a grammar to force the model's tool calls to match the tool schemas. It
-computes the logged logprobs after the grammar has removed the tokens it
-forbids. A token that the grammar leaves as the only choice is logged with a
-logprob near 0, a probability near 1, even when the model without the grammar
-gives it a low probability. A trainer that computes its own logprobs finds the
-logged logprob higher at those tokens.
 
 ## Agent model settings
 
