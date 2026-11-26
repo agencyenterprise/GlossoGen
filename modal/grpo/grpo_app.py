@@ -49,6 +49,12 @@ HERE = Path(__file__).resolve().parent
 APP_NAME = os.environ["GRPO_APP_NAME"]
 TRAINER_GPUS = os.environ["GRPO_TRAINER_GPUS"].split(",")
 SERVER_GPUS = os.environ["GRPO_SERVER_GPUS"].split(",")
+# The containers import this module too, so the image carries the values that the deploy read.
+DEPLOY_ENV = {
+    "GRPO_APP_NAME": APP_NAME,
+    "GRPO_TRAINER_GPUS": ",".join(TRAINER_GPUS),
+    "GRPO_SERVER_GPUS": ",".join(SERVER_GPUS),
+}
 CONTROL_DICT = f"{APP_NAME}-adapters"
 VOLUME_ROOT = Path("/grpo")
 HF_CACHE = Path("/root/.cache/huggingface")
@@ -76,7 +82,7 @@ train_image = (
         "accelerate==1.15.0",
         "safetensors==0.8.0",
     )
-    .env({"GRPO_APP_NAME": APP_NAME})
+    .env(DEPLOY_ENV)
     .add_local_file(local_path=str(HERE / "grpo_records.py"), remote_path="/root/grpo_records.py")
     .add_local_file(local_path=str(HERE / "grpo_training.py"), remote_path="/root/grpo_training.py")
     .add_local_file(
@@ -90,7 +96,7 @@ vllm_image = (
     modal.Image.from_registry("nvidia/cuda:13.0.2-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])
     .pip_install("vllm==0.31.0")
-    .env({"GRPO_APP_NAME": APP_NAME})
+    .env(DEPLOY_ENV)
     .add_local_file(local_path=str(HERE / "grpo_records.py"), remote_path="/root/grpo_records.py")
     .add_local_file(
         local_path=str(HERE / "adapter_loader.py"), remote_path="/root/adapter_loader.py"
