@@ -79,6 +79,12 @@ export interface ToolVerdictSummary {
   actionText: string;
 }
 
+/** A tool-call argument shown as a caption under the collapsed tool-call row. */
+export interface ToolCaption {
+  argumentName: string;
+  text: string;
+}
+
 /**
  * Live-stream wiring for a scenario whose executor emits an LLM-judge verdict.
  *
@@ -123,6 +129,16 @@ export interface ScenarioPlugin {
    * ``unknown`` — each plug-in narrows it internally to its own variant.
    */
   renderToolMetadata: (args: { toolName: string; callId: string; extras: unknown }) => ReactNode;
+  /**
+   * One argument of a tool call to show under the collapsed tool-call row, so
+   * it reads without expanding the row, or null to show none. The row leaves
+   * that argument out of its collapsed parameter summary. Default plug-in
+   * returns null.
+   */
+  toolCaption: (args: {
+    toolName: string;
+    toolArguments: Record<string, unknown>;
+  }) => ToolCaption | null;
   /**
    * Compact tool-call verdict for the round-timeline summary row, or null when
    * the plug-in has no bespoke verdict for this tool. LLM-judged scenarios

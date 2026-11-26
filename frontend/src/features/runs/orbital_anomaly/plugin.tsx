@@ -17,6 +17,7 @@ export const orbitalAnomalyPlugin: ScenarioPlugin = {
   RoundDetailPanel: OrbitalAnomalyRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: {
     sseEventNames: ["orbital_anomaly_actuation_judged"],
     judgedToolNames: ["actuate_panel"],

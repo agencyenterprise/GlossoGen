@@ -14,6 +14,7 @@ export const signalGamePlugin: ScenarioPlugin = {
   RoundDetailPanel: SignalGameRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,

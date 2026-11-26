@@ -40,6 +40,7 @@ describe("a read_notifications result a scenario rendered itself", () => {
       [],
       {},
       {},
+      {},
       {}
     );
     const call = entries.find(e => e.is_tool_use);
@@ -62,7 +63,7 @@ describe("a read_notifications result a scenario rendered itself", () => {
     ];
     const displays = notificationDisplaysByCallId(toolUse, plugin);
     expect(displays).toEqual({ c1: "rendered wake" });
-    const entries = mergeEntries([], [], toolUse, [], [], {}, {}, displays);
+    const entries = mergeEntries([], [], toolUse, [], [], {}, {}, {}, displays);
     const rendered = entries.find(e => e.is_notification_result && e.call_id === "c1");
     expect(rendered?.notification_display).toBe("rendered wake");
     expect(entries.some(e => e.is_notification_result && e.call_id === "c3")).toBe(false);
@@ -85,6 +86,7 @@ describe("an unrecognized event", () => {
           payload: { event_type: "gone_board_dealt", board: [1] },
         },
       ],
+      {},
       {},
       {},
       {}

@@ -47,6 +47,7 @@ export const containerYardStackingPlugin: ScenarioPlugin = {
       actionText: formatMoveArgs(toolArguments),
     };
   },
+  toolCaption: () => null,
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: classifyYardTrigger,

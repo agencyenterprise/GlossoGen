@@ -45,14 +45,22 @@ function unrecognizedEvent() {
 }
 
 it("lists a link message and leaves an unrecognized event out of the round's timeline", async () => {
-  const entries = mergeEntries([linkMessage()], [], [], [], [unrecognizedEvent()], {}, {}, {}).map(
-    entry => {
-      // An unrecognized entry has no channel of its own. Giving it the primary
-      // channel makes the filter the only thing keeping it out of the timeline.
-      if (entry.is_unrecognized) return { ...entry, channel_id: "link", text: "unrecognized row" };
-      return entry;
-    }
-  );
+  const entries = mergeEntries(
+    [linkMessage()],
+    [],
+    [],
+    [],
+    [unrecognizedEvent()],
+    {},
+    {},
+    {},
+    {}
+  ).map(entry => {
+    // An unrecognized entry has no channel of its own. Giving it the primary
+    // channel makes the filter the only thing keeping it out of the timeline.
+    if (entry.is_unrecognized) return { ...entry, channel_id: "link", text: "unrecognized row" };
+    return entry;
+  });
   expect(entries.some(entry => entry.is_unrecognized)).toBe(true);
 
   await act(async () => {

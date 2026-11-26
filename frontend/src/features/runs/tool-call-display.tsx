@@ -5,10 +5,22 @@ import { useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import type { JudgeGroundTruthMetadata } from "./display-entry";
+import type { ToolCaption } from "./scenario-plugin";
 
 /** Strip the MCP prefix from tool names for display. */
 function cleanToolName(name: string): string {
   return name.replace(/^mcp__comms__/, "");
+}
+
+/** The arguments without the one the caption already shows. */
+function argsWithoutCaption(
+  args: Record<string, unknown>,
+  caption: ToolCaption | null
+): Record<string, unknown> {
+  if (caption === null) {
+    return args;
+  }
+  return Object.fromEntries(Object.entries(args).filter(([key]) => key !== caption.argumentName));
 }
 
 /** Build a one-line parameter summary for the collapsed state. */
@@ -37,6 +49,10 @@ interface ToolCallDisplayProps {
    *  plug-in's ``renderToolMetadata`` hook (e.g. the container-yard move
    *  verdict). Null/undefined for tools and scenarios with nothing to add. */
   toolMetadata?: ReactNode;
+  /** One argument shown under the row while it is collapsed, from the scenario
+   *  plug-in's ``toolCaption`` hook, and left out of the collapsed summary. The
+   *  expanded row lists it with the other parameters. */
+  caption: ToolCaption | null;
 }
 
 /** Renders a single tool call as a collapsible row. */
@@ -46,10 +62,11 @@ export function ToolCallDisplay({
   result,
   judgeMetadata,
   toolMetadata,
+  caption,
 }: ToolCallDisplayProps) {
   const [expanded, setExpanded] = useState(false);
   const displayName = cleanToolName(toolName);
-  const summary = paramSummary(args);
+  const summary = paramSummary(argsWithoutCaption(args, caption));
 
   return (
     <div className="rounded border border-border/50 bg-muted/30 text-[11px]">
@@ -67,6 +84,12 @@ export function ToolCallDisplay({
         <span className="font-mono font-medium text-foreground">{displayName}</span>
         <span className="truncate text-muted-foreground">{summary}</span>
       </button>
+
+      {caption !== null && !expanded ? (
+        <p className="border-t border-border/30 px-2 py-1 pl-[26px] whitespace-pre-wrap text-[11.5px] leading-snug text-foreground/80">
+          {caption.text}
+        </p>
+      ) : null}
 
       {expanded ? (
         <div className="space-y-2 border-t border-border/30 px-2 py-2">

@@ -17,6 +17,7 @@ export const driveModuleRepairPlugin: ScenarioPlugin = {
   RoundDetailPanel: DriveModuleRepairRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: {
     sseEventNames: ["drive_module_replacement_judged"],
     judgedToolNames: ["service_component", "replace_component"],

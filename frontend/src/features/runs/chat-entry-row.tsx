@@ -32,6 +32,7 @@ function ToolOrNotification({ entry }: { entry: DisplayEntry }) {
       result={entry.tool_result}
       judgeMetadata={entry.judge_metadata}
       toolMetadata={entry.tool_metadata}
+      caption={entry.tool_caption}
     />
   );
 }

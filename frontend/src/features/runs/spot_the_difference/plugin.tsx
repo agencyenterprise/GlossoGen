@@ -15,6 +15,7 @@ export const spotTheDifferencePlugin: ScenarioPlugin = {
   RoundDetailPanel: SpotTheDifferenceRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: () => null,
