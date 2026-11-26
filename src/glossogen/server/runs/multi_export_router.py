@@ -238,11 +238,11 @@ async def export_runs_raw(
         write_runs_zip(
             runs=summaries,
             include_logs=body.include_logs,
-            include_atif=body.include_atif,
+            trajectory_format=body.trajectory_format,
             destination=destination,
         )
 
-    # The estimate leaves out the ATIF trajectories, which are generated during the
+    # The estimate leaves out the trajectories, which are generated during the
     # build, so the ceiling can still be crossed partway through.
     return await _archive_or_too_large(
         build=build,

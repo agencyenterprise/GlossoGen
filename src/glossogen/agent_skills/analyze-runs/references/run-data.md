@@ -42,7 +42,8 @@ A derived run's log starts with the rounds that it copied from its source. Its `
 | `glossogen export ... --frames message_level,round_context` | one row per message, and each agent's briefing per round |
 | `glossogen analyze --runs-dir <dir> ...` | metrics grouped by knob, label or model; `--list-fields` lists what a selection can be grouped by |
 | `glossogen evaluate <scenario> --run-dir <run> --metrics <names> --model <judge> --provider <provider>` | runs metrics on a run and writes its report |
-| `glossogen export-thread`, `glossogen export-atif` | one agent's history as a provider request body, or as ATIF trajectories |
+| `glossogen export-thread`, `glossogen export-atif --format atif` | one agent's history as a provider request body, or as ATIF trajectories |
+| `glossogen export-atif --format inspect` | the run's agents as one Inspect-format log, which Docent's web UI imports |
 
 `export` and `analyze` select runs with `--scenario`, `--label`, `--knob '<knob><op><value>'` and `--run-id`. See the glossogen docs on exporting runs and on analysis for every flag.
 

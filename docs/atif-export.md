@@ -9,6 +9,7 @@ reads.
 ```bash
 glossogen export-atif veyru \
   --run-dir ./runs/veyru/1782395813 \
+  --format atif \
   --out-dir ./atif
 ```
 
@@ -17,12 +18,32 @@ It logs one line per trajectory written, with its step count.
 | Flag | Effect |
 |---|---|
 | `--run-dir DIR` | the run to export (required) |
-| `--out-dir DIR` | where to write `<agent_id>.json`, created if missing (required) |
+| `--format FORMAT` | `atif` writes `<agent_id>.json` per agent; `inspect` writes one `inspect_log.json` (required) |
+| `--out-dir DIR` | where to write the files, created if missing (required) |
 | `--agent-id ID` | only this agent; omit for every agent |
 | `--round R` | exclusive cutoff, as for `export-thread`: keeps rounds `1..R-1` |
 
 Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.
+
+## The Inspect format
+
+`--format inspect` writes the same trajectories as one Inspect-format log, which
+[Docent](docent.md)'s Upload Runs dialog imports. Each trajectory becomes one
+sample, and each step becomes one or more chat messages:
+
+| ATIF | Inspect message |
+|---|---|
+| `system` step | a `system` message |
+| `user` step | a `user` message |
+| `agent` step | an `assistant` message with the reasoning, the text and the tool calls |
+| each observation result | a `tool` message, named after the call it answers |
+
+A sample's metadata holds the run id, the scenario, the agent id, the model, the
+provider, the generation and the scenario config. Each message's metadata holds its
+step id, whether the step is copied context, and the step's `extra`. The log holds
+only the fields that Docent's importer reads, so Inspect's own tools do not open
+it.
 
 ## Other ways to get it
 
@@ -30,12 +51,13 @@ written to the run directory.
 |---|---|
 | REST | `GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/agents/{agent_id}/atif?round=R` |
 | MCP | `export_agent_atif` with `run_id`, `agent_id`, `cutoff_round` |
-| Raw zip | the export modal's raw tab (on by default), `glossogen export --raw --include-atif`, or `include_atif` on `POST .../runs/export/raw` |
+| Raw zip | the Export dialog's raw tab (ATIF by default), `glossogen export --raw --trajectories atif`, or `"trajectory_format": "atif"` on `POST .../runs/export/raw` |
 | Single-run zip | always included in a run's zip download |
 
 REST and MCP return `{"trajectories": [...]}` for one agent. The raw zip writes
-every agent of every selected run under `atif/` in that run's folder, as described
-in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
+every agent of every selected run under `atif/` in that run's folder, or with
+`inspect` one `inspect_log.json` at the zip root, as described in
+[exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 
 ## How events map to steps
 

@@ -390,7 +390,7 @@ async def test_a_raw_export_over_the_byte_ceiling_is_refused(
     body = RawExportRequest(
         selection=ExplicitRunSelection(kind="explicit", run_ids=[r.run_id for r in runs]),
         include_logs=False,
-        include_atif=False,
+        trajectory_format=None,
     )
     with pytest.raises(HTTPException) as raised:
         await export_runs_raw(body=body, request=REQUEST)
@@ -461,7 +461,7 @@ async def test_the_raw_zip_nests_each_run_under_its_scenario(
     body = RawExportRequest(
         selection=ExplicitRunSelection(kind="explicit", run_ids=[r.run_id for r in runs]),
         include_logs=False,
-        include_atif=False,
+        trajectory_format=None,
     )
     response = await export_runs_raw(body=body, request=REQUEST)
 

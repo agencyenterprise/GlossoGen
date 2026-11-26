@@ -261,7 +261,7 @@ glossogen export --runs-dir ./runs --out ./export \
 | `--no-repeat-run-columns` | keep the round, agent and message tables narrow |
 | `--raw` | also write `runs.zip` |
 | `--include-logs` | keep debug and stdout logs in that zip |
-| `--include-atif` | with `--raw`, add each agent's [ATIF trajectory](atif-export.md) to that zip |
+| `--trajectories FORMAT` | with `--raw`, add the agents' [trajectories](atif-export.md) to that zip: `atif` or `inspect` |
 | `--max-runs N` | override the 5000-run ceiling |
 
 Every column and metric available for the selection is included. The flags trim
@@ -340,10 +340,17 @@ in flight, so a re-imported run carrying them reads as still running.
 `run_summary_cache.json` is always left out too, since it names no run and an
 importing server would trust it for the wrong one.
 
-An `atif/` folder in each run holds one [ATIF trajectory](atif-export.md) per
-agent, generated from the event log while the zip is written. The Export dialog's ATIF
-checkbox starts ticked. The CLI adds it with `--include-atif`, and the REST body
-with `include_atif`. A single run's zip download always includes it.
+The zip can also hold the agents' [trajectories](atif-export.md), generated from
+each event log while the zip is written. The Export dialog's **Agent
+trajectories** choice sets their format:
+
+| Choice | CLI | REST `trajectory_format` | What the zip holds |
+| --- | --- | --- | --- |
+| ATIF, the dialog's default | `--trajectories atif` | `"atif"` | an `atif/` folder in each run, with one ATIF file per agent |
+| Inspect log for Docent | `--trajectories inspect` | `"inspect"` | one `inspect_log.json` at the zip root, with one sample per agent of every run |
+| None | no flag | `null` | no trajectories |
+
+A single run's zip download includes the `atif/` folder.
 
 A run still being written is safe to export. Members are streamed into the
 archive rather than pre-declaring a size, so a JSONL that grows mid-read does not

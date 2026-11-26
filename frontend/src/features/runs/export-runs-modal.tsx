@@ -14,6 +14,7 @@ import { useExportPreview } from "./use-export-preview";
 
 type ExportFrame = components["schemas"]["ExportFrame"];
 type ExportValueColumn = components["schemas"]["ExportValueColumn"];
+type TrajectoryFormat = components["schemas"]["TrajectoryFormat"];
 type RunSelection =
   components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
 
@@ -31,6 +32,20 @@ const FRAME_DESCRIPTIONS: Array<{ frame: ExportFrame; title: string; detail: str
     title: "round_context.csv",
     detail: "One row per round, one column per agent's briefing",
   },
+];
+
+const TRAJECTORY_CHOICES: Array<{
+  format: TrajectoryFormat | null;
+  title: string;
+  detail: string;
+}> = [
+  { format: "atif", title: "ATIF", detail: "atif/<agent>.json in every run's folder" },
+  {
+    format: "inspect",
+    title: "Inspect log for Docent",
+    detail: "One inspect_log.json for all the runs, for Docent's Upload Runs dialog",
+  },
+  { format: null, title: "None", detail: "" },
 ];
 
 const COLUMN_SECTIONS: Array<{ group: string; title: string; empty: string }> = [
@@ -195,7 +210,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
     selectedRunIds.size > 0 ? "explicit" : "filters"
   );
   const [includeLogs, setIncludeLogs] = useState(false);
-  const [includeAtif, setIncludeAtif] = useState(true);
+  const [trajectoryFormat, setTrajectoryFormat] = useState<TrajectoryFormat | null>("atif");
   const [frames, setFrames] = useState<Set<ExportFrame>>(new Set<ExportFrame>(["run_level"]));
   const [columnKeys, setColumnKeys] = useState<ReadonlySet<string>>(new Set());
   const [metricNames, setMetricNames] = useState<ReadonlySet<string>>(new Set());
@@ -315,7 +330,7 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
         const body: components["schemas"]["RawExportRequest"] = {
           selection,
           include_logs: includeLogs,
-          include_atif: includeAtif,
+          trajectory_format: trajectoryFormat,
         };
         await downloadAuthenticatedFile({
           path: "/api/g/{group_slug}/runs/export/raw",
@@ -530,15 +545,30 @@ export function ExportRunsModal({ onClose }: { onClose: () => void }) {
                   />
                   Include debug and stdout logs
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={includeAtif}
-                    onChange={() => setIncludeAtif(!includeAtif)}
-                    className="rounded border-input"
-                  />
-                  Include ATIF trajectories (one per agent)
-                </label>
+                <fieldset className="space-y-1">
+                  <legend className="text-xs">Agent trajectories</legend>
+                  {TRAJECTORY_CHOICES.map(choice => (
+                    <label
+                      key={choice.title}
+                      className="flex cursor-pointer items-start gap-2 text-xs"
+                    >
+                      <input
+                        type="radio"
+                        checked={trajectoryFormat === choice.format}
+                        onChange={() => setTrajectoryFormat(choice.format)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        {choice.title}
+                        {choice.detail ? (
+                          <span className="block text-[11px] text-muted-foreground">
+                            {choice.detail}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
                 <p className="text-[11px] text-muted-foreground">
                   {rawEstimate === null
                     ? "Sizing the run folders."
