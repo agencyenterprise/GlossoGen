@@ -12,6 +12,10 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL app's GPU types are set at deploy time.** `modal/grpo/grpo_app.py`
+  reads `GRPO_TRAINER_GPUS` and `GRPO_SERVER_GPUS`, each a comma-separated
+  list of GPU types in order of preference, and a deploy without them fails.
+  See [Training a model with RL](docs/rl-training.md#1-deploy-the-app).
 - **The RL loop's `train` can test adapters on held-out seeds as it trains.**
   With `--eval-every N --eval-seeds ... --eval-games-per-seed G`, `train` tests
   each adapter k above 0 for which k is a multiple of N, once the trainer has

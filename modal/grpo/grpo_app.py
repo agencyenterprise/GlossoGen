@@ -26,7 +26,11 @@ model of that name. The server also serves the base model, without an adapter, u
 
 Deploy from the repository root:
 
-    GRPO_APP_NAME=<app name> uv run --no-sync modal deploy modal/grpo/grpo_app.py
+    GRPO_APP_NAME=<app name> GRPO_TRAINER_GPUS=B200,H200 GRPO_SERVER_GPUS=H200,H100 \
+        uv run --no-sync modal deploy modal/grpo/grpo_app.py
+
+``GRPO_TRAINER_GPUS`` and ``GRPO_SERVER_GPUS`` list the GPU types that the trainer and the
+policy server accept, in order of preference.
 """
 
 import logging
@@ -43,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).resolve().parent
 APP_NAME = os.environ["GRPO_APP_NAME"]
+TRAINER_GPUS = os.environ["GRPO_TRAINER_GPUS"].split(",")
+SERVER_GPUS = os.environ["GRPO_SERVER_GPUS"].split(",")
 CONTROL_DICT = f"{APP_NAME}-adapters"
 VOLUME_ROOT = Path("/grpo")
 HF_CACHE = Path("/root/.cache/huggingface")
@@ -105,7 +111,7 @@ def adapter_dir(*, run_name: str, step: int) -> Path:
 
 @app.cls(
     image=train_image,
-    gpu=["B200", "H200"],
+    gpu=TRAINER_GPUS,
     volumes={str(VOLUME_ROOT): grpo_volume, str(HF_CACHE): hf_cache_volume},
     secrets=[modal.Secret.from_name("huggingface-glossogen")],
     timeout=2 * HOURS,
@@ -281,9 +287,9 @@ def gpu_memory_mib() -> int:
 
 @app.function(
     image=vllm_image,
-    # H200 or H100 only. With LoRA on, vLLM 0.31 failed in its flash-attention kernel while
-    # capturing CUDA graphs on a B200. The H200 containers worked.
-    gpu=[f"{gpu_type}:{SERVE_GPUS}" for gpu_type in ("H200", "H100")],
+    # Not a B200: with LoRA on, vLLM 0.31 failed in its flash-attention kernel while capturing
+    # CUDA graphs on a B200. The H200 and H100 containers worked.
+    gpu=[f"{gpu_type}:{SERVE_GPUS}" for gpu_type in SERVER_GPUS],
     secrets=[
         modal.Secret.from_name("huggingface-glossogen"),
         modal.Secret.from_name("vllm-api-key"),

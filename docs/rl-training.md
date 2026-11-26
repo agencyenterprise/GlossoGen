@@ -37,12 +37,15 @@ Run every command from the repository root, in one terminal.
 ```bash
 unset VIRTUAL_ENV
 export GRPO_APP_NAME=grpo-$USER
+export GRPO_TRAINER_GPUS=B200,H200 GRPO_SERVER_GPUS=H200,H100
 uv run --no-sync modal deploy modal/grpo/grpo_app.py
 ```
 
 The app holds the policy server, which plays the games, and the trainer, which updates the model.
 `GRPO_APP_NAME` names the app and its volume, so it has to be a name that nobody in your Modal
-workspace uses. `uv run --no-sync modal app list` shows the names in use. `unset VIRTUAL_ENV` stops
+workspace uses. `uv run --no-sync modal app list` shows the names in use. `GRPO_TRAINER_GPUS` and
+`GRPO_SERVER_GPUS` list the GPU types that the trainer and the policy server accept, in order of
+preference. The policy server cannot run on a B200. `unset VIRTUAL_ENV` stops
 `uv` from using a virtualenv that your shell has active.
 
 ### 2. Create the run
