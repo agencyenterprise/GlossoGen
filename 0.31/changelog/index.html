@@ -686,6 +686,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../analyzing-runs-with-claude-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analyzing runs with Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../reading-runs-from-code/" class="md-nav__link">
         
   
@@ -750,10 +778,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_14" >
         
           
-          <label class="md-nav__link" for="__nav_4_13" id="__nav_4_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_14" id="__nav_4_14_label" tabindex="0">
             
   
   
@@ -771,8 +799,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_13">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2059,6 +2087,22 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Claude Code can analyze a group of runs with the <code>analyze-runs</code> skill.</strong>
+  <code>glossogen install-skill</code> copies the skill into a project's <code>.claude/skills/</code>,
+  and this repository links it there. The skill has Claude check the runs
+  against the plan, have subagents read every transcript, check each claim
+  against the event logs, and write a findings file.
+  <a href="../analyzing-runs-with-claude-code/">Analyzing runs with Claude Code</a>
+  describes it. The veyru and signal_game READMEs have a section called
+  "Analyzing runs" that the skill reads.</li>
+<li><strong><code>glossogen transcript</code> prints a run's event log as plain text, round by
+  round.</strong> It keeps what each agent was told, wrote, called and received, and
+  leaves out event ids, timestamps, token counts and waits that give no reason. <code>--out-dir</code>
+  writes one file per round.</li>
+<li><strong>A run's log records the glossogen code that wrote it.</strong> <code>simulation_started</code>
+  holds <code>glossogen_build</code>: the installed version, the git commit when one is
+  known, and whether an editable checkout had uncommitted changes under <code>src/</code>.
+  A fork or an agent replacement records the code that derived it.</li>
 <li><strong><code>record_token_ids</code> also records the logprob of each answer token.</strong> Each
   request of a self-hosted agent asks the server for <code>logprobs</code> as well as
   <code>return_token_ids</code>, and each <code>llm_response_received</code> event holds

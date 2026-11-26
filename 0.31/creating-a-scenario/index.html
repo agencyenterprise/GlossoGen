@@ -688,6 +688,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../analyzing-runs-with-claude-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analyzing runs with Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../reading-runs-from-code/" class="md-nav__link">
         
   
@@ -752,10 +780,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_14" >
         
           
-          <label class="md-nav__link" for="__nav_4_13" id="__nav_4_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_14" id="__nav_4_14_label" tabindex="0">
             
   
   
@@ -773,8 +801,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_13">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1259,6 +1287,17 @@
     <span class="md-ellipsis">
       
         evaluation/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes-for-analyzing-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes for analyzing runs
       
     </span>
   </a>
@@ -1889,6 +1928,17 @@
     <span class="md-ellipsis">
       
         evaluation/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes-for-analyzing-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes for analyzing runs
       
     </span>
   </a>
@@ -2766,6 +2816,13 @@ reading a hook is preferred.</p>
 the generic metrics. Its name must not repeat a generic metric's; <code>validate</code>
 checks. <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/signal_game/scenario.py">signal_game</a> is the
 example.</p>
+<h3 id="notes-for-analyzing-runs">Notes for analyzing runs<a class="headerlink" href="#notes-for-analyzing-runs" title="Permanent link">&para;</a></h3>
+<p>A section called <code>## Analyzing runs</code> in the scenario's README lists what someone reading its runs
+can misread, and the ways that agents can win a round without the behaviour that the scenario
+tests. The <code>analyze-runs</code> skill reads it (<a href="../analyzing-runs-with-claude-code/">Analyzing runs with Claude Code</a>).
+Leave out what the run's event log already holds: the scenario description, the system prompts
+and the briefings. <a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/veyru/README.md#analyzing-runs">veyru</a> and
+<a href="https://github.com/agencyenterprise/GlossoGen/blob/main/src/glossogen/scenarios/signal_game/README.md#analyzing-runs">signal_game</a> are examples.</p>
 <h3 id="run-detail-extension">Run-detail extension<a class="headerlink" href="#run-detail-extension" title="Permanent link">&para;</a></h3>
 <p>For per-round ground truth, judge metadata keyed by tool <code>call_id</code>, or custom SSE
 events on the run-detail API. The scenario class returns the extension:</p>
