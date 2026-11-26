@@ -30,6 +30,7 @@ the results of our runs.
 | `test_partner.py` | Tests of the partner file, the partner's game config and URLs, and the seats that train |
 | `test_grpo_steps.py` | Whole training steps on CPU, with and without `--overlap`, tests during training, and runs that stop and resume: real signal_game games with scripted players, a fake app |
 | `test_grpo_training.py` | CPU tests of the loss, the k3 clamp, the ratio cap, the LoRA targets and reloading a saved adapter, on a tiny random model |
+| `design_notes.md` | Designs of two features that the loop does not have: a trained adapter for each seat, and a new game in each free slot |
 
 The repository's test suite does not run these tests. Run the loop's tests with:
 

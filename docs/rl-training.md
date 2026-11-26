@@ -152,9 +152,9 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 
 Then run the `eval` command of section 4 once, with `--step 30`, and compare its count with the
 base model's count from section 4, by the same rule. You need not test `--step 0` again: `eval`
-plays nothing for a test that `eval.jsonl` already holds. `first-item-rep3` trained to step 29 in two `train`
-calls, and its steps 10 to 29 took 9.5 hours, 21 to 48 minutes each. Its adapter 30 ended on the
-first item in 632 of 1,440 player-rounds, against 257 for the base model (see
+plays nothing for a test that `eval.jsonl` already holds. `first-item-rep3` trained to step 29 in
+two `train` calls, and its steps 10 to 29 took 9.5 hours, 21 to 48 minutes each. Its adapter 30
+ended on the first item in 632 of 1,440 player-rounds, against 257 for the base model (see
 [Training longer](#training-longer)).
 
 ### 6. Stop the app
@@ -212,15 +212,15 @@ metrics if the games are the same, and refuses the step if they differ.
 
 With `--overlap`, step k's games play while the trainer trains step k−1. Step k's games then play
 with adapter k−1, the newest adapter when they start. Steps 0 and 1 both play adapter 0. The
-trainer trains step k from adapter k, so each batch after step 1's comes from games of the adapter
+trainer trains step k from adapter k, so each batch after step 0's comes from games of the adapter
 before the one that trains on it. The [importance weight](#the-loss) corrects for that
 difference.
 
 Once the trainer has saved adapter k+1, the policy server loads it while step k+1's games are
 still playing adapter k. The loop asks the server to keep adapter k loaded until those games end.
 It then unloads it when it loads the next adapter. Each load request lists the adapters to keep,
-and the server unloads each other adapter that it loaded. vLLM holds at most 2 adapters at once
-(`--max-loras 2`), which is the most that this order needs.
+and the server unloads each other adapter that it loaded. vLLM runs at most 2 adapters in one
+batch (`--max-loras 2`), and this order needs no more than 2.
 
 A step with `--overlap` takes about as long as the longer of its games and the training of the
 step before, instead of their sum. The `play` and `train` times that each step prints are those of
@@ -320,10 +320,11 @@ steps. `win` has not been tested with this loop.
 ### Records
 
 Each game's event log lands in `--runs-dir`, under `signal_game/`. A training game's labels are
-`grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `adapter=<a>`, `seed=<seed>` and `game=<n>`, where adapter a played the game. A test game
-has the same labels without `reward=`, and with `grpo_eval` in place of `grpo`. A game with a
-partner also has the labels `partner_seat=<seat>` and `partner=<model>`. The loop's own records
-are in `<records dir>/<run>/`:
+`grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `adapter=<a>`, `seed=<seed>` and
+`game=<n>`, where a is the adapter that played the game. A test game has the same labels without
+`reward=`, and with `grpo_eval` in place of `grpo`. A game with a partner also has the labels
+`partner_seat=<seat>` and `partner=<model>`. The loop's own records are in
+`<records dir>/<run>/`:
 
 | Path | What it holds |
 | --- | --- |
@@ -412,17 +413,20 @@ resumed games.
 ### Another scenario
 
 To train on another scenario, write a module like `signal_game_rewards.py`. It reads a game's
-events and gives each agent a score in each round. `grpo_loop.py` imports `Reward`,
-`PlayerRound`, `GameOutcome`, `game_outcome` and `player_score` from that module. It reads the
-`GameOutcome` fields `finished`, `players`, `rounds`, `won_rounds`, `first_item_finishes`, `moves`
-and `player_rounds_without_move`. Your module has to provide these seven fields, or `grpo_loop.py` has
-to change. Set `SCENARIO` in `grpo_loop.py` to the scenario's name, and pass its config as
+events and gives each agent a score in each round. The loop imports `Reward`, `PlayerRound`,
+`GameOutcome`, `game_outcome` and `player_score` from that module. It reads the `GameOutcome`
+fields `finished`, `players`, `rounds`, `won_rounds`, `first_item_finishes`, `moves` and
+`player_rounds_without_move`. Your module has to provide these seven fields, or the loop has to
+change. Set `SCENARIO` in `loop_services.py` to the scenario's name, and pass its config as
 `--game-config`. In a run with a partner, the policy plays the agents in the other seats.
 
 ## Our runs
 
 The commands above ran four times, as the runs `tutorial-check`, `first-item-rep1`,
-`first-item-rep2` and `first-item-rep3`. Two of the four learned within ten steps:
+`first-item-rep2` and `first-item-rep3`. These four runs trained with a loss that had no
+importance weight w. Their players sent strict tools, and they ran without `--overlap` and
+without a partner. No run has tested whether the loop learns as often with w, without strict
+tools, or with `--overlap`. Two of the four learned within ten steps:
 
 | Run | Base model | Adapter 10 | Difference |
 | --- | --- | --- | --- |
