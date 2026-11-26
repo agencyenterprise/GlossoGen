@@ -342,15 +342,18 @@ importing server would trust it for the wrong one.
 
 The zip can also hold the agents' [trajectories](atif-export.md), generated from
 each event log while the zip is written. The Export dialog's **Agent
-trajectories** choice sets their format:
+trajectories** choice, the CLI's `--trajectories` flag and the REST body's
+`trajectory_format` field set their format. The REST field is required:
 
 | Choice | CLI | REST `trajectory_format` | What the zip holds |
 | --- | --- | --- | --- |
 | ATIF, the dialog's default | `--trajectories atif` | `"atif"` | an `atif/` folder in each run, with one ATIF file per agent |
-| Inspect log for Docent | `--trajectories inspect` | `"inspect"` | one `inspect_log.json` at the zip root, with one sample per agent of every run |
+| Inspect log for [Docent](docent.md) | `--trajectories inspect` | `"inspect"` | one [Inspect log](atif-export.md#the-inspect-format), `inspect_log.json`, at the zip root, with one sample per agent generation of every run |
 | None | no flag | `null` | no trajectories |
 
-A single run's zip download includes the `atif/` folder.
+A run whose event log does not parse is archived without trajectories, so it adds
+no `atif/` folder and no samples. A single run's zip download includes the `atif/`
+folder.
 
 A run still being written is safe to export. Members are streamed into the
 archive rather than pre-declaring a size, so a JSONL that grows mid-read does not

@@ -14,13 +14,15 @@ the commit log.
 ### Added
 - **Agent trajectories can be exported as an Inspect-format log that Docent
   imports.** `glossogen export-atif --format inspect` writes one
-  `inspect_log.json` with one sample per agent. The raw zip's
-  `--trajectories inspect`, and the Export dialog's **Inspect log for Docent**
-  choice, write one such log at the zip root for every selected run.
+  `inspect_log.json` with one sample per agent. `glossogen export --raw
+  --trajectories inspect` writes one such log at the root of the zip, and the log
+  holds every selected run. The Export dialog's **Inspect log for Docent** choice
+  writes the same log.
   [ATIF export](docs/atif-export.md#the-inspect-format) describes the format.
 - **A docs page gives the steps to search runs with Docent.**
-  [Searching runs with Docent](docs/docent.md) runs Docent on your own machine,
-  uploads an Inspect log in Docent's web UI, and searches the runs with a rubric.
+  [Searching runs with Docent](docs/docent.md) gives the steps to run Docent on
+  your own machine, upload an Inspect log in its web UI, and search the runs with a
+  rubric.
 - **Claude Code can analyze a group of runs with the `analyze-runs` skill.**
   `glossogen install-skill` copies the skill into a project's `.claude/skills/`,
   and this repository links it there. The skill has Claude check the runs
@@ -135,8 +137,9 @@ the commit log.
   [README](src/glossogen/scenarios/spot_the_intersection/README.md#discussion-phase).
 
 ### Changed
-- **`glossogen export-atif` needs `--format atif` or `--format inspect`.** The raw
-  export takes `trajectory_format` (`"atif"`, `"inspect"` or `null`) in place of
+- **Breaking for scripts that call the export: `glossogen export-atif` needs
+  `--format atif` or `--format inspect`.** `POST .../runs/export/raw` takes
+  `trajectory_format` (`"atif"`, `"inspect"` or `null`) in place of
   `include_atif`, and `glossogen export --raw` takes `--trajectories atif` or
   `--trajectories inspect` in place of `--include-atif`.
 - `AutonomousSupervisor` takes `list_offered_tool_definitions` in place of

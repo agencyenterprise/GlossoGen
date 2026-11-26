@@ -2,9 +2,10 @@
 
 `glossogen export-atif` writes a run's agents as
 [ATIF](https://docs.harborframework.com/agents/atif) (Agent Trajectory
-Interchange Format) trajectories: one JSON document per agent, holding its
-prompts, responses, tool calls and token usage in a schema other agent tooling
-reads.
+Interchange Format) trajectories, one JSON document per agent, or as one
+[Inspect-format log](#the-inspect-format) for Docent. An ATIF trajectory holds the
+agent's prompts, responses, tool calls and token usage in a schema that other agent
+tooling reads.
 
 ```bash
 glossogen export-atif veyru \
@@ -13,7 +14,9 @@ glossogen export-atif veyru \
   --out-dir ./atif
 ```
 
-It logs one line per trajectory written, with its step count.
+With `--format atif`, it logs one line for each trajectory that it writes, with the
+trajectory's step count. With `--format inspect`, it logs one line with the number
+of samples.
 
 | Flag | Effect |
 |---|---|
@@ -26,38 +29,20 @@ It logs one line per trajectory written, with its step count.
 Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.
 
-## The Inspect format
-
-`--format inspect` writes the same trajectories as one Inspect-format log, which
-[Docent](docent.md) imports with **Add Data** > **Upload Inspect Log**. Each trajectory becomes one
-sample, and each step becomes one or more chat messages:
-
-| ATIF | Inspect message |
-|---|---|
-| `system` step | a `system` message |
-| `user` step | a `user` message |
-| `agent` step | an `assistant` message with the reasoning, the text and the tool calls |
-| each observation result | a `tool` message, named after the call it answers |
-
-A sample's metadata holds the run id, the scenario, the agent id, the model, the
-provider, the generation and the scenario config. Each message's metadata holds its
-step id, whether the step is copied context, and the step's `extra`. The log holds
-only the fields that Docent's importer reads, so Inspect's own tools do not open
-it.
-
-## Other ways to get it
+## Other ways to get ATIF
 
 | Surface | Call |
 |---|---|
 | REST | `GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/agents/{agent_id}/atif?round=R` |
 | MCP | `export_agent_atif` with `run_id`, `agent_id`, `cutoff_round` |
-| Raw zip | the Export dialog's raw tab (ATIF by default), `glossogen export --raw --trajectories atif`, or `"trajectory_format": "atif"` on `POST .../runs/export/raw` |
+| Raw zip | the Export dialog's **Raw run folders** tab (ATIF by default), `glossogen export --raw --trajectories atif`, or `"trajectory_format": "atif"` on `POST .../runs/export/raw`; `inspect` in place of `atif` gives the Inspect log |
 | Single-run zip | always included in a run's zip download |
 
-REST and MCP return `{"trajectories": [...]}` for one agent. The raw zip writes
-every agent of every selected run under `atif/` in that run's folder, or with
-`inspect` one `inspect_log.json` at the zip root, as described in
-[exporting runs](exporting-runs.md#what-the-raw-zip-holds).
+REST and MCP return `{"trajectories": [...]}` for one agent. With `atif`, the raw
+zip writes every agent of every selected run under `atif/` in that run's folder.
+With `inspect`, it writes one `inspect_log.json` at the zip root that holds every
+selected run. [Exporting runs](exporting-runs.md#what-the-raw-zip-holds) describes
+both.
 
 ## How events map to steps
 
@@ -232,6 +217,29 @@ from harbor.models.trajectories import Trajectory
 Trajectory.model_validate(json.load(open(sys.argv[1])))
 print("valid")' ./atif/field_observer.json
 ```
+
+## The Inspect format
+
+Inspect is an evaluation framework, and an Inspect log is its log file.
+`glossogen export-atif --format inspect` writes the ATIF trajectories as one
+Inspect log, `inspect_log.json`, which [Docent](docent.md) imports with
+**Add Data** > **Upload Inspect Log**. Each trajectory becomes one sample, which
+is Inspect's record of one conversation. Each step becomes one or more chat
+messages:
+
+| ATIF step | Inspect message |
+|---|---|
+| `system` step | a `system` message |
+| `user` step | a `user` message |
+| `agent` step | an `assistant` message with the reasoning, the text and the tool calls |
+| each observation result | a `tool` message with the call's id and its function name |
+
+A sample's metadata holds the run id, the scenario, the agent id, the model, the
+provider, the [generation](#swapped-and-replaced-seats) and the scenario config. A
+`system`, `user` or `assistant` message's metadata holds its step id, whether the
+step is [copied context](#copied-context), and the step's `extra`. A `tool`
+message's metadata holds only its step id. The log holds only the fields that
+Docent's importer reads, so Inspect's own tools do not open it.
 
 ## Next
 
