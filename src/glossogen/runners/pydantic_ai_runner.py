@@ -587,7 +587,11 @@ class PydanticAIRunner(AgentRunner):
                 record_token_ids=agent_config.record_token_ids,
             )
             agent: Agent[None, str] = Agent(
-                model=build_pydantic_ai_model(model=agent_config.model, provider=provider),
+                model=build_pydantic_ai_model(
+                    model=agent_config.model,
+                    provider=provider,
+                    self_hosted_strict_tools=agent_config.self_hosted_strict_tools,
+                ),
                 deps_type=type(None),
                 system_prompt=full_system_prompt,
                 tools=build_agent_tools(

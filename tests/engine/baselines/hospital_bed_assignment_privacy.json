@@ -31,6 +31,7 @@
     },
     "wait_reasoning": false,
     "record_token_ids": false,
+    "self_hosted_strict_tools": true,
     "seed": 42,
     "round_time_budget_seconds": null,
     "patient_pool_size": 6,

@@ -221,9 +221,10 @@ def test_a_seed_with_one_finished_game_gives_no_advantage() -> None:
     assert seed_advantages(group=group, reward=Reward.FIRST_ITEM) == []
 
 
-def test_the_shipped_game_config_records_token_ids() -> None:
+def test_the_shipped_game_config_records_token_ids_and_sends_no_strict_tools() -> None:
     config = json.loads((Path(__file__).parent / "signal_game_shapes.json").read_text())
     assert config["record_token_ids"] is True
+    assert config["self_hosted_strict_tools"] is False
 
 
 def test_the_modules_that_run_on_modal_parse_as_python_3_12() -> None:

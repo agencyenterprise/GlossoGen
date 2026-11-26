@@ -8,8 +8,12 @@ from pydantic_ai.settings import ModelSettings
 
 from glossogen.llm.pydantic_ai_model_factory import agent_model_settings
 from glossogen.model_catalog.provider_catalog import Provider
+from glossogen.models.agent_config import AgentConfig
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import AgentRegistered, ToolResultReceived
+from glossogen.runners.pydantic_ai_runner import PydanticAIRunner
+from glossogen.runtime.agent_run_result import AgentRunResult
+from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.scenarios.signal_game.board import generate_boards
 from glossogen.scenarios.signal_game.events import (
     SignalGameMoveMade,
@@ -633,6 +637,37 @@ async def test_the_record_token_ids_knob_reaches_each_agents_settings(
     await play(scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert sorted(flags) == [(PLAYER_A, True), (PLAYER_B, True)]
+
+
+@pytest.mark.parametrize("strict_tools", [True, False])
+async def test_the_self_hosted_strict_tools_knob_reaches_each_agents_config(
+    strict_tools: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The supervisor copies the knob into the config that each agent's runner starts with."""
+    flags: list[tuple[str, bool]] = []
+    start = PydanticAIRunner.start
+
+    async def recording_start(
+        self: PydanticAIRunner,
+        agent_config: AgentConfig,
+        runtime: SimulationRuntime,
+        cost_tracker: dict[str, float],
+    ) -> AgentRunResult:
+        flags.append((agent_config.agent_id, agent_config.self_hosted_strict_tools))
+        return await start(
+            self, agent_config=agent_config, runtime=runtime, cost_tracker=cost_tracker
+        )
+
+    monkeypatch.setattr(PydanticAIRunner, "start", recording_start)
+    overrides = {**ONE_ROUND, "self_hosted_strict_tools": strict_tools}
+    scenario = build(preset_name="knobs_default", overrides=overrides)
+    scripts: dict[str, list[ScriptedTurn]] = {
+        PLAYER_A: [read(), end_round(), wait_for_next_round()],
+        PLAYER_B: [read(), end_round(), wait_for_next_round()],
+    }
+    await play(scenario=scenario, scripts=scripts, tmp_path=tmp_path, monkeypatch=monkeypatch)
+
+    assert sorted(flags) == [(PLAYER_A, strict_tools), (PLAYER_B, strict_tools)]
 
 
 async def test_the_settings_a_run_starts_with_win_over_the_presets(

@@ -106,6 +106,18 @@ class BaseKnobs(BaseModel):
     effect on agents under providers other than ``self-hosted``. Off by
     default, which keeps these fields out of a run's log.
 
+    ``self_hosted_strict_tools`` decides whether a self-hosted agent's requests
+    mark a tool ``strict`` when pydantic-ai finds the tool's schema
+    strict-compatible. vLLM then forces the tool's calls to match the schema
+    with a grammar, and logs the logprobs of the tokens that the grammar left.
+    A token that the grammar forces is logged with a logprob near 0, whatever
+    probability the model gives it. Off, each tool goes out with the same schema
+    and without the ``strict`` key, so the logged logprobs are the model's own
+    over the whole vocabulary, and the model can write a call that does not
+    match the schema. On by default, which keeps a self-hosted agent's requests
+    comparable with runs recorded before the knob existed. The knob has no
+    effect on agents under providers other than ``self-hosted``.
+
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and
     ``noise_replacement_mode`` decides what a corrupted character becomes.
@@ -134,6 +146,7 @@ class BaseKnobs(BaseModel):
     compaction: CompactionConfig = CompactionConfig()
     wait_reasoning: bool = False
     record_token_ids: bool = False
+    self_hosted_strict_tools: bool = True
 
     @model_validator(mode="before")
     @classmethod

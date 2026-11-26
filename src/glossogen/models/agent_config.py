@@ -37,8 +37,9 @@ class AgentConfig(BaseModel):
     ``model_overrides`` settings, else the run's ``agent_model_settings``, before
     registering the agent.
 
-    ``record_token_ids`` is the run's ``record_token_ids`` knob. Scenarios leave
-    it unset, and the supervisor fills it in the same way.
+    ``record_token_ids`` and ``self_hosted_strict_tools`` are the run's knobs of
+    the same names. Scenarios leave them unset, and the supervisor fills them in
+    the same way.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -54,3 +55,4 @@ class AgentConfig(BaseModel):
     initial_message_history: list[ModelMessage] | None = None
     model_settings: AgentModelSettings = AgentModelSettings()
     record_token_ids: bool = False
+    self_hosted_strict_tools: bool = True

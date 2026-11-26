@@ -52,14 +52,18 @@ def resolve_self_hosted_base_url(model: str) -> str:
     return mapping[model]
 
 
-def build_pydantic_ai_model(model: str, provider: Provider) -> str | SelfHostedChatModel:
+def build_pydantic_ai_model(
+    model: str, provider: Provider, self_hosted_strict_tools: bool
+) -> str | SelfHostedChatModel:
     """Return the ``model`` argument for a pydantic-ai ``Agent`` constructor.
 
     For ``self-hosted`` providers the function returns a fully-constructed
-    ``SelfHostedChatModel`` pointing at the OpenAI-compatible base URL. For all
-    other providers it returns the ``"<prefix>:<model>"`` string literal that
-    pydantic-ai uses to look up the right backend, with the prefix from the
-    provider's row in ``PROVIDER_SPECS``.
+    ``SelfHostedChatModel`` pointing at the OpenAI-compatible base URL, which
+    marks strict-compatible tools ``strict`` when ``self_hosted_strict_tools`` is
+    on. For all other providers it returns the ``"<prefix>:<model>"`` string
+    literal that pydantic-ai uses to look up the right backend, with the prefix
+    from the provider's row in ``PROVIDER_SPECS``, and ``self_hosted_strict_tools``
+    has no effect.
     """
     spec = provider_spec(provider=provider)
     if spec is None:
@@ -70,7 +74,9 @@ def build_pydantic_ai_model(model: str, provider: Provider) -> str | SelfHostedC
             base_url=base_url,
             api_key=os.environ[SELF_HOSTED_API_KEY_VAR],
         )
-        return SelfHostedChatModel(model_name=model, provider=oai_provider)
+        return SelfHostedChatModel(
+            model_name=model, provider=oai_provider, strict_tools=self_hosted_strict_tools
+        )
     return f"{spec.pydantic_ai_prefix}:{model}"
 
 
@@ -82,7 +88,9 @@ def thinking_reaches_model(model: str, provider: Provider, thinking: ThinkingLev
     instead of restating it. Builds the model's client, so the provider's
     credentials must be set; it makes no call.
     """
-    built = infer_model(model=build_pydantic_ai_model(model=model, provider=provider))
+    built = infer_model(
+        model=build_pydantic_ai_model(model=model, provider=provider, self_hosted_strict_tools=True)
+    )
     _, parameters = built.prepare_request(
         model_settings=ModelSettings(thinking=thinking),
         model_request_parameters=ModelRequestParameters(),

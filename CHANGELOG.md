@@ -12,6 +12,16 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The knob `self_hosted_strict_tools` can turn off strict tools for
+  self-hosted agents.** On, its default, a self-hosted agent's requests mark a
+  tool `strict` when pydantic-ai finds its schema strict-compatible, and vLLM
+  forces the tool's calls to match the schema with a grammar. Off, the requests
+  send the same schemas without the `strict` key. The grammar logs a forced
+  token at a logprob near 0, whatever probability the model gives it. The RL
+  game config `modal/grpo/signal_game_shapes.json` turns the knob off.
+  `build_pydantic_ai_model` takes `self_hosted_strict_tools`, and
+  `SelfHostedChatModel` takes `strict_tools`. See
+  [Training a model with RL](docs/rl-training.md#token-ids-in-the-event-log).
 - **The RL loop can train one seat against a frozen partner.** A frozen partner
   is a model that plays one seat of every game and does not train. In
   `modal/grpo/`, `grpo_loop.py init --partner FILE` saves the partner in the

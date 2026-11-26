@@ -6,7 +6,7 @@ template, and Qwen3.8's template rejects a system message anywhere but first.
 
 import json
 from functools import partial
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import httpx2
 import pytest
@@ -137,7 +137,11 @@ def agent_on(model: OpenAIChatModel | str) -> Agent[None, str]:
 
 
 def self_hosted_agent() -> Agent[None, str]:
-    return agent_on(model=build_pydantic_ai_model(model=MODEL, provider=Provider.SELF_HOSTED))
+    return agent_on(
+        model=build_pydantic_ai_model(
+            model=MODEL, provider=Provider.SELF_HOSTED, self_hosted_strict_tools=True
+        )
+    )
 
 
 async def test_feedback_after_an_empty_response_goes_out_as_a_user_message(
@@ -206,6 +210,7 @@ async def test_a_run_without_an_empty_response_sends_what_openai_chat_model_send
         provider=OpenAIProvider(
             base_url=BASE_URL, api_key=API_KEY, http_client=servers[1].client()
         ),
+        strict_tools=True,
     )
 
     await agent_on(model=plain).run(user_prompt="Your move.")
@@ -215,6 +220,39 @@ async def test_a_run_without_an_empty_response_sends_what_openai_chat_model_send
     assert [json.loads(s=body) for body in servers[1].bodies] == [
         json.loads(s=body) for body in servers[0].bodies
     ]
+
+
+def sent_tools(body: str) -> list[dict[str, object]]:
+    """The ``function`` entry of each tool in a request body."""
+    tools = cast(list[dict[str, dict[str, object]]], json.loads(s=body)["tools"])
+    return [tool["function"] for tool in tools]
+
+
+@pytest.mark.parametrize("strict_tools", [True, False])
+async def test_strict_tools_off_sends_the_same_tool_without_the_strict_key(
+    strict_tools: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """vLLM applies a grammar to a strict tool's calls, which forces tokens the model may not
+    choose."""
+    server = serve_self_hosted_model(replies=["Done."], monkeypatch=monkeypatch)
+    model = build_pydantic_ai_model(
+        model=MODEL, provider=Provider.SELF_HOSTED, self_hosted_strict_tools=strict_tools
+    )
+
+    await agent_on(model=model).run(user_prompt="Your move.")
+
+    [function] = sent_tools(body=server.bodies[0])
+    expected_strict: bool | None = None
+    if strict_tools:
+        expected_strict = True
+    assert function.get("strict") is expected_strict
+    assert function["name"] == "move"
+    assert function["parameters"] == {
+        "additionalProperties": False,
+        "properties": {"direction": {"type": "string"}},
+        "required": ["direction"],
+        "type": "object",
+    }
 
 
 async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_headers(
@@ -227,7 +265,9 @@ async def test_each_request_of_a_self_hosted_agent_carries_the_run_and_agent_hea
     ]
     server = serve_self_hosted_model(replies=replies, monkeypatch=monkeypatch)
     agent = Agent(
-        model=build_pydantic_ai_model(model=MODEL, provider=Provider.SELF_HOSTED),
+        model=build_pydantic_ai_model(
+            model=MODEL, provider=Provider.SELF_HOSTED, self_hosted_strict_tools=True
+        ),
         system_prompt=SYSTEM_PROMPT,
         tools=[move],
         model_settings=agent_model_settings(
@@ -293,6 +333,7 @@ async def run_with_token_ids(
             api_key=API_KEY,
             http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler=respond)),
         ),
+        strict_tools=True,
     )
     agent = Agent(
         model=model,

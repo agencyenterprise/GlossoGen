@@ -17,7 +17,7 @@ the results of our runs.
 | `signal_game_rewards.py` | The signal_game rewards, `win` and `first_item` |
 | `first_item_baselines.py` | The random-square and start-square baselines of `first_item`, per step |
 | `token_sequences.py` | Training sequences from the token ids that a game logged |
-| `signal_game_shapes.json` | The game config: shapes on a 3×3 grid, 10 rounds, `record_token_ids` on |
+| `signal_game_shapes.json` | The game config: shapes on a 3×3 grid, 10 rounds, `record_token_ids` on, `self_hosted_strict_tools` off |
 | `test_grpo_loop.py` | Tests of the rewards, the advantages, the sequences and the game config, and a check that the Modal modules parse as Python 3.12 |
 | `test_partner.py` | Tests of the partner file, the partner's game config and URLs, and the seats that train |
 | `test_grpo_training.py` | CPU tests of the loss, the k3 clamp, the LoRA targets and reloading a saved adapter, on a tiny random model |

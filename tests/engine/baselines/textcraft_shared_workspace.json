@@ -28,6 +28,7 @@
     },
     "wait_reasoning": false,
     "record_token_ids": false,
+    "self_hosted_strict_tools": true,
     "crafter_count": 4,
     "steps_per_agent": 2,
     "quantity_scale": 2,

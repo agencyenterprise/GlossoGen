@@ -503,14 +503,14 @@ async def _run_supervised(
 
     logged_events = _LoggedEvents(event_bus=event_bus)
 
-    def model_for_agent(model: str, provider: str) -> object:
+    def model_for_agent(model: str, provider: str, self_hosted_strict_tools: bool) -> object:
         """Route the runner's model request to that agent's scripted model.
 
         Models are built while :meth:`AutonomousSupervisor.run` is launching
         runners, which is after it has built the runtime, so the round reader
         handed to the builder is live by the time anything calls it.
         """
-        _ = provider
+        _ = provider, self_hosted_strict_tools
         agent_id = model.removeprefix("scripted::")
         return scripted_model_for(agent_id, supervisor.current_round, logged_events.wait_for)
 
