@@ -72,10 +72,12 @@ AGENT_CYCLE_EVENTS = frozenset(
 MESSAGE_EVENT = "message_sent"
 WORLD_DELIVERY_EVENT = "world_event_delivered"
 
-# Identifiers and clocks that differ between any two runs and carry no behaviour.
+# Identifiers, clocks and the code version, which differ between runs or checkouts and
+# carry no behaviour.
 VOLATILE_FIELDS = frozenset(
     {
         "event_id",
+        "glossogen_build",
         "timestamp",
         "message_id",
         "message_ids",

@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
+from glossogen.models.glossogen_build import GlossogenBuild
 from glossogen.run_storage.jsonl_lines import rewrite_json_objects
 
 logger = logging.getLogger(__name__)
@@ -29,15 +30,16 @@ def drop_simulation_ended(event_dict: dict[str, Any]) -> bool:
 def rewrite_run_jsonl(
     log_path: Path,
     new_run_id: str,
+    glossogen_build: GlossogenBuild,
     message_edits: dict[str, str],
     should_drop_event: Callable[[dict[str, Any]], bool],
 ) -> int:
     """Rewrite ``log_path`` in place for a derived run.
 
-    Walks the JSONL once: applies the new ``run_id`` to the
-    ``simulation_started`` event, applies any ``message_edits`` keyed by
-    message ID, and drops events for which ``should_drop_event`` returns
-    True. Returns the number of lines written.
+    Walks the JSONL once: applies the new ``run_id`` and the deriving process's
+    ``glossogen_build`` to the ``simulation_started`` event, applies any
+    ``message_edits`` keyed by message ID, and drops events for which
+    ``should_drop_event`` returns True. Returns the number of lines written.
     """
 
     def derive(event_dict: dict[str, Any]) -> dict[str, Any] | None:
@@ -48,6 +50,7 @@ def rewrite_run_jsonl(
 
         if event_type == "simulation_started":
             event_dict["run_id"] = new_run_id
+            event_dict["glossogen_build"] = glossogen_build.model_dump(mode="json")
 
         if event_type == "message_sent":
             msg = event_dict.get("message", {})
