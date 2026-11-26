@@ -256,7 +256,7 @@
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
 | src/glossogen/runners/pydantic\_ai\_banner.py                                                          |        3 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      443 |       39 |      146 |       26 |     87% |96, 104-105, 188, 193, 197, 274, 278, 311-\>310, 314-320, 382, 458-467, 514, 544, 574-575, 757-760, 825-826, 998-999, 1166-\>exit, 1182-\>1185, 1186, 1187-\>1196, 1191, 1196-\>1198, 1198-\>exit, 1203, 1204-\>exit, 1211, 1260-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      443 |       38 |      146 |       25 |     87% |104-105, 188, 193, 197, 274, 278, 311-\>310, 314-320, 382, 458-467, 514, 544, 574-575, 757-760, 825-826, 998-999, 1166-\>exit, 1182-\>1185, 1186, 1187-\>1196, 1191, 1196-\>1198, 1198-\>exit, 1203, 1204-\>exit, 1211, 1260-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       63 |        1 |       10 |        2 |     96% |65-\>64, 68 |
 | src/glossogen/runners/token\_id\_log.py                                                                |       19 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
@@ -613,14 +613,14 @@
 | src/glossogen/testing/scenario\_registration.py                                                        |       26 |        0 |       10 |        0 |    100% |           |
 | src/glossogen/testing/scenario\_runtime.py                                                             |      102 |       14 |       42 |       14 |     81% |156, 162, 205, 207, 212, 218, 235, 243, 248, 257, 260, 268, 270, 280 |
 | src/glossogen/testing/scripted\_agent.py                                                               |      118 |        4 |       36 |        4 |     95% |180, 231, 235, 254 |
-| src/glossogen/testing/simulation\_harness.py                                                           |      174 |        3 |       22 |        3 |     97% |189, 205, 432 |
+| src/glossogen/testing/simulation\_harness.py                                                           |      174 |        5 |       22 |        3 |     96% |189, 205, 432, 455-456 |
 | src/glossogen/testing/smoke\_scenario.py                                                               |       90 |        1 |        4 |        1 |     98% |       207 |
 | src/glossogen/testing/stub\_llm\_provider.py                                                           |       25 |        1 |        4 |        1 |     93% |        67 |
 | src/glossogen/thread\_export/\_\_init\_\_.py                                                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **30736** | **3944** | **8888** | **1178** | **85%** |           |
+| **TOTAL**                                                                                              | **30736** | **3945** | **8888** | **1177** | **85%** |           |
 
 
 ## Setup coverage badge
