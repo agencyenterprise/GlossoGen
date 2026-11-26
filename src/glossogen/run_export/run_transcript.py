@@ -1,10 +1,13 @@
 """One run's event log as plain text, grouped by round, for a person or an agent to read.
 
-The transcript keeps what each agent was told, wrote, called and received, in log
-order. It leaves out what only the platform reads: event ids, timestamps, token
-usage and token ids, wait and wake records, and the tool-call lines that repeat the
-calls of a model response. An event that has no rule here, a scenario's own events
+The transcript keeps what each agent was told, wrote, called and received. It leaves
+out what only the platform reads: event ids, timestamps, token usage and token ids,
+and wait and wake records. An event that has no rule here, a scenario's own events
 included, is printed with its fields as JSON.
+
+Events print in log order with one exception. The log records a model response after
+the tool calls that it made have run. So a response's reasoning and text print just
+before its first call, and each call prints once, from its ``tool_call_invoked`` event.
 """
 
 import json
@@ -35,17 +38,21 @@ class TranscriptSection(NamedTuple):
     text: str
 
 
+class _ResponseIndex(NamedTuple):
+    """The tool calls that ran, and the model response that made each of them."""
+
+    invoked_call_ids: frozenset[str]
+    response_by_call_id: dict[str, LLMResponseReceived]
+
+
 def render_run_transcript(events: list[SimulationEvent]) -> list[TranscriptSection]:
     """Render ``events`` as one text section per round, in round order."""
+    index = _index_responses(events=events)
+    shown_response_ids: set[str] = set()
     lines_by_round: dict[int, list[str]] = {}
-    answered_call_ids: set[str] = set()
     for event in events:
-        if isinstance(event, LLMResponseReceived):
-            answered_call_ids.update(call.call_id for call in event.tool_calls)
-        rendered = _render_event(event=event, answered_call_ids=answered_call_ids)
-        if rendered is None:
-            continue
-        lines_by_round.setdefault(event.round_number, []).append(rendered)
+        for line in _render_event(event=event, index=index, shown_response_ids=shown_response_ids):
+            lines_by_round.setdefault(event.round_number, []).append(line)
     return [
         TranscriptSection(round_number=round_number, text="\n".join(lines))
         for round_number, lines in sorted(lines_by_round.items())
@@ -59,11 +66,40 @@ def section_heading(round_number: int) -> str:
     return f"=== Round {round_number} ==="
 
 
-def _render_event(event: SimulationEvent, answered_call_ids: set[str]) -> str | None:
-    """One event as text, or None for an event the transcript leaves out."""
+def _index_responses(events: list[SimulationEvent]) -> _ResponseIndex:
+    """Find which tool calls ran, and which response made each call that ran."""
+    invoked_call_ids = frozenset(
+        event.call_id for event in events if isinstance(event, ToolCallInvoked)
+    )
+    response_by_call_id = {
+        call.call_id: event
+        for event in events
+        if isinstance(event, LLMResponseReceived)
+        for call in event.tool_calls
+        if call.call_id in invoked_call_ids
+    }
+    return _ResponseIndex(
+        invoked_call_ids=invoked_call_ids, response_by_call_id=response_by_call_id
+    )
+
+
+def _render_event(
+    event: SimulationEvent, index: _ResponseIndex, shown_response_ids: set[str]
+) -> list[str]:
+    """One event as lines of text; no lines for an event that the transcript leaves out."""
+    if isinstance(event, ToolCallInvoked):
+        return _render_tool_call(event=event, index=index, shown_response_ids=shown_response_ids)
+    if isinstance(event, LLMResponseReceived):
+        return _render_llm_response(event=event, index=index, shown_response_ids=shown_response_ids)
+    rendered = _render_single(event=event)
+    if rendered is None:
+        return []
+    return [rendered]
+
+
+def _render_single(event: SimulationEvent) -> str | None:
+    """An event that renders on its own, or None for an event the transcript leaves out."""
     if isinstance(event, AgentResumed):
-        return None
-    if isinstance(event, ToolCallInvoked) and event.call_id in answered_call_ids:
         return None
     if isinstance(event, WaitRegistered):
         return _render_wait(event=event)
@@ -71,10 +107,6 @@ def _render_event(event: SimulationEvent, answered_call_ids: set[str]) -> str | 
         return _render_simulation_started(event=event)
     if isinstance(event, AgentRegistered):
         return _render_agent_registered(event=event)
-    if isinstance(event, LLMResponseReceived):
-        return _render_llm_response(event=event)
-    if isinstance(event, ToolCallInvoked):
-        return f"[{event.agent_id} calls] {event.tool_name}({_to_json(value=event.arguments)})"
     if isinstance(event, ToolResultReceived):
         return f"[{event.agent_id} receives from {event.tool_name}] {event.result}"
     if isinstance(event, MessageSent):
@@ -83,6 +115,54 @@ def _render_event(event: SimulationEvent, answered_call_ids: set[str]) -> str | 
     if isinstance(event, InjectionDelivered):
         return f"[briefing to {event.agent_id}]\n{event.text}"
     return _render_other(event=event)
+
+
+def _render_tool_call(
+    event: ToolCallInvoked, index: _ResponseIndex, shown_response_ids: set[str]
+) -> list[str]:
+    """A call that ran, after the reasoning and text of its response when not yet shown."""
+    lines: list[str] = []
+    response = index.response_by_call_id.get(event.call_id)
+    if response is not None and response.event_id not in shown_response_ids:
+        shown_response_ids.add(response.event_id)
+        lines.extend(_response_words(response=response))
+    lines.append(
+        _call_line(agent_id=event.agent_id, tool_name=event.tool_name, arguments=event.arguments)
+    )
+    return lines
+
+
+def _render_llm_response(
+    event: LLMResponseReceived, index: _ResponseIndex, shown_response_ids: set[str]
+) -> list[str]:
+    """A response's reasoning and text when not yet shown, and the calls that never ran."""
+    if not event.thinking and not event.text and not event.tool_calls:
+        return [f"[{event.agent_id}] empty response, stop reason {event.stop_reason}"]
+    lines: list[str] = []
+    if event.event_id not in shown_response_ids:
+        shown_response_ids.add(event.event_id)
+        lines.extend(_response_words(response=event))
+    lines.extend(
+        _call_line(agent_id=event.agent_id, tool_name=call.tool_name, arguments=call.arguments)
+        for call in event.tool_calls
+        if call.call_id not in index.invoked_call_ids
+    )
+    return lines
+
+
+def _response_words(response: LLMResponseReceived) -> list[str]:
+    """A model response's reasoning and text."""
+    words: list[str] = []
+    if response.thinking:
+        words.append(f"[{response.agent_id} thinks]\n{response.thinking}")
+    if response.text:
+        words.append(f"[{response.agent_id} writes]\n{response.text}")
+    return words
+
+
+def _call_line(agent_id: str, tool_name: str, arguments: dict[str, Any]) -> str:
+    """A tool call with its arguments."""
+    return f"[{agent_id} calls] {tool_name}({_to_json(value=arguments)})"
 
 
 def _render_wait(event: WaitRegistered) -> str | None:
@@ -130,20 +210,6 @@ def _render_agent_registered(event: AgentRegistered) -> str:
             event.system_prompt,
         ]
     )
-
-
-def _render_llm_response(event: LLMResponseReceived) -> str:
-    """A model response: its reasoning, its text and the tool calls that it made."""
-    parts: list[str] = []
-    if event.thinking:
-        parts.append(f"[{event.agent_id} thinks]\n{event.thinking}")
-    if event.text:
-        parts.append(f"[{event.agent_id} writes]\n{event.text}")
-    for call in event.tool_calls:
-        parts.append(f"[{event.agent_id} calls] {call.tool_name}({_to_json(value=call.arguments)})")
-    if not parts:
-        return f"[{event.agent_id}] empty response, stop reason {event.stop_reason}"
-    return "\n".join(parts)
 
 
 def _render_other(event: SimulationEvent) -> str:

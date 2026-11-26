@@ -218,3 +218,57 @@ def test_an_empty_response_is_reported_with_its_stop_reason() -> None:
     text = render_run_transcript(events=[empty])[0].text
 
     assert text == f"[observer] empty response, stop reason {StopReason.END_TURN}"
+
+
+def _response_with_call(call_id: str) -> LLMResponseReceived:
+    return LLMResponseReceived(
+        round_number=1,
+        agent_id="observer",
+        thinking=None,
+        text="I will describe the faces.",
+        tool_calls=[
+            ToolCallRequest(call_id=call_id, tool_name="send_message", arguments={"text": "T"})
+        ],
+        stop_reason=StopReason.TOOL_USE,
+        usage=_usage(),
+    )
+
+
+def test_a_response_logged_after_its_call_prints_before_it_and_the_call_prints_once() -> None:
+    events: list[SimulationEvent] = [
+        ToolCallInvoked(
+            round_number=1,
+            agent_id="observer",
+            call_id="call-1",
+            tool_name="send_message",
+            arguments={"text": "T"},
+        ),
+        ToolResultReceived(
+            round_number=1,
+            agent_id="observer",
+            tool_name="send_message",
+            call_id="call-1",
+            arguments={"text": "T"},
+            result="sent",
+        ),
+        _response_with_call(call_id="call-1"),
+    ]
+
+    lines = render_run_transcript(events=events)[0].text.splitlines()
+
+    assert lines == [
+        "[observer writes]",
+        "I will describe the faces.",
+        '[observer calls] send_message({"text": "T"})',
+        "[observer receives from send_message] sent",
+    ]
+
+
+def test_a_call_that_never_ran_prints_with_its_response() -> None:
+    text = render_run_transcript(events=[_response_with_call(call_id="refused")])[0].text
+
+    assert text.splitlines() == [
+        "[observer writes]",
+        "I will describe the faces.",
+        '[observer calls] send_message({"text": "T"})',
+    ]
