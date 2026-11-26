@@ -172,16 +172,16 @@ In step k:
 
 1. The policy server loads adapter k. The loop waits until the server reports it as loaded.
 2. The loop plays 6 games on each of the step's 4 seeds, seeds 1000 + 4k to 1003 + 4k. The model
-   plays both seats of every game at temperature 1.0, so the 6 games of a seed differ. Every game
-   runs with `record_token_ids=true`, so its event log holds the token ids of every prompt and
-   answer, and the logprob of each answer token. The loop trains on the ids and does not use the
-   logprobs.
+   plays both seats of each game at temperature 1.0, so the 6 games of a seed differ. Each game
+   runs with `record_token_ids=true`, so its event log holds the token ids of each prompt and
+   answer, and the logprob of each answer token.
 3. The reward gives each player a score of 0 or 1 in each round. A player's advantage in a round
    is its score minus the mean score of its seat in that round, over the seed's finished games.
-4. The loop builds each player's prompts and answers from the logged token ids. It marks every
-   answer token with the advantage of its round. An answer's round is the round of its first tool
-   call. An answer without a tool call takes the round of the player's previous tool call, and
-   an answer before the player's first tool call gets advantage 0.
+4. The loop builds each player's prompts and answers from the logged token ids. It marks each
+   answer token with the advantage of its round, and with the logprob that vLLM logged for it.
+   An answer's round is the round of its first tool call. An answer without a tool call takes
+   the round of the player's previous tool call, and an answer before the player's first tool
+   call gets advantage 0.
 5. The trainer takes one gradient step on these sequences and saves adapter k+1.
 
 A game that ends without `simulation_ended` is left out of the batch. When a seed has fewer than 2
@@ -220,8 +220,21 @@ partner's entry into each seed's config.
 
 The method is GRPO (group relative policy optimization), and a group is the finished games of one
 seed. Some versions of GRPO divide the advantage by the group's standard deviation, and this loop
-does not. The loss of each answer token is `-advantage × log p_policy(token) + 0.02 × k3`, averaged
-over the batch's answer tokens. The policy is the model with its current adapter.
+does not. The loss of each answer token is `-w × advantage × log p_policy(token) + 0.02 × k3`,
+averaged over the batch's answer tokens. The policy is the model with its current adapter.
+
+w is the token's importance weight. With r = log p_policy − log p_sampler, w = exp(r), capped
+at 5. p_sampler is the probability that vLLM logged for the token when it sampled it. The
+trainer computes w without a gradient, so w scales the token's term and is not trained. This
+loss is CISPO, platoon's default loss, with platoon's default cap. When the policy is the
+adapter that played the games, w differs from 1 only by the numeric differences between vLLM and
+the trainer. When the games played with an older adapter, w corrects for that.
+
+Each line of `steps.jsonl` holds three statistics of the ratio exp(r) before the cap, under
+`trainer`. `ratio_mean` is its mean over the batch's answer tokens, `ratio_max` its largest
+value, and `ratio_capped_share` the share of the answer tokens whose ratio was above 5. The
+mean can stay near 1 while a few tokens have a large ratio, so read it together with the other
+two.
 
 k3 estimates the KL divergence between the policy and the base model on that token. The KL
 divergence measures how far one model's token probabilities are from another's. With
@@ -256,7 +269,7 @@ steps. `win` has not been tested with this loop.
 
 | Setting | Where |
 | --- | --- |
-| LoRA rank 32 and alpha 64, learning rate 1e-4, k3 weight 0.02, gradient norm clipped at 1.0 | `SETTINGS` in `grpo_app.py`. The trainer uses the deployed settings. `init` also saves them as `runs/<run>/settings.json` on the volume |
+| LoRA rank 32 and alpha 64, learning rate 1e-4, k3 weight 0.02, importance weight capped at 5, gradient norm clipped at 1.0 | `SETTINGS` in `grpo_app.py`. The trainer uses the deployed settings. `init` also saves them as `runs/<run>/settings.json` on the volume |
 | The frozen partner | `init --partner`, saved in `runs/<run>/settings.json` on the volume |
 | Seeds per step, games per seed, games at a time | the `train` and `eval` flags |
 | Grid, items, rounds, temperature | the game config, `signal_game_shapes.json` |

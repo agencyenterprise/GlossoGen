@@ -52,6 +52,7 @@ SETTINGS = GrpoSettings(
     kl_beta=0.02,
     max_grad_norm=1.0,
     logit_slice=4096,
+    ratio_cap=5.0,
 )
 
 train_image = (

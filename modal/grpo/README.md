@@ -10,7 +10,7 @@ the results of our runs.
 | --- | --- |
 | `grpo_app.py` | The Modal app: the trainer, and the vLLM server that serves each new adapter |
 | `grpo_loop.py` | The loop: load an adapter, play games, score them, and send the training sequences to the trainer |
-| `grpo_training.py` | The GRPO loss, the LoRA setup, and saving and loading an adapter |
+| `grpo_training.py` | The GRPO loss with its capped importance ratio, the LoRA setup, and saving and loading an adapter |
 | `grpo_records.py` | The records that the loop and the trainer exchange, and the base model's name |
 | `partner.py` | The frozen partner: the model of a seat that does not train |
 | `base_model_partner.json` | A partner file that puts the base model in `player_b` |
@@ -20,7 +20,7 @@ the results of our runs.
 | `signal_game_shapes.json` | The game config: shapes on a 3×3 grid, 10 rounds, `record_token_ids` on, `self_hosted_strict_tools` off |
 | `test_grpo_loop.py` | Tests of the rewards, the advantages, the sequences and the game config, and a check that the Modal modules parse as Python 3.12 |
 | `test_partner.py` | Tests of the partner file, the partner's game config and URLs, and the seats that train |
-| `test_grpo_training.py` | CPU tests of the loss, the k3 clamp, the LoRA targets and reloading a saved adapter, on a tiny random model |
+| `test_grpo_training.py` | CPU tests of the loss, the k3 clamp, the ratio cap, the LoRA targets and reloading a saved adapter, on a tiny random model |
 
 The repository's test suite does not run these tests. Run the loop's tests with:
 

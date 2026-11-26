@@ -12,6 +12,14 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL trainer weights each answer token by a capped importance ratio.**
+  The loss in `modal/grpo/grpo_training.py` is CISPO, platoon's default loss:
+  each answer token's term is multiplied by exp(trainer logprob − sampler
+  logprob), capped at 5 and taken without a gradient. The loop reads the
+  sampler logprobs from each game's `token_logprobs`, and refuses an answer
+  without them. The KL term and the gradient clipping are unchanged. Each line
+  of `steps.jsonl` records `ratio_mean`, `ratio_max` and `ratio_capped_share`.
+  See [Training a model with RL](docs/rl-training.md#the-loss).
 - **The knob `self_hosted_strict_tools` can turn off strict tools for
   self-hosted agents.** On, its default, a self-hosted agent's requests mark a
   tool `strict` when pydantic-ai finds its schema strict-compatible, and vLLM
