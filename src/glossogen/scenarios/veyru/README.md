@@ -246,6 +246,17 @@ Cost: ~$0.20 for the consolidation call + ~$0.03 per run for relabeling. At 440 
 
 Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp/pipeline_<id>_<phase>.log` with the full traceback. Re-running the same phase re-attempts the failed runs (sidecar presence is the idempotency key).
 
+## Analyzing runs
+
+These notes are for reading veyru runs, for example with the `analyze-runs` skill that `glossogen install-skill` installs.
+
+- **Link codes can be agreed in the `postmortem` channel.** With `postmortem_enabled`, the agents talk at no cost in the `postmortem` channel between rounds. Read the `postmortem` messages before a round to decode that round's link messages. If you read only the link channel, you miss the definitions that the agents made there.
+- **Each agent sees a different part of the case.** The observer sees the symptoms, and the engineer sees the stellar table. Each round's `veyru_case_started` event holds the symptoms and each stage's expected procedure. The engineer's table is in the engineer's briefing, its `injection_delivered` event. A message can carry only what its sender saw or was told.
+- **Shorthand sent to the judge.** The observer can pass its link shorthand as the `stabilize_veyru` action. The judge receives the expected procedure and the action. Its prompt tells it to judge the action alone, and to accept it only when every parameter is written as at least one full English word (see [the judge-decodability exploit](../../../../docs/judge-decodability-exploit.md)). Count the `stabilize_veyru` calls in shorthand, and how many of them the judge accepted in the `veyru_stabilization_judged` event that follows each call.
+- **One reason covers several ways to lose a round.** `round_result_recorded` gives `Veyru collapsed` when the link messages used up the time budget, when both agents stopped acting, and when the round reached its duration limit. The `trigger` of `round_ended` tells them apart: `veyru_collapsed`, `all_agents_idle` and `round_timeout`. A two-team round in which one team stabilized and the other collapsed ends with `veyru_mixed_outcome`. The `round_ended_idle` and `round_ended_timeout` metrics count the `all_agents_idle` and `round_timeout` rounds.
+- **Blocked requests.** A provider's content filter can block an agent's request. Each block is an `agent_run_cycle_failed` event with `error_type` `ContentFilterError`, and the `content_filter_refusal` metric counts them. Count them before you read a lost round as a failed protocol. The metric misses a model that declines the task in its text.
+- **Swaps and interns.** In two-team swap mode and intern mode, `protocol_learned_after_swap` has an LLM judge count the rounds after the swap in which the new agent used the earlier protocol. [Evaluation](#evaluation) lists the other metrics for runs with a swap.
+
 ## Knobs
 
 | Knob | Description |

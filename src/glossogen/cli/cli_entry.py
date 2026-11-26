@@ -27,6 +27,7 @@ from glossogen.cli.export_commands import (
     handle_export_atif,
     handle_export_thread,
 )
+from glossogen.cli.install_skill_command import add_install_skill_parser, handle_install_skill
 from glossogen.cli.label_description_commands import (
     add_describe_label_parser,
     add_list_label_descriptions_parser,
@@ -49,6 +50,7 @@ from glossogen.cli.scenario_authoring_commands import (
     handle_validate,
 )
 from glossogen.cli.serve_command import add_serve_parser, handle_serve
+from glossogen.cli.transcript_command import add_transcript_parser, handle_transcript
 from glossogen.dotenv_loader import load_env_from_working_directory
 from glossogen.runners.pydantic_ai_banner import turn_off_pydantic_ai_banner
 from glossogen.scenario_contract.catalog import ScenarioCatalogError, ScenarioNotLoaded
@@ -81,6 +83,7 @@ _SYNC_COMMANDS: dict[str, _CommandHandler] = {
     "serve": handle_serve,
     "validate": handle_validate,
     "new-scenario": handle_new_scenario,
+    "install-skill": handle_install_skill,
 }
 _ASYNC_COMMANDS: dict[str, _AsyncCommandHandler] = {
     "replace-agent": handle_replace_agent,
@@ -95,6 +98,7 @@ _ASYNC_COMMANDS: dict[str, _AsyncCommandHandler] = {
     "analyze": handle_analyze,
     "export-atif": handle_export_atif,
     "export-thread": handle_export_thread,
+    "transcript": handle_transcript,
 }
 
 
@@ -154,8 +158,10 @@ def _build_parser() -> argparse.ArgumentParser:
     add_analyze_parser(subparsers=subparsers)
     add_export_thread_parser(subparsers=subparsers, scenario_names=scenario_names)
     add_export_atif_parser(subparsers=subparsers, scenario_names=scenario_names)
+    add_transcript_parser(subparsers=subparsers, scenario_names=scenario_names)
     add_validate_parser(subparsers=subparsers, scenario_names=scenario_names)
     add_new_scenario_parser(subparsers=subparsers)
+    add_install_skill_parser(subparsers=subparsers)
     add_serve_parser(subparsers=subparsers)
     add_replace_agent_parser(subparsers=subparsers, scenario_names=scenario_names)
     add_cross_run_replace_agent_parser(subparsers=subparsers, scenario_names=scenario_names)

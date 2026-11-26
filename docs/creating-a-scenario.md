@@ -613,6 +613,15 @@ the generic metrics. Its name must not repeat a generic metric's; `validate`
 checks. [signal_game](../src/glossogen/scenarios/signal_game/scenario.py) is the
 example.
 
+### Notes for analyzing runs
+
+A section called `## Analyzing runs` in the scenario's README lists what someone reading its runs
+can misread, and the ways that agents can win a round without the behaviour that the scenario
+tests. The `analyze-runs` skill reads it ([Analyzing runs with Claude Code](analyzing-runs-with-claude-code.md)).
+Leave out what the run's event log already holds: the scenario description, the system prompts
+and the briefings. [veyru](../src/glossogen/scenarios/veyru/README.md#analyzing-runs) and
+[signal_game](../src/glossogen/scenarios/signal_game/README.md#analyzing-runs) are examples.
+
 ### Run-detail extension
 
 For per-round ground truth, judge metadata keyed by tool `call_id`, or custom SSE
