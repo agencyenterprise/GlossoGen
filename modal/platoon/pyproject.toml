@@ -26,7 +26,7 @@ build-backend = "hatchling.build"
 # Installed editable into this project's environment, so that `platoon` finds the packages a config names.
 # glossogen_side runs in GlossoGen's environment instead, from this folder.
 [tool.hatch.build.targets.wheel]
-packages = ["glossogen_platoon"]
+packages = ["glossogen_platoon", "tinker_service"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
