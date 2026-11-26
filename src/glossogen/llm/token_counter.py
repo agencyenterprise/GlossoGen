@@ -103,7 +103,9 @@ def create_token_counter(provider: Provider, model: str) -> TokenCounter:
     """
     try:
         pydantic_ai_model = infer_model(
-            model=build_pydantic_ai_model(model=model, provider=provider),
+            model=build_pydantic_ai_model(
+                model=model, provider=provider, self_hosted_strict_tools=True
+            ),
         )
     except Exception:
         logger.exception(

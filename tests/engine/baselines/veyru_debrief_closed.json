@@ -32,6 +32,7 @@
     },
     "wait_reasoning": false,
     "record_token_ids": false,
+    "self_hosted_strict_tools": true,
     "judge_model": "claude-haiku-4-5-20251001",
     "judge_provider": "anthropic",
     "judge_model_settings": {},

@@ -7,9 +7,10 @@ with the whole sequence so far, and a new sequence begins otherwise. A new seque
 the runner restarts an agent's turn from an earlier point. The trainer therefore computes each
 answer token's log-probability in the context in which vLLM sampled it.
 
-Only the answer tokens are marked. Each marked token gets the advantage of its answer's round.
-An answer's round is the round of its first tool call. An answer without a tool call keeps the
-round of the agent's previous call.
+Only the answer tokens are marked. Each marked token gets the advantage of its answer's round,
+and the logprob that the policy server logged when it sampled the token. An answer's round is
+the round of its first tool call. An answer without a tool call keeps the round of the agent's
+previous call. A recorded answer without logged logprobs raises ``MissingSamplerLogprobs``.
 """
 
 from typing import NamedTuple
@@ -63,6 +64,53 @@ def answer_rounds(*, events: list[SimulationEvent], agent_id: str) -> list[int]:
     return rounds
 
 
+class MissingSamplerLogprobs(ValueError):
+    """A recorded answer holds token ids but no logprobs, which the loss needs."""
+
+
+def sampler_logprobs(*, request: RecordedTokenIds) -> list[float]:
+    """The logprob that the policy server logged for each token of the request's answer."""
+    if request.token_logprobs is None:
+        raise MissingSamplerLogprobs(
+            f"an answer of round {request.round_number} holds token ids and no token_logprobs"
+        )
+    return request.token_logprobs
+
+
+class SequenceInProgress:
+    """The training sequence that ``player_sequences`` is chaining requests onto."""
+
+    def __init__(self) -> None:
+        self.input_ids: list[int] = []
+        self.kl_mask: list[int] = []
+        self.advantages: list[float] = []
+        self.sampler_logprobs: list[float] = []
+
+    def extended_by(self, *, request: RecordedTokenIds) -> bool:
+        """Whether the request's prompt starts with the whole sequence so far."""
+        return request.prompt_ids[: len(self.input_ids)] == self.input_ids
+
+    def add(self, *, request: RecordedTokenIds, advantage: float) -> None:
+        """Append the request's new prompt tokens, then its answer tokens, marked."""
+        tail = request.prompt_ids[len(self.input_ids) :]
+        answer = request.token_ids
+        self.input_ids = self.input_ids + tail + answer
+        self.kl_mask = self.kl_mask + [0] * len(tail) + [1] * len(answer)
+        self.advantages = self.advantages + [0.0] * len(tail) + [advantage] * len(answer)
+        self.sampler_logprobs = (
+            self.sampler_logprobs + [0.0] * len(tail) + sampler_logprobs(request=request)
+        )
+
+    def sequence(self) -> TrainingSequence:
+        """The sequence as the trainer takes it."""
+        return TrainingSequence(
+            input_ids=self.input_ids,
+            kl_mask=self.kl_mask,
+            advantages=self.advantages,
+            sampler_logprobs=self.sampler_logprobs,
+        )
+
+
 def player_sequences(
     *, recorded: list[RecordedTokenIds], rounds: list[int], advantages: dict[int, float]
 ) -> PlayerSequences:
@@ -70,29 +118,16 @@ def player_sequences(
     if len(recorded) != len(rounds):
         raise ValueError(f"{len(recorded)} recorded requests, but {len(rounds)} answer rounds")
     sequences: list[TrainingSequence] = []
-    input_ids: list[int] = []
-    kl_mask: list[int] = []
-    marked_advantages: list[float] = []
+    current = SequenceInProgress()
     breaks = 0
     for request, round_number in zip(recorded, rounds, strict=True):
-        extends = request.prompt_ids[: len(input_ids)] == input_ids
-        if input_ids and not extends:
-            sequences.append(
-                TrainingSequence(input_ids=input_ids, kl_mask=kl_mask, advantages=marked_advantages)
-            )
+        if current.input_ids and not current.extended_by(request=request):
+            sequences.append(current.sequence())
             breaks += 1
-            input_ids, kl_mask, marked_advantages = [], [], []
-        tail = request.prompt_ids[len(input_ids) :]
-        advantage = advantages.get(round_number, 0.0)
-        input_ids = input_ids + tail + request.token_ids
-        kl_mask = kl_mask + [0] * len(tail) + [1] * len(request.token_ids)
-        marked_advantages = (
-            marked_advantages + [0.0] * len(tail) + [advantage] * len(request.token_ids)
-        )
-    if input_ids:
-        sequences.append(
-            TrainingSequence(input_ids=input_ids, kl_mask=kl_mask, advantages=marked_advantages)
-        )
+            current = SequenceInProgress()
+        current.add(request=request, advantage=advantages.get(round_number, 0.0))
+    if current.input_ids:
+        sequences.append(current.sequence())
     return PlayerSequences(
         sequences=sequences,
         answers=len(recorded),

@@ -217,6 +217,12 @@ ids, the events hold none of these fields.
 [Training a model with RL](rl-training.md#token-ids-in-the-event-log) lists the
 fields that the knob adds.
 
+The knob `self_hosted_strict_tools` is on by default. With it on, a self-hosted
+agent's requests mark a tool `strict` when pydantic-ai finds the tool's schema
+strict-compatible, and vLLM then forces the tool's calls to match the schema
+with a grammar. With `self_hosted_strict_tools=false`, the requests send the
+same tool schemas without the `strict` key, and vLLM applies no grammar.
+
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
 rejects the call and the run stalls. The output cap is

@@ -8,27 +8,38 @@ other volume or Dict.
 ``Trainer`` keeps the model, its LoRA adapter and its optimizer in GPU memory until 20 minutes
 after its last call. When a step's games take longer than that, the next call starts a new
 container.
-``initialize`` saves step 0, an adapter whose B matrices are 0, which leaves the base model's
-outputs unchanged.
-``train_step(step, sequences)`` takes one GRPO step from adapter ``step - 1`` and saves adapter
-``step`` on the volume at ``runs/<run>/adapters/step_<step>/``. A new container resumes from the
-volume.
+``initialize(partner)`` saves step 0, an adapter whose B matrices are 0, which leaves the base
+model's outputs unchanged. It also saves the run's settings, with its frozen partner, to
+``runs/<run>/settings.json``.
+``train_step(step, sequences, run_ids)`` takes one GRPO step from adapter ``step - 1`` and saves
+adapter ``step`` on the volume at ``runs/<run>/adapters/step_<step>/``, with the run ids of the
+games that it trained on. A call for a step whose adapter exists returns the saved metrics when
+it brings the same run ids, and raises otherwise (trained_adapters.py). A new container resumes
+from the volume.
 
 ``serve`` runs vLLM with LoRA enabled. Its loader thread watches the control Dict. When the key
-``request`` holds a new id, it reloads the volume and asks vLLM to load the adapter at the
-request's path under the request's name. It then unloads the adapter that it loaded before, and
-writes the outcome under ``result``. The adapter is then playable as a model of that name.
+``adapter_request`` holds an ``AdapterRequest`` with a new id, it reloads the volume and asks vLLM
+to load the adapter at the request's path under the request's name. It then unloads each adapter
+that it loaded before and that the request's ``keep`` leaves out, and writes the
+``AdapterResult`` under ``adapter_result`` (adapter_loader.py). The adapter is then playable as a
+model of that name. The server also serves the base model, without an adapter, under BASE_MODEL.
 
 Deploy from the repository root:
 
-    GRPO_APP_NAME=<app name> uv run --no-sync modal deploy modal/grpo/grpo_app.py
+    GRPO_APP_NAME=<app name> GRPO_TRAINER_GPUS=B200,H200 GRPO_SERVER_GPUS=H200,H100 \
+        uv run --no-sync modal deploy modal/grpo/grpo_app.py
+
+``GRPO_TRAINER_GPUS`` and ``GRPO_SERVER_GPUS`` list the GPU types that the trainer and the
+policy server accept, in order of preference.
 """
 
 import logging
 import os
+from functools import partial
 from pathlib import Path
 
-from grpo_records import GrpoSettings, StepMetrics, TrainingSequence
+from adapter_loader import ADAPTER_REQUEST_KEY, ADAPTER_RESULT_KEY, LoadedAdapters, VllmReply
+from grpo_records import BASE_MODEL, GrpoSettings, StepMetrics, TrainingSequence
 
 import modal
 
@@ -36,8 +47,15 @@ logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).resolve().parent
 APP_NAME = os.environ["GRPO_APP_NAME"]
+TRAINER_GPUS = os.environ["GRPO_TRAINER_GPUS"].split(",")
+SERVER_GPUS = os.environ["GRPO_SERVER_GPUS"].split(",")
+# The containers import this module too, so the image carries the values that the deploy read.
+DEPLOY_ENV = {
+    "GRPO_APP_NAME": APP_NAME,
+    "GRPO_TRAINER_GPUS": ",".join(TRAINER_GPUS),
+    "GRPO_SERVER_GPUS": ",".join(SERVER_GPUS),
+}
 CONTROL_DICT = f"{APP_NAME}-adapters"
-MODEL_NAME = "Qwen/Qwen3.8-27B"
 VOLUME_ROOT = Path("/grpo")
 HF_CACHE = Path("/root/.cache/huggingface")
 VLLM_PORT = 8000
@@ -51,6 +69,7 @@ SETTINGS = GrpoSettings(
     kl_beta=0.02,
     max_grad_norm=1.0,
     logit_slice=4096,
+    ratio_cap=5.0,
 )
 
 train_image = (
@@ -63,16 +82,25 @@ train_image = (
         "accelerate==1.15.0",
         "safetensors==0.8.0",
     )
-    .env({"GRPO_APP_NAME": APP_NAME})
+    .env(DEPLOY_ENV)
     .add_local_file(local_path=str(HERE / "grpo_records.py"), remote_path="/root/grpo_records.py")
     .add_local_file(local_path=str(HERE / "grpo_training.py"), remote_path="/root/grpo_training.py")
+    .add_local_file(
+        local_path=str(HERE / "trained_adapters.py"), remote_path="/root/trained_adapters.py"
+    )
+    .add_local_file(
+        local_path=str(HERE / "adapter_loader.py"), remote_path="/root/adapter_loader.py"
+    )
 )
 vllm_image = (
     modal.Image.from_registry("nvidia/cuda:13.0.2-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])
     .pip_install("vllm==0.31.0")
-    .env({"GRPO_APP_NAME": APP_NAME})
+    .env(DEPLOY_ENV)
     .add_local_file(local_path=str(HERE / "grpo_records.py"), remote_path="/root/grpo_records.py")
+    .add_local_file(
+        local_path=str(HERE / "adapter_loader.py"), remote_path="/root/adapter_loader.py"
+    )
 )
 
 grpo_volume = modal.Volume.from_name(APP_NAME, create_if_missing=True)
@@ -89,7 +117,7 @@ def adapter_dir(*, run_name: str, step: int) -> Path:
 
 @app.cls(
     image=train_image,
-    gpu=["B200", "H200"],
+    gpu=TRAINER_GPUS,
     volumes={str(VOLUME_ROOT): grpo_volume, str(HF_CACHE): hf_cache_volume},
     secrets=[modal.Secret.from_name("huggingface-glossogen")],
     timeout=2 * HOURS,
@@ -111,7 +139,7 @@ class Trainer:
 
         self.device = torch.device("cuda")
         base = Qwen3_5ForConditionalGeneration.from_pretrained(
-            snapshot_download(repo_id=MODEL_NAME),
+            snapshot_download(repo_id=BASE_MODEL),
             dtype=torch.bfloat16,
             device_map="cuda",
             attn_implementation="sdpa",
@@ -121,8 +149,11 @@ class Trainer:
         self.loaded_step = -1
 
     @modal.method()
-    def initialize(self) -> str:
-        """Save step 0, the untrained adapter, and the run's settings; refuse a run that exists."""
+    def initialize(self, partner: str) -> str:
+        """Save step 0, the untrained adapter, and the run's settings; refuse a run that exists.
+
+        ``partner`` is the JSON of the run's frozen partner, or ``null`` when every seat trains.
+        """
         import json
 
         from grpo_training import save_state
@@ -132,19 +163,26 @@ class Trainer:
             raise ValueError(f"run {self.run_name} already exists on the volume")
         target = adapter_dir(run_name=self.run_name, step=0)
         save_state(model=self.model, optimizer=self.optimizer, directory=target, metrics=None)
-        (run_dir / "settings.json").write_text(json.dumps(SETTINGS._asdict(), indent=1) + "\n")
+        run_settings = {**SETTINGS._asdict(), "partner": json.loads(partner)}
+        (run_dir / "settings.json").write_text(json.dumps(run_settings, indent=1) + "\n")
         grpo_volume.commit()
         self.loaded_step = 0
         return str(target)
 
     @modal.method()
-    def train_step(self, step: int, sequences: list[TrainingSequence]) -> StepMetrics:
-        """One GRPO step from adapter ``step - 1`` on the batch; save it as adapter ``step``."""
+    def train_step(
+        self, step: int, sequences: list[TrainingSequence], run_ids: list[str]
+    ) -> StepMetrics:
+        """One GRPO step from adapter ``step - 1`` on the games ``run_ids``; save it as adapter
+        ``step``, or return its saved metrics when it already holds these games."""
         from grpo_training import load_state, save_state, train_step
+        from trained_adapters import record_trained_games, saved_step
 
         target = adapter_dir(run_name=self.run_name, step=step)
-        if target.exists():
-            raise ValueError(f"adapter step {step} of {self.run_name} already exists")
+        saved = saved_step(directory=target, run_ids=run_ids)
+        if saved is not None:
+            print(f"step {step}: adapter saved earlier from these games", flush=True)
+            return saved
         if self.loaded_step != step - 1:
             grpo_volume.reload()
             load_state(
@@ -161,13 +199,14 @@ class Trainer:
             settings=SETTINGS,
         )
         save_state(model=self.model, optimizer=self.optimizer, directory=target, metrics=metrics)
+        record_trained_games(directory=target, run_ids=run_ids)
         grpo_volume.commit()
         self.loaded_step = step
         print(f"step {step}: {metrics._asdict()}", flush=True)
         return metrics
 
 
-def post_to_vllm(*, path: str, body: dict[str, str], api_key: str) -> tuple[int, str]:
+def post_to_vllm(*, path: str, body: dict[str, str], api_key: str) -> VllmReply:
     """POST ``body`` to the local vLLM server; return the HTTP status and the response text."""
     import json
     import urllib.error
@@ -180,14 +219,14 @@ def post_to_vllm(*, path: str, body: dict[str, str], api_key: str) -> tuple[int,
     )
     try:
         with urllib.request.urlopen(request, timeout=600) as response:
-            return response.status, response.read().decode()
+            return VllmReply(status=response.status, body=response.read().decode())
     except urllib.error.HTTPError as error:
         logger.exception("vLLM refused %s", path)
-        return error.code, error.read().decode()
+        return VllmReply(status=error.code, body=error.read().decode())
     except OSError as error:
         # urllib's URLError is an OSError, so this also catches a refused connection.
         logger.exception("vLLM did not answer %s", path)
-        return 0, repr(error)
+        return VllmReply(status=0, body=repr(error))
 
 
 def vllm_ready(*, api_key: str) -> bool:
@@ -207,7 +246,7 @@ def vllm_ready(*, api_key: str) -> bool:
 
 
 def load_adapter_requests(*, api_key: str) -> None:
-    """Load each adapter that the control Dict asks for into the local vLLM server.
+    """Handle each adapter request that the control Dict holds with the local vLLM server.
 
     Runs in a thread beside vLLM.
     """
@@ -216,39 +255,27 @@ def load_adapter_requests(*, api_key: str) -> None:
     while not vllm_ready(api_key=api_key):
         time.sleep(10)
     print("adapter loader: vLLM is up", flush=True)
+    adapters = LoadedAdapters(post=partial(post_to_vllm, api_key=api_key))
     handled = None
-    loaded = None
     while True:
         time.sleep(5)
         try:
-            request = control.get("request")
+            request = control.get(ADAPTER_REQUEST_KEY)
         except Exception:
             # A Dict read can fail for a moment. This thread reads the Dict again 5 seconds later.
             logger.exception("adapter loader: reading the control Dict failed")
             continue
-        if request is None or request["id"] == handled:
+        if request is None or request.id == handled:
             continue
         grpo_volume.reload()
-        status, body = post_to_vllm(
-            path="/v1/load_lora_adapter",
-            body={"lora_name": request["name"], "lora_path": request["path"]},
-            api_key=api_key,
+        result = adapters.handle(request=request)
+        control[ADAPTER_RESULT_KEY] = result
+        print(
+            f"adapter loader: {request.name} -> {result.status} {result.body[:300]}, "
+            f"unloaded {list(result.unloaded)}, loaded {sorted(adapters.names)}",
+            flush=True,
         )
-        unloaded = None
-        if status == 200 and loaded is not None and loaded != request["name"]:
-            unloaded = post_to_vllm(
-                path="/v1/unload_lora_adapter", body={"lora_name": loaded}, api_key=api_key
-            )[0]
-        if status == 200:
-            loaded = request["name"]
-        control["result"] = {
-            "id": request["id"],
-            "status": status,
-            "body": body[:2000],
-            "unloaded_status": unloaded,
-        }
-        print(f"adapter loader: {request['name']} -> {status} {body[:300]}", flush=True)
-        handled = request["id"]
+        handled = request.id
 
 
 def gpu_memory_mib() -> int:
@@ -266,9 +293,9 @@ def gpu_memory_mib() -> int:
 
 @app.function(
     image=vllm_image,
-    # H200 or H100 only. With LoRA on, vLLM 0.31 failed in its flash-attention kernel while
-    # capturing CUDA graphs on a B200. The H200 containers worked.
-    gpu=[f"{gpu_type}:{SERVE_GPUS}" for gpu_type in ("H200", "H100")],
+    # Not a B200: with LoRA on, vLLM 0.31 failed in its flash-attention kernel while capturing
+    # CUDA graphs on a B200. The H200 and H100 containers worked.
+    gpu=[f"{gpu_type}:{SERVE_GPUS}" for gpu_type in SERVER_GPUS],
     secrets=[
         modal.Secret.from_name("huggingface-glossogen"),
         modal.Secret.from_name("vllm-api-key"),
@@ -312,7 +339,7 @@ def serve() -> None:
     command = [
         "vllm",
         "serve",
-        MODEL_NAME,
+        BASE_MODEL,
         "--host",
         "0.0.0.0",
         "--port",

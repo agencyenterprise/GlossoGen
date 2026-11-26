@@ -168,4 +168,6 @@ def _build_judge_model(model: str, provider: Provider, inference_provider: str |
         raise ValueError(
             f"an inference provider routes a HuggingFace judge; this judge runs under {provider}"
         )
-    return infer_model(build_pydantic_ai_model(model=model, provider=provider))
+    return infer_model(
+        build_pydantic_ai_model(model=model, provider=provider, self_hosted_strict_tools=True)
+    )

@@ -97,6 +97,7 @@ class AutonomousSupervisor:
         for config in agent_configs:
             config.model_settings = knobs.model_settings_for(agent_id=config.agent_id)
             config.record_token_ids = knobs.record_token_ids
+            config.self_hosted_strict_tools = knobs.self_hosted_strict_tools
         scheduled = list(knobs.scheduled_events)
         completed_event_count_by_round: dict[int, int] = (
             resume_state.completed_scheduler_event_count_by_round

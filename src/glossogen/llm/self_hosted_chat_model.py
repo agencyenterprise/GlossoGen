@@ -42,6 +42,10 @@ class SelfHostedChatModel(OpenAIChatModel):
     taking effect, the explanation then joins the agent's prompt instead of following it as a
     second system message.
 
+    ``strict_tools`` decides whether a request marks a tool ``strict`` when pydantic-ai finds
+    the tool's schema strict-compatible. vLLM forces a strict tool's calls to match its schema
+    with a grammar. Off, each tool goes out without the ``strict`` key and the same schema.
+
     When the request asked for token ids (vLLM's ``return_token_ids``) and logprobs, the
     response's ``prompt_token_ids``, its first choice's ``token_ids`` and the logprob of each
     answer token are kept in the response's ``provider_details`` under
@@ -52,13 +56,14 @@ class SelfHostedChatModel(OpenAIChatModel):
 
     _announces_system_voice: ClassVar[bool] = False
 
-    def __init__(self, model_name: str, provider: OpenAIProvider) -> None:
+    def __init__(self, model_name: str, provider: OpenAIProvider, strict_tools: bool) -> None:
         super().__init__(
             model_name=model_name,
             provider=provider,
             profile=OpenAIModelProfile(
                 supports_inline_system_prompts=False,
                 openai_chat_supports_multiple_system_messages=False,
+                openai_supports_strict_tool_definition=strict_tools,
             ),
         )
 

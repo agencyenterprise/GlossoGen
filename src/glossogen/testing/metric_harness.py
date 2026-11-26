@@ -154,9 +154,9 @@ def use_scripted_probe_model(
     ]
     scripted = build_scripted_model(turns=turns, when_exhausted=[turns[-1]])
 
-    def probe_model(model: str, provider: str) -> object:
+    def probe_model(model: str, provider: str, self_hosted_strict_tools: bool) -> object:
         """Stand in for the per-agent model factory the probe agent builds."""
-        _ = model, provider
+        _ = model, provider, self_hosted_strict_tools
         return scripted
 
     monkeypatch.setattr(

@@ -32,6 +32,7 @@ def test_google_gla_uses_pydantic_ais_google_prefix(
     model_name = build_pydantic_ai_model(
         model="gemini-2.5-flash",
         provider=Provider.GOOGLE_GLA,
+        self_hosted_strict_tools=True,
     )
     assert model_name == "google:gemini-2.5-flash"
     assert isinstance(infer_model(model_name), GoogleModel)

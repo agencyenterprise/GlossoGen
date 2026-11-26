@@ -1,16 +1,21 @@
-"""One on-policy GRPO step with LoRA on Qwen3.8-27B, and the adapter's saved state.
+"""One GRPO step with LoRA on Qwen3.8-27B, and the adapter's saved state.
 
 A training sequence holds a player's prompts and answers as the model received and wrote them.
-``kl_mask`` marks the answer tokens, and ``advantages`` gives each of them its round's advantage.
-The loss over a batch is
+``kl_mask`` marks the answer tokens. ``advantages`` gives each of them its round's advantage, and
+``sampler_logprobs`` the logprob that the policy server logged when it sampled the token. The
+loss over a batch is
 
-    sum over marked tokens of ( -advantage * log p_policy(token) + kl_beta * k3 ) / marked tokens,
+    sum over marked tokens of ( -w * advantage * log p_policy(token) + kl_beta * k3 )
+    / marked tokens,
 
-with k3 = exp(r) - r - 1 and r = log p_reference - log p_policy. The reference is the same model
-with the adapter switched off. k3 is clamped at K3_MAX per token, as the verl library does, and
-the step's metrics count the clamped tokens. Each batch is used for one optimizer step. The policy
-that played the games is therefore the one being updated, and the loss needs no probability
-ratio.
+with w = min(exp(log p_policy - log p_sampler), ratio_cap), taken without a gradient. This is
+CISPO, platoon's default loss. w corrects for the difference between the policy that is being
+updated and the one that sampled the games. The two differ when the games played with an older
+adapter, and by the numeric differences between vLLM and the trainer.
+
+k3 = exp(r) - r - 1 with r = log p_reference - log p_policy. The reference is the same model with
+the adapter switched off. k3 is clamped at K3_MAX per token, as the verl library does, and the
+step's metrics count the clamped tokens. Each batch is used for one optimizer step.
 
 Only marked positions go through the LM head, in slices of ``logit_slice`` positions. LoRA adapts
 the language model's modules whose names are in LORA_TARGET_MODULES. The adapter lists them by
@@ -31,6 +36,7 @@ from grpo_records import GrpoSettings, StepMetrics, TrainingSequence
 from peft import LoraConfig, PeftModel, get_peft_model, set_peft_model_state_dict
 from safetensors.torch import load_file
 from torch.utils.checkpoint import checkpoint
+from trained_adapters import METRICS_FILE
 
 LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 LANGUAGE_MODEL_PREFIX = "model.language_model."
@@ -42,6 +48,25 @@ class ClampedK3(NamedTuple):
 
     k3: torch.Tensor
     clamped_tokens: int
+
+
+class CappedRatio(NamedTuple):
+    """Each marked token's importance weight, and the sum, the maximum and the count above the
+    cap of the ratio before the cap."""
+
+    weights: torch.Tensor
+    ratio_sum: float
+    ratio_max: float
+    capped_tokens: int
+
+
+class SequenceTerms(NamedTuple):
+    """One sequence's sums of the two loss terms, and its k3 and ratio statistics."""
+
+    policy_sum: torch.Tensor
+    kl_sum: torch.Tensor
+    clamped_tokens: int
+    ratio: CappedRatio
 
 
 def language_model_targets(*, model: torch.nn.Module) -> list[str]:
@@ -137,6 +162,55 @@ def clamped_k3(*, log_ratio: torch.Tensor) -> ClampedK3:
     )
 
 
+def capped_ratio(*, policy: torch.Tensor, sampler: torch.Tensor, cap: float) -> CappedRatio:
+    """exp(policy - sampler) per token, without a gradient, capped at ``cap``."""
+    ratio = torch.exp(policy.detach() - sampler)
+    return CappedRatio(
+        weights=torch.clamp(ratio, max=cap),
+        ratio_sum=float(ratio.sum()),
+        ratio_max=float(ratio.max()),
+        capped_tokens=int((ratio > cap).sum()),
+    )
+
+
+def marked_values(
+    *, sequence: TrainingSequence, values: list[float], device: torch.device
+) -> torch.Tensor:
+    """The entries of ``values`` at the sequence's marked positions after the first, in order."""
+    marked = [index for index, value in enumerate(sequence.kl_mask[1:], start=1) if value]
+    return torch.tensor([values[index] for index in marked], device=device)
+
+
+def sequence_terms(
+    *,
+    model: PeftModel,
+    sequence: TrainingSequence,
+    device: torch.device,
+    settings: GrpoSettings,
+) -> SequenceTerms:
+    """The two loss terms of one sequence, summed over its marked tokens, with a gradient."""
+    reference = reference_logprobs(
+        model=model, sequence=sequence, device=device, logit_slice=settings.logit_slice
+    )
+    policy = marked_logprobs(
+        model=model,
+        sequence=sequence,
+        device=device,
+        logit_slice=settings.logit_slice,
+        with_grad=True,
+    )
+    advantages = marked_values(sequence=sequence, values=sequence.advantages, device=device)
+    sampler = marked_values(sequence=sequence, values=sequence.sampler_logprobs, device=device)
+    ratio = capped_ratio(policy=policy, sampler=sampler, cap=settings.ratio_cap)
+    clamped = clamped_k3(log_ratio=reference - policy)
+    return SequenceTerms(
+        policy_sum=-(ratio.weights * advantages * policy).sum(),
+        kl_sum=clamped.k3.sum(),
+        clamped_tokens=clamped.clamped_tokens,
+        ratio=ratio,
+    )
+
+
 def peak_memory_gb(*, device: torch.device) -> float:
     """The most GPU memory allocated since ``train_step`` reset the count, in GB.
 
@@ -165,29 +239,21 @@ def train_step(
     policy_total = 0.0
     kl_total = 0.0
     clamped_tokens = 0
+    ratio_total = 0.0
+    ratio_max = 0.0
+    capped_tokens = 0
     model.train()
     for sequence in sequences:
         if sum(sequence.kl_mask[1:]) == 0:
             continue
-        reference = reference_logprobs(
-            model=model, sequence=sequence, device=device, logit_slice=settings.logit_slice
-        )
-        policy = marked_logprobs(
-            model=model,
-            sequence=sequence,
-            device=device,
-            logit_slice=settings.logit_slice,
-            with_grad=True,
-        )
-        marked = [index for index, value in enumerate(sequence.kl_mask[1:], start=1) if value]
-        advantages = torch.tensor([sequence.advantages[index] for index in marked], device=device)
-        clamped = clamped_k3(log_ratio=reference - policy)
-        clamped_tokens += clamped.clamped_tokens
-        policy_sum = -(advantages * policy).sum()
-        kl_sum = clamped.k3.sum()
-        ((policy_sum + settings.kl_beta * kl_sum) / marked_tokens).backward()
-        policy_total += float(policy_sum.detach())
-        kl_total += float(kl_sum.detach())
+        terms = sequence_terms(model=model, sequence=sequence, device=device, settings=settings)
+        ((terms.policy_sum + settings.kl_beta * terms.kl_sum) / marked_tokens).backward()
+        policy_total += float(terms.policy_sum.detach())
+        kl_total += float(terms.kl_sum.detach())
+        clamped_tokens += terms.clamped_tokens
+        ratio_total += terms.ratio.ratio_sum
+        ratio_max = max(ratio_max, terms.ratio.ratio_max)
+        capped_tokens += terms.ratio.capped_tokens
     parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     grad_norm = torch.nn.utils.clip_grad_norm_(
         parameters=parameters, max_norm=settings.max_grad_norm
@@ -207,6 +273,9 @@ def train_step(
         tokens=sum(len(sequence.input_ids) for sequence in sequences),
         grad_norm=float(grad_norm),
         clamped_tokens=clamped_tokens,
+        ratio_mean=ratio_total / marked_tokens,
+        ratio_max=ratio_max,
+        ratio_capped_share=capped_tokens / marked_tokens,
         seconds=time.monotonic() - began,
         peak_memory_gb=peak_memory_gb(device=device),
     )
@@ -233,7 +302,7 @@ def save_state(
     model.save_pretrained(save_directory=str(directory))
     torch.save(optimizer.state_dict(), directory / "optimizer.pt")
     if metrics is not None:
-        (directory / "metrics.json").write_text(json.dumps(metrics._asdict(), indent=1) + "\n")
+        (directory / METRICS_FILE).write_text(json.dumps(metrics._asdict(), indent=1) + "\n")
 
 
 def load_state(*, model: PeftModel, optimizer: torch.optim.Optimizer, directory: Path) -> None:

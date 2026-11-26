@@ -1,0 +1,8 @@
+{
+  "base_url": null,
+  "model_override": {
+    "model": "Qwen/Qwen3.8-27B",
+    "provider": "self-hosted"
+  },
+  "seat": "player_b"
+}

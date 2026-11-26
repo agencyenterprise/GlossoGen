@@ -72,7 +72,11 @@ def test_each_provider_builds_its_model_from_the_variables_its_row_names(
     """A row naming the wrong variable fails here: pydantic-ai would find no key."""
     set_credentials(spec=spec, monkeypatch=monkeypatch)
 
-    built = build_pydantic_ai_model(model=model_for(provider=spec.provider), provider=spec.provider)
+    built = build_pydantic_ai_model(
+        model=model_for(provider=spec.provider),
+        provider=spec.provider,
+        self_hosted_strict_tools=True,
+    )
 
     if isinstance(built, str):
         infer_model(built)

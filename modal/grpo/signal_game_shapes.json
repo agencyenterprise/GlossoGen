@@ -25,6 +25,7 @@
   "record_token_ids": true,
   "round_count": 10,
   "seed": 42,
+  "self_hosted_strict_tools": false,
   "shape_count": 3,
   "word_count": 0
 }

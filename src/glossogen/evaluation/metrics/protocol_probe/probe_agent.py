@@ -108,7 +108,9 @@ async def run_structured_probe(
     model at the same effort.
     """
     agent: Agent[None, ProbeOutputT] = Agent(
-        model=build_pydantic_ai_model(model=model, provider=provider),
+        model=build_pydantic_ai_model(
+            model=model, provider=provider, self_hosted_strict_tools=True
+        ),
         system_prompt=full_system_prompt,
         output_type=output_type,
         model_settings=_probe_model_settings(

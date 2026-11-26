@@ -12,6 +12,74 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL app's GPU types are set at deploy time.** `modal/grpo/grpo_app.py`
+  reads `GRPO_TRAINER_GPUS` and `GRPO_SERVER_GPUS`, each a comma-separated
+  list of GPU types in order of preference, and a deploy without them fails.
+  See [Training a model with RL](docs/rl-training.md#1-deploy-the-app).
+- **The RL loop's `train` can test adapters on held-out seeds as it trains.**
+  With `--eval-every N --eval-seeds ... --eval-games-per-seed G`, `train` tests
+  each adapter k above 0 for which k is a multiple of N, once the trainer has
+  saved it. It appends to `eval.jsonl` the same line that `eval` writes. Each
+  line of `eval.jsonl` records its seeds and games per seed. When `eval.jsonl`
+  already holds a line for the same adapter, partner, seeds and games per seed,
+  `eval` plays no games. When `train` resumes, it first runs a test that was
+  playing when the loop stopped. See
+  [Training a model with RL](docs/rl-training.md#4-test-the-adapters).
+- **The RL loop's `train` resumes a stopped run by itself.** `grpo_loop.py
+  train` starts with the step after the last one that `steps.jsonl` records,
+  and takes no `--first-step`. The loop writes a line in `games.jsonl` for each
+  game whose `glossogen run` exited, and a step that stopped partway reuses
+  those games. The log of a game that was playing when the loop stopped moves to
+  `game_logs/abandoned/`, its run gets the label `abandoned`, and the loop plays
+  the game again. The loop refuses to resume a step whose ended games another
+  adapter played. A cancelled game stops its `glossogen run`.
+  `test_grpo_steps.py` stops a run while a game plays, and another after the
+  trainer saved an adapter. It checks that each resumed run trains on each game
+  once. See
+  [Training a model with RL](docs/rl-training.md#resuming-after-a-stop).
+- **The RL loop can play a step's games while the trainer trains the step
+  before.** With `grpo_loop.py train --overlap`, step k's games play with
+  adapter k−1 while the trainer trains step k−1, and the importance ratio
+  corrects for the one adapter of difference. The policy server's loader
+  takes a list of adapters to keep with each load request, so adapter k−1
+  stays loaded while step k's games play. The trainer saves the run ids of
+  the games that trained each adapter in `games.json`, and returns the saved
+  metrics when it is asked to train a saved step on the same games. Each
+  game's labels and each line of `steps.jsonl` name the adapter that played.
+  The loop is split into modules behind two interfaces, the app and the game
+  launcher, and `test_grpo_steps.py` runs whole steps on CPU with fakes of
+  both. See [Training a model with RL](docs/rl-training.md#overlapping-play-and-training).
+- **The RL trainer weights each answer token by a capped importance ratio.**
+  The loss in `modal/grpo/grpo_training.py` is CISPO, platoon's default loss:
+  each answer token's term is multiplied by exp(trainer logprob − sampler
+  logprob), capped at 5 and taken without a gradient. The loop reads the
+  sampler logprobs from each game's `token_logprobs`, and refuses an answer
+  without them. The KL term and the gradient clipping are unchanged. Each line
+  of `steps.jsonl` records `ratio_mean`, `ratio_max` and `ratio_capped_share`.
+  See [Training a model with RL](docs/rl-training.md#the-loss).
+- **The knob `self_hosted_strict_tools` can turn off strict tools for
+  self-hosted agents.** On, its default, a self-hosted agent's requests mark a
+  tool `strict` when pydantic-ai finds its schema strict-compatible, and vLLM
+  forces the tool's calls to match the schema with a grammar. Off, the requests
+  send the same schemas without the `strict` key. The grammar logs a forced
+  token at a logprob near 0, whatever probability the model gives it. The RL
+  game config `modal/grpo/signal_game_shapes.json` turns the knob off.
+  `build_pydantic_ai_model` takes `self_hosted_strict_tools`, and
+  `SelfHostedChatModel` takes `strict_tools`. See
+  [Training a model with RL](docs/rl-training.md#token-ids-in-the-event-log).
+- **The RL loop can train one seat against a frozen partner.** A frozen partner
+  is a model that plays one seat of every game and does not train. In
+  `modal/grpo/`, `grpo_loop.py init --partner FILE` saves the partner in the
+  run's `settings.json` on the volume, and `train` plays it in every step. The
+  loop builds training sequences only from the other seat's answers. `eval
+  --partner FILE` tests an adapter against a partner. The partner is the base
+  model on the policy server, another self-hosted model, or a model of another
+  provider. `base_model_partner.json` puts the base model in `player_b`. Each
+  line of `steps.jsonl` and `eval.jsonl` records the partner and the
+  first-item count of each seat. The loop refuses a game config that would
+  change a seed config that a run already wrote. `pytest modal/grpo/` leaves
+  out the trainer's tests when torch is not installed. See
+  [Training a model with RL](docs/rl-training.md#a-frozen-partner).
 - **Claude Code can analyze a group of runs with the `analyze-runs` skill.**
   `glossogen install-skill` copies the skill into a project's `.claude/skills/`,
   and this repository links it there. The skill has Claude check the runs

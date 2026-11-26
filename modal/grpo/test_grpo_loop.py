@@ -11,9 +11,11 @@ import ast
 import json
 from pathlib import Path
 
-from grpo_loop import FinishedGame, Game, counts_by_seed, first_item_count, seed_advantages
+import pytest
+from loop_services import Game
 from signal_game_rewards import PlayerRound, Reward, game_outcome, player_score
-from token_sequences import answer_rounds, game_sequences
+from step_batch import FinishedGame, counts_by_seed, first_item_count, seed_advantages
+from token_sequences import MissingSamplerLogprobs, answer_rounds, game_sequences
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import (
@@ -40,7 +42,10 @@ GRID_B = [["square-red", "circle-blue"], ["circle-red", "triangle-green"]]
 def response(
     *, round_number: int, index: int, prefix: int, tail: list[int], answer: list[int], call_id: str
 ) -> LLMResponseReceived:
-    """A recorded response of player_a; ``call_id`` empty means a text answer."""
+    """A recorded response of player_a; ``call_id`` empty means a text answer.
+
+    Each answer token is logged with the logprob minus its id.
+    """
     tool_calls: list[ToolCallRequest] = []
     if call_id:
         tool_calls = [ToolCallRequest(call_id=call_id, tool_name="move", arguments={})]
@@ -60,6 +65,7 @@ def response(
         prompt_prefix_tokens=prefix,
         prompt_tail_ids=tail,
         token_ids=answer,
+        token_logprobs=[-float(token) for token in answer],
     )
 
 
@@ -87,6 +93,7 @@ def test_answers_chain_into_one_sequence_with_only_answers_marked() -> None:
     assert sequence.input_ids == [1, 2, 3, 4, 5, 6, 7]
     assert sequence.kl_mask == [0, 0, 0, 1, 1, 0, 1]
     assert sequence.advantages == [0.0, 0.0, 0.0, 0.5, 0.5, 0.0, -0.5]
+    assert sequence.sampler_logprobs == [0.0, 0.0, 0.0, -4.0, -5.0, 0.0, -7.0]
     assert (built.answers, built.answer_tokens, built.sequence_tokens) == (2, 3, 7)
 
 
@@ -101,6 +108,20 @@ def test_a_prompt_that_does_not_extend_the_sequence_starts_a_new_one() -> None:
     assert built.chain_breaks == 1
     assert [sequence.input_ids for sequence in built.sequences] == [[1, 2, 3], [1, 9, 8]]
     assert [sequence.kl_mask for sequence in built.sequences] == [[0, 0, 1], [0, 0, 1]]
+    assert [sequence.sampler_logprobs for sequence in built.sequences] == [
+        [0.0, 0.0, -3.0],
+        [0.0, 0.0, -8.0],
+    ]
+
+
+def test_an_answer_without_logged_logprobs_is_refused() -> None:
+    logged = response(round_number=1, index=0, prefix=0, tail=[1], answer=[2], call_id="c1")
+    events: list[SimulationEvent] = [
+        logged.model_copy(update={"token_logprobs": None}),
+        invoked(round_number=1, call_id="c1"),
+    ]
+    with pytest.raises(MissingSamplerLogprobs):
+        game_sequences(events=events, agent_id="player_a", advantages={1: 1.0})
 
 
 def test_an_answer_takes_the_round_of_its_tool_call_and_a_text_answer_keeps_the_last() -> None:
@@ -179,7 +200,7 @@ def finished_game(*, run_id: str, final_square_a: tuple[int, int]) -> FinishedGa
     """A finished one-round game on seed 1000."""
     events = signal_game_events(final_square_a=final_square_a, success=False)
     return FinishedGame(
-        game=Game(seed=1000, game=1, run_id=run_id, returncode=0),
+        game=Game(seed=1000, game=1, adapter=0, run_id=run_id, returncode=0),
         events=events,
         outcome=game_outcome(events=events),
     )
@@ -206,9 +227,15 @@ def test_counts_by_seed_lists_each_game_in_game_order() -> None:
     on_first_item = finished_game(run_id="signal_game/1", final_square_a=(1, 1))
     elsewhere = finished_game(run_id="signal_game/2", final_square_a=(2, 2))
     finished = [
-        on_first_item._replace(game=Game(seed=1001, game=1, run_id="signal_game/1", returncode=0)),
-        elsewhere._replace(game=Game(seed=1000, game=2, run_id="signal_game/2", returncode=0)),
-        on_first_item._replace(game=Game(seed=1000, game=1, run_id="signal_game/3", returncode=0)),
+        on_first_item._replace(
+            game=Game(seed=1001, game=1, adapter=0, run_id="signal_game/1", returncode=0)
+        ),
+        elsewhere._replace(
+            game=Game(seed=1000, game=2, adapter=0, run_id="signal_game/2", returncode=0)
+        ),
+        on_first_item._replace(
+            game=Game(seed=1000, game=1, adapter=0, run_id="signal_game/3", returncode=0)
+        ),
     ]
     assert counts_by_seed(finished=finished, count=first_item_count) == {
         "1000": [1, 0],
@@ -221,13 +248,21 @@ def test_a_seed_with_one_finished_game_gives_no_advantage() -> None:
     assert seed_advantages(group=group, reward=Reward.FIRST_ITEM) == []
 
 
-def test_the_shipped_game_config_records_token_ids() -> None:
+def test_the_shipped_game_config_records_token_ids_and_sends_no_strict_tools() -> None:
     config = json.loads((Path(__file__).parent / "signal_game_shapes.json").read_text())
     assert config["record_token_ids"] is True
+    assert config["self_hosted_strict_tools"] is False
 
 
 def test_the_modules_that_run_on_modal_parse_as_python_3_12() -> None:
     # The Modal images run Python 3.12, and black formats this repository for 3.14.
-    for name in ("grpo_app.py", "grpo_training.py", "grpo_records.py"):
+    modal_modules = (
+        "grpo_app.py",
+        "grpo_training.py",
+        "grpo_records.py",
+        "adapter_loader.py",
+        "trained_adapters.py",
+    )
+    for name in modal_modules:
         source = (Path(__file__).parent / name).read_text()
         ast.parse(source, filename=name, feature_version=(3, 12))
