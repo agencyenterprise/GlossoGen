@@ -1,28 +1,37 @@
 # Searching runs with Docent
 
 Follow these steps to run Docent on your own machine, load one glossogen run into
-it, and search the run for a behaviour.
+it, and search its agents' transcripts for a behaviour.
 [Docent](https://transluce.org/docent) is Transluce's tool for reading and
 searching agent transcripts.
 
 | Step | What it needs |
 | --- | --- |
 | [1. Run Docent locally](#1-run-docent-locally) | Docker, git, and about 1.3 GB of disk for Docent's Docker images |
-| [2. Get a Docent API key](#2-get-a-docent-api-key) | a browser |
-| [3. Export a run as ATIF](#3-export-a-run-as-atif) | glossogen and a finished run |
-| [4. Upload the run](#4-upload-the-run) | uv |
-| [5. Search the run](#5-search-the-run) | an OpenAI API key, and about 95,000 `gpt-5` tokens for one search of the example run |
+| [2. Sign up in Docent](#2-sign-up-in-docent) | a browser |
+| [3. Export a run as an Inspect log](#3-export-a-run-as-an-inspect-log) | glossogen and a finished run |
+| [4. Upload the Inspect log](#4-upload-the-inspect-log) | the Docent account from step 2 |
+| [5. Search the agent runs](#5-search-the-agent-runs) | an OpenAI API key, and about 65,000 `gpt-5` tokens for one search of the example run |
 
 Nothing here uses Transluce's hosted Docent. Docent keeps its data in Docker on
-your machine. In step 5, Docent sends the run's transcripts to OpenAI.
+your machine. In step 5, Docent sends the agents' transcripts to OpenAI.
 
-Docent stores agent runs. An agent run holds transcripts, and a transcript is one
-agent's messages in order. Docent groups agent runs into collections. The script
-in step 4 turns one glossogen run into one agent run, with one transcript per
-glossogen agent. In step 5 you search with a rubric, which is a description of a
-behaviour. A judge model reads the agent run and answers whether it matches.
+A glossogen run is one run of a scenario, in one folder under `runs/`. Docent
+stores agent runs. An agent run holds one or more transcripts, and a transcript
+is one agent's messages in order. Docent groups agent runs into collections.
+
+Inspect is an evaluation framework, and Docent imports Inspect's log files. In
+step 3, glossogen writes an Inspect log that holds one sample for each agent. A
+sample is one agent's messages in order. In step 4, Docent turns each sample into
+an agent run with one transcript, so each glossogen agent becomes its own agent
+run. In step 5 you search with a rubric, which is a description of a behaviour.
+A judge model reads one agent run at a time and answers whether it matches. This
+page calls that answer the agent run's result.
 
 ## 1. Run Docent locally
+
+These commands clone Docent at commit `7a477df`.
+[Why commit 7a477df](#why-commit-7a477df) explains why this commit:
 
 ```bash
 git clone https://github.com/TransluceAI/docent.git
@@ -33,8 +42,14 @@ chmod 644 .env
 ```
 
 **Set `OPENAI_API_KEY` in `.env` before you build.** Only step 5 uses the key.
-The build copies `.env`, with the key, into Docent's API and worker images. A key
-that you add later needs the build command below again.
+The build copies `.env`, with the key, into Docent's API and worker images. If
+you add the key later, run the build command below again.
+
+**Use an OpenAI key for search.** Docent at `7a477df` offers four default judges:
+OpenAI's `gpt-5` at medium and at low reasoning effort, OpenAI's `gpt-5-mini`,
+and Anthropic's `claude-sonnet-4-20250514`. Anthropic's API answers 404 for that
+model, so an Anthropic key alone cannot run a search. A new rubric uses the first
+judge, `gpt-5` at medium effort.
 
 **Keep `.env` readable by other users (mode 644).** The containers read it as an
 unprivileged user. With mode 600, the API fails to start with
@@ -60,10 +75,10 @@ variables.
 
 Docker Compose starts five containers: the API, a worker, the web UI, Postgres
 and Redis. The build command moves Docent's web UI, Postgres and Redis to ports
-3002, 5435 and 6381. A glossogen setup can already hold Docent's default ports
-and the ports next to them:
+3002, 5435 and 6381. A glossogen setup may already be using Docent's default
+ports and the ports next to them:
 
-| Service | Docent's default port | Port on this page | Ports that a glossogen setup can hold |
+| Service | Docent's default port | Port on this page | Ports that a glossogen setup may already use |
 | --- | --- | --- | --- |
 | Web UI | 3000 | 3002 | 3000 for glossogen's web UI, 3001 for its [Langfuse stack](observability.md) |
 | Postgres | 5432 | 5435 | 5432 for the local Postgres in [Installation](installation.md), 5433 for Langfuse's Postgres |
@@ -72,40 +87,40 @@ and the ports next to them:
 
 ### Why commit 7a477df
 
-**Build at commit `7a477df`.** Later commits do not build with Docent's compose
-file. Commit `9700ec0` deletes the web UI's `package-lock.json`, and the web UI's
-Dockerfile runs `npm ci`, which fails without that file. At the later commit
+**Build at commit `7a477df`.** Two later commits do not build with Docent's
+compose file. Commit `9700ec0` deletes the web UI's `package-lock.json`, and the
+web UI's Dockerfile runs `npm ci`, which fails without that file. At the later commit
 `731cbd3`, the API build also fails. It stops at `can't find Rust compiler` while
 it builds `tokenizers` 0.13.3.
 
-## 2. Get a Docent API key
+## 2. Sign up in Docent
 
 Open <http://localhost:3002/signup> and sign up with any email address and
 password. The account is a row in Docent's local Postgres, and Docent sends no
-email.
+email. Docent then shows a survey in five steps. To skip it, open
+<http://localhost:3002/dashboard>.
 
-Open <http://localhost:3002/settings/api-keys>, click **Create API Key**, give
-the key a name, and copy the key. It starts with `dk_`, and Docent shows it only
-once. Put it in the shell that runs step 4:
+The upload in step 4 runs in Docent's web UI, so it needs this account and no
+Docent API key.
 
-```bash
-export DOCENT_API_KEY=dk_...
-```
+## 3. Export a run as an Inspect log
 
-## 3. Export a run as ATIF
-
-In your glossogen project folder, write one ATIF file per agent:
+In your glossogen project folder, write the run's Inspect log:
 
 ```bash
 glossogen export-atif spot_the_intersection \
   --run-dir ./runs/spot_the_intersection/1795535900 \
-  --out-dir ./atif/1795535900
+  --format inspect \
+  --out-dir ./inspect/1795535900
 ```
 
-ATIF is the Agent Trajectory Interchange Format, and
-[ATIF export](atif-export.md) describes what each file holds. Put your own run's
-scenario and folder in the command. The rest of this page uses the
-spot_the_intersection run 1795535900 as its example.
+The command writes one file, `inspect_log.json`, with one sample per agent. Each
+sample's metadata names the glossogen run, the agent and the model.
+[The Inspect format](atif-export.md#the-inspect-format) describes what the file
+holds.
+
+Put your own run's scenario and folder in the command. The rest of this page uses
+the spot_the_intersection run 1795535900 as its example.
 
 In spot_the_intersection, two agents, viewer_1 and viewer_2, each have a private
 board. Each object on a board is a shape and a color in a grid cell, such as a
@@ -117,111 +132,56 @@ discussion phase. Characters sent on `postmortem` do not count toward the score.
 
 ### From glossogen's web UI
 
-glossogen's web UI writes the same files. Click **Export** in the navigation bar,
-open the **Raw run folders** tab, and keep **Include ATIF trajectories** ticked.
-The zip holds one ATIF file per agent under `<scenario>/<run>/atif/`. Unzip it,
-and give that `atif` folder to the script in step 4.
+glossogen's web UI writes the same file. Its Export dialog exports the runs
+that match the filters of the Simulation Runs page. Type the run's id into the
+**Search by run id…** box on that page, so that only this run matches. Then
+click **Export** at the top of the page and open the **Raw run folders** tab.
+Under **Agent trajectories**, pick **Inspect log for Docent**, and click
+**Export**.
 
-![The Export dialog on the Raw run folders tab, with Include ATIF trajectories ticked](../images/docent_atif_export.webp)
+The zip holds `inspect_log.json` at its root. The file holds one sample for each
+agent of each run in the zip. Unzip the zip to get the file.
 
-## 4. Upload the run
+![glossogen's Export dialog on the Raw run folders tab, with Inspect log for Docent picked](../images/docent_inspect_export.webp)
 
-Save this script as `upload_to_docent.py` in your glossogen project folder. It
-converts each agent's ATIF file with Docent's Python SDK and puts all the
-transcripts into one agent run. Each transcript goes in a transcript group, named
-after its agent and model. The script then adds the agent run to a new collection.
+## 4. Upload the Inspect log
 
-```python
-"""Upload one glossogen run, exported as ATIF, to a local Docent as one agent run."""
+Open <http://localhost:3002/dashboard> in Docent's web UI. Click
+**Create New Collection**, give the collection a name, and click
+**Create Collection**. Then click the collection's row to open it.
 
-import json
-import os
-import sys
-from pathlib import Path
-from uuid import uuid4
+On the collection page, click **Add Data**, then **Upload Inspect Log**, and
+choose `inspect_log.json`. You can also drag the file onto the
+**Agent Run List**. Docent shows a preview with the number of agent runs that it
+will create, which is 2 for the example. Click **Import 2 Runs**.
 
-import requests
-from docent.data_models import AgentRun, TranscriptGroup
-from docent.sdk.integrations import convert_atif_to_agent_run
+![Docent's upload dialog for inspect_log.json: 2 agent runs, and the metadata of the first, viewer_1](../images/docent_upload_dialog.webp)
 
-DOCENT_API = "http://localhost:8888/rest"
-DOCENT_WEB = "http://localhost:3002"
+The example's viewer_1 and viewer_2 become two agent runs. An agent
+run's metadata holds the glossogen run in `glossogen_run`, the agent in
+`agent_id`, and the model in `model`.
 
-atif_dir = Path(sys.argv[1])
-trajectories = [json.loads(path.read_text()) for path in sorted(atif_dir.glob("*.json"))]
+### The uploaded agent runs
 
-# One transcript per agent, each in a group named after the agent and its model.
-run_id = str(uuid4())
-groups = []
-transcripts = []
-for trajectory in trajectories:
-    agent = trajectory["agent"]
-    group = TranscriptGroup(
-        name=f"{agent['extra']['agent_id']} ({agent['model_name']})",
-        agent_run_id=run_id,
-    )
-    groups.append(group)
-    for transcript in convert_atif_to_agent_run(trajectory).transcripts:
-        transcripts.append(transcript.model_copy(update={"transcript_group_id": group.id}))
+On the collection page, click an agent run's row to open it. The **Transcript**
+panel shows the agent's messages, one per block, numbered from 0. Block 0 is the
+agent's system prompt.
 
-run = AgentRun(
-    id=run_id,
-    name=trajectories[0]["session_id"],
-    transcripts=transcripts,
-    transcript_groups=groups,
-    metadata={
-        "scenario": trajectories[0]["extra"]["scenario_name"],
-        "agents": [group.name for group in groups],
-    },
-)
+An agent's transcript also holds the messages that its teammate sent. They are
+in what the agent's `read_channel` and `send_message` calls returned. viewer_1's transcript
+holds all 15 `link` messages that viewer_2 sent, and viewer_2's transcript holds
+all 15 of viewer_1's.
 
-session = requests.Session()
-session.headers["Authorization"] = f"Bearer {os.environ['DOCENT_API_KEY']}"
-created = session.post(f"{DOCENT_API}/create", json={"name": "glossogen runs"})
-created.raise_for_status()
-collection_id = created.json()["collection_id"]
-added = session.post(
-    f"{DOCENT_API}/{collection_id}/agent_runs",
-    json={"agent_runs": [run.model_dump(mode="json")]},
-)
-added.raise_for_status()
-print(f"Uploaded {run.name} as one agent run: {DOCENT_WEB}/dashboard/{collection_id}")
-```
+The screenshot shows blocks 3 to 5 of viewer_1's transcript. Block 3 holds
+viewer_1's round 1 board. In block 4, viewer_1 calls `send_message` with its
+board written as four-character codes. In block 5, the call returns `conflict`,
+with viewer_2's board in `new_messages`. `send_message` returns `conflict` and
+sends nothing when a message has arrived since the agent last read the channel.
+viewer_2's board had arrived first, so viewer_1's message was never sent.
 
-Run it on the folder from step 3:
+![viewer_1's agent run in Docent: its metadata, and blocks 3 to 5 of its transcript](../images/docent_agent_run.webp)
 
-```bash
-uv run --no-project --python 3.12 --with docent==0.1.88 \
-  python upload_to_docent.py ./atif/1795535900
-```
-
-```text
-Uploaded spot_the_intersection/1795535900 as one agent run: http://localhost:3002/dashboard/483c76d8-eaa4-486a-99cc-11009df48cb1
-```
-
-The printed link opens the collection. Each time you run the script, it creates a
-new collection named `glossogen runs`.
-
-**Post with `requests`, not with the SDK's `add_agent_runs`.** That method sends
-a gzip-compressed body, and Docent at `7a477df` rejects it with
-`HTTP 400: There was an error parsing the body`.
-
-### The uploaded run
-
-On the collection page, click the agent run's row. The **Transcripts** list shows
-one transcript group per viewer, as a folder. The **Transcript** panel next to it
-shows the selected transcript, one message per block. The screenshot shows the
-start of round 1 in viewer_1's transcript.
-
-In block 2, viewer_1 calls `read_notifications`, and block 3 holds its round 1
-board. In block 4, viewer_1 calls `send_message` with its board written as
-four-character codes. That message was never sent. In block 5, the tool returns
-`conflict`, because viewer_2's board arrived first. viewer_1 then sends only
-`B3rc`, the object on both boards.
-
-![The agent run in Docent: its metadata, a transcript group per viewer, and blocks 2 to 4 of viewer_1's transcript](../images/docent_agent_run.webp)
-
-## 5. Search the run
+## 5. Search the agent runs
 
 On the collection page, type this rubric into the **Create a rubric** box and
 click **Direct search**:
@@ -229,49 +189,71 @@ click **Direct search**:
 > An agent proposes a new code for the objects on its board, such as a shorter
 > way to write a shape, color and cell, for its teammate to use in later rounds.
 
-The judge model reads the whole agent run and answers whether it matches the
-rubric, with an explanation. After the search, the box becomes the
-**Rubric Editor**, and its **Run rubric** button runs the rubric again.
+The judge reads each agent run on its own. Its result for an agent run is
+`match` or `no match`, with an explanation. Docent lists each result under the
+agent run's id. After the search, the box becomes the **Rubric Editor**, and its
+**Run rubric** button runs the rubric again.
 
-For this run, `gpt-5` answered `match` and cited four blocks. A citation such as
-`T1B50` means transcript 1, block 50. Transcripts and blocks count from 0. The
-transcripts follow the `agents` list in the agent run's metadata, so transcript 0
-is viewer_1's and transcript 1 is viewer_2's.
+**Click Run rubric again when an agent run has no result.** Docent expects the
+judge's answer to hold `label` and `explanation` at its top level. The judge
+sometimes nests them inside a `properties` object instead. Docent at `7a477df`
+drops such an answer, and Docent's worker container logs `KeyError: 'label'`.
+Docent then lists fewer results than the collection has agent runs. Run rubric
+judges only the agent runs that have no result.
 
-| Citation | Round | What the block holds |
-| --- | --- | --- |
-| `T0B20` | 1 | viewer_1's discussion message, which proposes a protocol: viewer_2 sends its board, viewer_1 replies with only the matching cell in two characters, and colors and shapes keep their one-letter codes |
-| `T1B50` | 2 | viewer_2's discussion message, which proposes a two-character code: one base-36 character for the cell, and one hex character for the color and shape together |
-| `T0B50` | 2 | viewer_1 confirms the code for the next round |
-| `T0B57` | 3 | viewer_1 reads viewer_2's link message `4fsau5k1ddtbl7m6cc`, which is nine objects in the two-character code |
+For the example run, `gpt-5` at medium effort judged viewer_1's agent run twice
+and viewer_2's four times, in two searches and two Run rubric clicks. Docent
+dropped 0 of viewer_1's 2 answers and 3 of viewer_2's 4. In the first search, it
+dropped viewer_2's answer, and the two Run rubric clicks after it dropped
+viewer_2's answer again.
 
-Clicking a citation opens its block in the transcript, next to the result:
+In the second search, Docent kept both answers, and the result for both agent
+runs was `match`. A
+citation such as `T0B50` means transcript 0, block 50, in the agent run that the
+result belongs to. Each agent run here holds one transcript, so every citation
+starts with `T0`.
 
-![The rubric, the judge's explanation with its four citations, and block 50 of viewer_2's transcript, opened from the T1B50 citation](../images/docent_search_result.webp)
+| Agent run | Citation | Round | What the block holds |
+| --- | --- | --- | --- |
+| viewer_1 | `T0B20` | 1, discussion phase | viewer_1's discussion message, which proposes a protocol: viewer_2 sends its board, viewer_1 replies with only the matching cell in two characters, and colors and shapes keep their one-letter codes |
+| viewer_2 | `T0B18` | 1, discussion phase | viewer_2's `send_message` call on `postmortem` with a three-character code: one base-36 character for the cell, and one letter each for the color and the shape. The call returned `conflict`, because viewer_1's message had arrived first, and the message was never sent |
+| viewer_2 | `T0B24` | 1, discussion phase | viewer_2's discussion message, which agrees to send its board with no spaces, at four characters per object, and asks viewer_1 to reply with the matching object's position in the list |
+| viewer_1 | `T0B26` | 1, discussion phase | viewer_1's discussion message, which agrees to viewer_2's plan and says that it will write positions from 10 up as letters: a for 10, b for 11 |
+| viewer_2 | `T0B50` | 2, discussion phase | viewer_2's discussion message, which proposes a two-character code: one base-36 character for the cell, and one hex character for the color and shape together |
+| viewer_2 | `T0B55` | 2, discussion phase | what viewer_2's `read_channel` call returned: viewer_1's message that confirms the code for the next round |
+| viewer_2 | `T0B58` | 3, on `link` | viewer_2 sends its board on `link` as `4fsau5k1ddtbl7m6cc`, which is nine objects in the two-character code |
+| viewer_2 | `T0B63` | 3, on `link` | what a `read_channel` call returned: viewer_1's `link` reply `9`, which names the ninth object: a yellow circle at A3, the object on both boards |
+
+The table lists each cited block once, and viewer_1's result cites `T0B20` twice.
+Clicking a citation opens its block in the agent run, next to the result:
+
+![Both results, and block 50 of viewer_2's agent run, opened from the T0B50 citation](../images/docent_search_result.webp)
 
 ### The refinement chat and its tokens
 
 Direct search also opens a refinement chat, in which `gpt-5` asks you questions
-to make the rubric more precise. The search result does not wait for your
-answers. Docent makes another `gpt-5` call for each answer that you give.
+to make the rubric more precise. Docent shows the results before you answer. Docent makes another `gpt-5` call for each answer that you give.
 
-Docent made two `gpt-5` calls for this search. The judge call used 90,664 prompt
-tokens and 2,357 completion tokens. 1,984 of the completion tokens were reasoning
-tokens. The refinement chat's first question used 1,363 prompt tokens and 369
-completion tokens. These counts are the `usage` fields of OpenAI's two
-responses, logged by a proxy between Docent and OpenAI. The judge's prompt holds
-both transcripts, so a longer run uses more tokens.
+Docent made three `gpt-5` calls for the example's second search:
 
-**Use an OpenAI key for search.** Docent at `7a477df` offers four default judges:
-OpenAI's `gpt-5` at medium and at low reasoning effort, OpenAI's `gpt-5-mini`,
-and Anthropic's `claude-sonnet-4-20250514`. Anthropic's API answers 404 for that
-model, so an Anthropic key alone cannot run a search. A new rubric uses the first
-judge, `gpt-5` at medium effort.
+| Call | Prompt tokens | Completion tokens | Reasoning tokens, part of the completion |
+| --- | --- | --- | --- |
+| Judge, viewer_1's agent run | 27,986 | 1,967 | 1,728 |
+| Judge, viewer_2's agent run | 29,375 | 3,816 | 3,328 |
+| Refinement chat's first question | 1,363 | 268 | 192 |
+
+These counts are the `usage` fields of OpenAI's responses. A logging proxy
+between Docent and OpenAI recorded them, and the steps on this page do not need
+it. A judge prompt holds one agent run's transcript, so a longer glossogen run
+uses more tokens. Each **Run rubric** click makes one judge call for each agent
+run that it judges. Completion tokens vary between calls on the same prompt. Four
+judge calls on viewer_2's agent run, with `gpt-5` at medium
+effort, used from 1,668 to 3,816 completion tokens.
 
 ## Where to go next
 
-- [ATIF export](atif-export.md) describes what an ATIF file holds and what it
-  leaves out.
+- [The Inspect format](atif-export.md#the-inspect-format) describes what the
+  Inspect log holds, and [ATIF export](atif-export.md) what it is built from.
 - [Exporting runs](exporting-runs.md) covers the raw zip and the CSV tables.
 - [Reading runs from code](reading-runs-from-code.md) covers reading a run's
   event log from Python.
