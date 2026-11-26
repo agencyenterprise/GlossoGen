@@ -29,6 +29,7 @@ from pydantic import Discriminator, Field, TypeAdapter, model_serializer, model_
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.channel_visibility import ChannelVisibility
 from glossogen.models.event_base import EventBase, TokenUsage
+from glossogen.models.glossogen_build import GlossogenBuild
 from glossogen.models.message import SimulationMessage
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.thinking_part_record import ThinkingPartRecord
@@ -42,7 +43,14 @@ def _is_unset(value: object) -> bool:
 
 
 class SimulationStarted(EventBase):
-    """Emitted once when a simulation begins, recording the scenario, channels, and config."""
+    """Emitted once when a simulation begins, recording the scenario, channels, and config.
+
+    ``glossogen_build`` is the glossogen code that started the run. A derived run
+    (a fork or an agent replacement) records the code that derived it; the rounds
+    that it copied from its source were written by the build in the source's log.
+    A run continued with ``--resume`` keeps the build that started it. The field
+    is None in a log written before glossogen recorded it.
+    """
 
     event_type: Literal["simulation_started"] = "simulation_started"
     run_id: str
@@ -51,6 +59,7 @@ class SimulationStarted(EventBase):
     channel_ids: list[str]
     scenario_config: dict[str, Any] = {}
     provider: str
+    glossogen_build: GlossogenBuild | None = None
 
 
 class AgentRegistered(EventBase):

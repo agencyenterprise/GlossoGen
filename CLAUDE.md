@@ -40,7 +40,8 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/model_catalog/` — the models and providers a run can use, the self-hosted endpoint map and token pricing. Imports nothing from `models/`
 - `src/glossogen/models/` — Pydantic data models, including the platform's JSONL events. Imports nothing from `runtime/` and no scenario code
 - `src/glossogen/run_storage/` — reading finished runs from a runs directory: the event log, discovery and run summaries, manifests, scores, archives and bundles, and the knob filter that selects runs. Imports only `models/` and `model_catalog/` besides itself
-- `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
+- `src/glossogen/run_export/` / `run_analysis/` / `dashboards/` — multi-run CSV export, one run as a plain-text transcript, grouped analysis, saved dashboards. No imports from `server/`. See [docs/exporting-runs.md](docs/exporting-runs.md), [docs/analysis.md](docs/analysis.md)
+- `src/glossogen/agent_skills/` — the Claude Code skills that glossogen ships, which `glossogen install-skill` copies into a project; this repository links them under `.claude/skills/`. See [docs/analyzing-runs-with-claude-code.md](docs/analyzing-runs-with-claude-code.md)
 - `src/glossogen/label_descriptions/` — a group's label glossary, on the filesystem or in Postgres
 - `src/glossogen/atif_export/` / `thread_export/` — exporting agents as ATIF trajectories, and one agent's thread as a provider-native request
 - `src/glossogen/telemetry/` — Langfuse tracing of a run's LLM calls

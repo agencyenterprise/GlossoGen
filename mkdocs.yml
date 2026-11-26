@@ -130,6 +130,7 @@ nav:
       - Exporting runs: exporting-runs.md
       - ATIF export: atif-export.md
       - Analysis and dashboards: analysis.md
+      - Analyzing runs with Claude Code: analyzing-runs-with-claude-code.md
       - Reading runs from code: reading-runs-from-code.md
       - Training a model with RL: rl-training.md
       - Notebooks:
