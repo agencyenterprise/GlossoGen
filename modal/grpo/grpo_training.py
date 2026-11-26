@@ -36,6 +36,7 @@ from grpo_records import GrpoSettings, StepMetrics, TrainingSequence
 from peft import LoraConfig, PeftModel, get_peft_model, set_peft_model_state_dict
 from safetensors.torch import load_file
 from torch.utils.checkpoint import checkpoint
+from trained_adapters import METRICS_FILE
 
 LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 LANGUAGE_MODEL_PREFIX = "model.language_model."
@@ -301,7 +302,7 @@ def save_state(
     model.save_pretrained(save_directory=str(directory))
     torch.save(optimizer.state_dict(), directory / "optimizer.pt")
     if metrics is not None:
-        (directory / "metrics.json").write_text(json.dumps(metrics._asdict(), indent=1) + "\n")
+        (directory / METRICS_FILE).write_text(json.dumps(metrics._asdict(), indent=1) + "\n")
 
 
 def load_state(*, model: PeftModel, optimizer: torch.optim.Optimizer, directory: Path) -> None:

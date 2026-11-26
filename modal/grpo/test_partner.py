@@ -9,19 +9,13 @@ import json
 from pathlib import Path
 
 import pytest
-from grpo_loop import (
-    FinishedGame,
-    Game,
-    LoopSettings,
-    batch,
-    first_item_by_seat,
-    seed_config,
-    step_advantages,
-)
+from game_sets import seed_config
 from grpo_records import BASE_MODEL
+from loop_services import Game, LoopSettings
 from partner import Partner, load_partner, partner_labels, self_hosted_urls, trained_seats
 from pydantic import ValidationError
 from signal_game_rewards import Reward, game_outcome
+from step_batch import FinishedGame, batch, first_item_by_seat, step_advantages
 
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import AgentModelSettings
@@ -209,7 +203,7 @@ def finished_game(*, game: int, final_square_a: tuple[int, int]) -> FinishedGame
         ),
     ]
     return FinishedGame(
-        game=Game(seed=1000, game=game, run_id=f"signal_game/{game}", returncode=0),
+        game=Game(seed=1000, game=game, adapter=0, run_id=f"signal_game/{game}", returncode=0),
         events=events,
         outcome=game_outcome(events=events),
     )

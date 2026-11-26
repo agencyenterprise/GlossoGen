@@ -1,0 +1,220 @@
+"""Whole training steps on CPU: load an adapter, play games, build the batch, train and record.
+
+The games are real signal_game runs in this process, with scripted players (loop_fakes.py). The
+policy server, the trainer and the volume are fakes. Run from the repository root:
+
+    VIRTUAL_ENV= uv run --no-sync pytest modal/grpo/test_grpo_steps.py
+"""
+
+import json
+from pathlib import Path
+from typing import Any, NamedTuple
+
+import pytest
+from adapter_loader import AdapterRequest, LoadedAdapters
+from grpo_loop import StepPlan, train
+from grpo_records import BASE_MODEL
+from loop_fakes import SAMPLED_LOGPROB, FakeBackend, FakeVllm, ScriptedGameLauncher
+from loop_services import GameSpec, Loop, LoopSettings
+from partner import Partner
+from signal_game_rewards import Reward
+from token_sequences import recorded_responses
+
+from glossogen.model_catalog.provider_catalog import Provider
+from glossogen.run_storage.event_log_reader import load_events
+from glossogen.run_storage.run_file_paths import event_log_path
+from glossogen.run_storage.run_labels_file import read_run_labels
+from glossogen.scenario_contract.base_knobs import AgentModelOverride
+from glossogen.scenario_contract.scenario_sources import (
+    load_configured_scenario_catalog_unless_loaded,
+)
+
+HERE = Path(__file__).resolve().parent
+RUN = "cpu-run"
+SEEDS_PER_STEP = 2
+GAMES_PER_SEED = 2
+
+
+class LoopUnderTest(NamedTuple):
+    """A loop on fakes, and the fakes, for a test to inspect."""
+
+    loop: Loop
+    backend: FakeBackend
+    launcher: ScriptedGameLauncher
+
+
+def never_interrupt(spec: GameSpec) -> bool:
+    """Let every game play."""
+    _ = spec
+    return False
+
+
+def two_round_config(*, tmp_path: Path) -> Path:
+    """The shipped game config with 2 rounds."""
+    config = json.loads((HERE / "signal_game_shapes.json").read_text())
+    config["round_count"] = 2
+    path = tmp_path / "game_config.json"
+    path.write_text(json.dumps(config))
+    return path
+
+
+def loop_on_fakes(
+    *,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    partner: Partner | None,
+    kl_at: dict[int, float],
+) -> LoopUnderTest:
+    """A loop whose services are fakes, with its folders under ``tmp_path``."""
+    load_configured_scenario_catalog_unless_loaded()
+    settings = LoopSettings(
+        app_name="app",
+        run_name=RUN,
+        runs_dir=tmp_path / "runs",
+        records_dir=tmp_path / "records",
+        game_config=two_round_config(tmp_path=tmp_path),
+        concurrency=1,
+    )
+    backend = FakeBackend(
+        run_name=RUN,
+        adapters_dir=tmp_path / "adapters",
+        partner=partner,
+        kl_at=kl_at,
+        fail_after_saving=set(),
+    )
+    launcher = ScriptedGameLauncher(
+        settings=settings, backend=backend, monkeypatch=monkeypatch, interrupt=never_interrupt
+    )
+    return LoopUnderTest(
+        loop=Loop(settings=settings, backend=backend, launcher=launcher),
+        backend=backend,
+        launcher=launcher,
+    )
+
+
+def plan(*, partner: Partner | None, overlap: bool) -> StepPlan:
+    """2 games on each of 2 seeds per step, scored on the first item."""
+    return StepPlan(
+        reward=Reward.FIRST_ITEM,
+        seeds_per_step=SEEDS_PER_STEP,
+        games_per_seed=GAMES_PER_SEED,
+        partner=partner,
+        overlap=overlap,
+    )
+
+
+def step_lines(*, tested: LoopUnderTest) -> list[dict[str, Any]]:
+    """The lines of the run's ``steps.jsonl``."""
+    path = tested.loop.settings.records_dir / RUN / "steps.jsonl"
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def adapters_by_step(*, tested: LoopUnderTest) -> dict[int, set[int]]:
+    """The adapters that played each step's games, read from the games' labels."""
+    played: dict[int, set[int]] = {}
+    for game in tested.launcher.played:
+        labels = read_run_labels(run_dir=tested.loop.settings.runs_dir / game.run_id)
+        step = int(next(label for label in labels if label.startswith("step="))[5:])
+        played.setdefault(step, set()).add(game.adapter)
+    return played
+
+
+def test_the_loader_keeps_the_listed_adapters_and_unloads_the_rest() -> None:
+    vllm = FakeVllm()
+    loader = LoadedAdapters(post=vllm.post)
+    for request in (
+        AdapterRequest(id="1", name="r-step0", path="/a/0", keep=()),
+        AdapterRequest(id="2", name="r-step1", path="/a/1", keep=("r-step0",)),
+    ):
+        assert loader.handle(request=request).loaded
+    assert vllm.loaded == {"r-step0", "r-step1"}
+    result = loader.handle(request=AdapterRequest(id="3", name="r-step2", path="/a/2", keep=()))
+    assert result.unloaded == ("r-step0", "r-step1")
+    assert vllm.loaded == {"r-step2"}
+    again = loader.handle(request=AdapterRequest(id="4", name="r-step2", path="/a/2", keep=()))
+    assert (again.loaded, again.status, again.unloaded) == (True, 400, ())
+
+
+async def test_steps_in_turn_play_their_own_adapter_and_train_on_their_games(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={})
+
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=False), first_step=0, last_step=1)
+
+    assert adapters_by_step(tested=tested) == {0: {0}, 1: {1}}
+    assert [call.step for call in tested.backend.calls] == [1, 2]
+    lines = step_lines(tested=tested)
+    assert [(line["step"], line["adapter"], line["finished"]) for line in lines] == [
+        (0, 0, 4),
+        (1, 1, 4),
+    ]
+    for line, call in zip(lines, tested.backend.calls, strict=True):
+        assert call.run_ids == line["run_ids"]
+        assert line["answers"] > 0
+    for sequence in tested.backend.calls[0].sequences:
+        for marked, logprob in zip(sequence.kl_mask, sequence.sampler_logprobs, strict=True):
+            assert logprob == SAMPLED_LOGPROB * marked
+
+
+async def test_overlapped_steps_play_the_adapter_before_and_keep_it_loaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The launcher fails a game whose adapter the policy server does not hold."""
+    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={})
+
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), first_step=0, last_step=2)
+
+    assert adapters_by_step(tested=tested) == {0: {0}, 1: {0}, 2: {1}}
+    assert [call.step for call in tested.backend.calls] == [1, 2, 3]
+    assert [(line["step"], line["adapter"]) for line in step_lines(tested=tested)] == [
+        (0, 0),
+        (1, 0),
+        (2, 1),
+    ]
+    assert all(line["finished"] == 4 for line in step_lines(tested=tested))
+    assert (1, (0, 1)) in tested.backend.loads
+    assert (2, (1, 2)) in tested.backend.loads
+
+
+async def test_a_kl_above_the_limit_stops_the_run_and_the_next_steps_games(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={2: 0.5})
+
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), first_step=0, last_step=3)
+
+    assert [call.step for call in tested.backend.calls] == [1, 2]
+    assert [line["step"] for line in step_lines(tested=tested)] == [0, 1]
+
+
+async def test_a_frozen_partner_trains_only_the_other_seat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    partner = Partner(
+        seat="player_b",
+        model_override=AgentModelOverride(
+            model=BASE_MODEL, provider=Provider.SELF_HOSTED, model_settings=None
+        ),
+        base_url=None,
+    )
+    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=partner, kl_at={})
+
+    await train(
+        loop=tested.loop, plan=plan(partner=partner, overlap=False), first_step=0, last_step=0
+    )
+
+    [line] = step_lines(tested=tested)
+    assert line["trained_seats"] == ["player_a"]
+    assert line["partner"]["seat"] == "player_b"
+    answers = {"player_a": 0, "player_b": 0}
+    for run_id in line["run_ids"]:
+        run_dir = tested.loop.settings.runs_dir / run_id
+        events = await load_events(
+            log_path=event_log_path(run_dir=run_dir, scenario_name="signal_game")
+        )
+        for seat in answers:
+            answers[seat] += len(recorded_responses(events=events, agent_id=seat))
+        assert f"partner={BASE_MODEL}" in read_run_labels(run_dir=run_dir)
+    assert answers["player_b"] > 0
+    assert line["answers"] == answers["player_a"]

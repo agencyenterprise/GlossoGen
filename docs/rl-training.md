@@ -78,6 +78,7 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 | `--reward` | `first_item` or `win`, from [Rewards](#rewards) |
 | `--first-step`, `--last-step` | the steps to run |
 | `--seeds-per-step`, `--games-per-seed` | each step plays 6 games on each of 4 seeds, 24 games in all |
+| `--overlap` | optional: each step's games play while the trainer trains the step before, as [Overlapping play and training](#overlapping-play-and-training) explains |
 
 The loop, `grpo_loop.py`, runs on your machine, so keep the machine awake until `train` ends. In
 our runs, each of steps 0 to 9 took 13 to 41 minutes. The first step also waits for the policy
@@ -156,7 +157,7 @@ Stopping the app keeps the volume, which holds the adapters.
 | Part | Where it runs | What it does |
 | --- | --- | --- |
 | The loop, `grpo_loop.py` | your machine | plays the games with `glossogen run`, computes the rewards, and sends each batch to the trainer |
-| The policy server | the app, on an H200 or an H100 | a vLLM server that serves the model with one adapter, under the name `<run>-step<k>` |
+| The policy server | the app, on an H200 or an H100 | a vLLM server that serves each loaded adapter k under the name `<run>-step<k>`, and the base model under its own name |
 | The trainer | the app, on a B200 or an H200 | updates the adapter and saves it on the volume |
 | The volume | Modal, named `$GRPO_APP_NAME` | each run's adapters and settings |
 | The Dict | Modal, named `$GRPO_APP_NAME-adapters` | a small key-value store on Modal. The loop writes into it the adapter that the policy server has to load |
@@ -186,6 +187,32 @@ In step k:
 
 A game that ends without `simulation_ended` is left out of the batch. When a seed has fewer than 2
 finished games, its answer tokens get advantage 0.
+
+The trainer saves adapter k+1 with `games.json`, the run ids of the finished games that it trained
+on. When the loop asks it to train a step whose adapter exists, it returns that adapter's saved
+metrics if the games are the same, and refuses the step if they differ.
+
+### Overlapping play and training
+
+With `--overlap`, step k's games play while the trainer trains step k−1. Step k's games then play
+with adapter k−1, the newest adapter when they start. Steps 0 and 1 both play adapter 0. The
+trainer trains step k from adapter k, so each batch after step 1's comes from games of the adapter
+before the one that trains on it. The [importance weight](#the-loss) corrects for that
+difference.
+
+Once the trainer has saved adapter k+1, the policy server loads it while step k+1's games are
+still playing adapter k. The loop asks the server to keep adapter k loaded until those games end.
+It then unloads it when it loads the next adapter. Each load request lists the adapters to keep,
+and the server unloads each other adapter that it loaded. vLLM holds at most 2 adapters at once
+(`--max-loras 2`), which is the most that this order needs.
+
+A step with `--overlap` takes about as long as the longer of its games and the training of the
+step before, instead of their sum. The `play` and `train` times that each step prints are those of
+the step's own games and its own training. Each game's labels include `adapter=<k>`, and each line
+of `steps.jsonl` holds `adapter`, the adapter that played the step's games.
+
+When a step stops training, as [Checks and problems](#checks-and-problems) describes, the next
+step's games are already playing. The loop stops them, and they leave no record.
 
 ### A frozen partner
 
@@ -277,7 +304,7 @@ steps. `win` has not been tested with this loop.
 ### Records
 
 Each game's event log lands in `--runs-dir`, under `signal_game/`. A training game's labels are
-`grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `seed=<seed>` and `game=<n>`. A test game
+`grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `adapter=<a>`, `seed=<seed>` and `game=<n>`, where adapter a played the game. A test game
 has the same labels without `reward=`, and with `grpo_eval` in place of `grpo`. A game with a
 partner also has the labels `partner_seat=<seat>` and `partner=<model>`. The loop's own records
 are in `<records dir>/<run>/`:
@@ -345,7 +372,8 @@ providers.
 The adapters are on the volume, at `runs/<run>/adapters/step_<k>/`. To resume, find the highest k
 for which that folder exists, and run `train` with `--first-step k`. The trainer loads adapter k
 from the volume. The loop refuses to play a game whose log is already in `game_logs/`. To run a
-step again after it stopped partway, first move that step's logs out of `game_logs/`.
+step again after it stopped partway, first move that step's logs out of `game_logs/`. With
+`--overlap`, also move the logs of the step after it.
 `steps.jsonl` then gets a second line for that step.
 
 ### Another scenario

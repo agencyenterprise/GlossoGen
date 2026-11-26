@@ -12,6 +12,18 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL loop can play a step's games while the trainer trains the step
+  before.** With `grpo_loop.py train --overlap`, step k's games play with
+  adapter k−1 while the trainer trains step k−1, and the importance ratio
+  corrects for the one adapter of difference. The policy server's loader
+  takes a list of adapters to keep with each load request, so adapter k−1
+  stays loaded while step k's games play. The trainer saves the run ids of
+  the games that trained each adapter in `games.json`, and returns the saved
+  metrics when it is asked to train a saved step on the same games. Each
+  game's labels and each line of `steps.jsonl` name the adapter that played.
+  The loop is split into modules behind two interfaces, the app and the game
+  launcher, and `test_grpo_steps.py` runs whole steps on CPU with fakes of
+  both. See [Training a model with RL](docs/rl-training.md#overlapping-play-and-training).
 - **The RL trainer weights each answer token by a capped importance ratio.**
   The loss in `modal/grpo/grpo_training.py` is CISPO, platoon's default loss:
   each answer token's term is multiplied by exp(trainer logprob − sampler
