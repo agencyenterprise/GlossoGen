@@ -37,6 +37,7 @@ written to the run directory.
 | MCP | `export_agent_atif` with `run_id`, `agent_id`, `cutoff_round` |
 | Raw zip | the Export dialog's **Raw run folders** tab (ATIF by default), `glossogen export --raw --trajectories atif`, or `"trajectory_format": "atif"` on `POST .../runs/export/raw`; `inspect` in place of `atif` gives the Inspect log |
 | Single-run zip | always included in a run's zip download |
+| Run page | the **Export Inspect log for Docent** button downloads the run's Inspect log, which `GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/export/inspect` also serves |
 
 REST and MCP return `{"trajectories": [...]}` for one agent. With `atif`, the raw
 zip writes every agent of every selected run under `atif/` in that run's folder.
@@ -240,6 +241,9 @@ provider, the [generation](#swapped-and-replaced-seats) and the scenario config.
 step is [copied context](#copied-context), and the step's `extra`. A `tool`
 message's metadata holds only its step id. The log holds only the fields that
 Docent's importer reads, so Inspect's own tools do not open it.
+
+A run's page in the web UI has an **Export Inspect log for Docent** button, which
+downloads the same log for that one run.
 
 ## Next
 

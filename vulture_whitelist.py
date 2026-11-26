@@ -333,6 +333,7 @@ analysis_fields  # unused function (src/glossogen/server/runs/analysis_router.py
 analysis_query  # unused function (src/glossogen/server/runs/analysis_router.py:104)
 export_run_bundle  # unused function (src/glossogen/server/runs/bundle_router.py:78)
 export_run_zip  # unused function (src/glossogen/server/runs/bundle_router.py:125)
+export_run_inspect_log  # unused function (src/glossogen/server/runs/bundle_router.py:185)
 import_run_bundle  # unused function (src/glossogen/server/runs/bundle_router.py:400)
 _._proc_gnusparse_10  # unused method (src/glossogen/server/runs/bundle_tar_limits.py:73)
 tarinfo  # unused variable (src/glossogen/server/runs/bundle_tar_limits.py:89)

@@ -1242,6 +1242,53 @@
         }
       }
     },
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/inspect": {
+      "get": {
+        "summary": "Export Run Inspect Log",
+        "description": "Export every agent of a run as one Inspect-format log file.",
+        "operationId": "export_run_inspect_log_api_g__group_slug__runs__scenario___run_dir_name__export_inspect_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's agents as one Inspect-format log, for Docent.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/runs/import": {
       "post": {
         "summary": "Import Run Bundle",

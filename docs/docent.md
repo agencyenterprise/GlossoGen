@@ -132,12 +132,20 @@ discussion phase. Characters sent on `postmortem` do not count toward the score.
 
 ### From glossogen's web UI
 
-glossogen's web UI writes the same file. Its Export dialog exports the runs
-that match the filters of the Simulation Runs page. Type the run's id into the
-**Search by run id…** box on that page, so that only this run matches. Then
+glossogen's web UI exports the same Inspect log for one run or for many runs.
+
+For one run, open the run's page. A bar of icons sits above the run's messages,
+at the top right. Click its last icon, **Export Inspect log for Docent**. The
+two icons to its left are **Export PDF** and **Export run bundle**. Each icon
+shows its name when you hover over it. The browser saves the file as
+`<scenario>_<run folder>_inspect_log.json`, for example
+`spot_the_intersection_1795535900_inspect_log.json`.
+
+For many runs, use the Export dialog. It exports the runs that match the filters
+of the Simulation Runs page. Filter that page to the runs that you want. Then
 click **Export** at the top of the page and open the **Raw run folders** tab.
 Under **Agent trajectories**, pick **Inspect log for Docent**, and click
-**Export**.
+**Export**. The browser saves a zip.
 
 The zip holds `inspect_log.json` at its root. The file holds one sample for each
 agent of each run in the zip. Unzip the zip to get the file.
@@ -151,7 +159,7 @@ Open <http://localhost:3002/dashboard> in Docent's web UI. Click
 **Create Collection**. Then click the collection's row to open it.
 
 On the collection page, click **Add Data**, then **Upload Inspect Log**, and
-choose `inspect_log.json`. You can also drag the file onto the
+choose the Inspect log file. You can also drag the file onto the
 **Agent Run List**. Docent shows a preview with the number of agent runs that it
 will create, which is 2 for the example. Click **Import 2 Runs**.
 

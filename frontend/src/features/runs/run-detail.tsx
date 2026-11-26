@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   Download,
+  FileJson,
   FlaskConical,
   HelpCircle,
   Loader2,
@@ -469,6 +470,24 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
                     }}
                   >
                     <Package className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
+                <Tooltip label="Export Inspect log for Docent" wrap={false}>
+                  <button
+                    aria-label="Export Inspect log for Docent"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => {
+                      const { scenario, run_dir_name } = splitRunId(runId);
+                      downloadAuthenticatedFile({
+                        path: `/api/g/{group_slug}/runs/${runId}/export/inspect`,
+                        searchParams: new URLSearchParams(),
+                        fallbackFilename: `${scenario}_${run_dir_name}_inspect_log.json`,
+                      }).catch((error: unknown) => {
+                        alert(`Inspect log export failed: ${String(error)}`);
+                      });
+                    }}
+                  >
+                    <FileJson className="h-3.5 w-3.5" />
                   </button>
                 </Tooltip>
               </>

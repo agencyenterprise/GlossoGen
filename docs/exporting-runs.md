@@ -353,7 +353,9 @@ trajectories** choice, the CLI's `--trajectories` flag and the REST body's
 
 A run whose event log does not parse is archived without trajectories, so it adds
 no `atif/` folder and no samples. A single run's zip download includes the `atif/`
-folder.
+folder. A run's page also has an **Export Inspect log for Docent** button, which
+downloads that run's Inspect log as one JSON file. For a run whose event log is
+missing or does not parse, the button downloads nothing and shows an error.
 
 A run still being written is safe to export. Members are streamed into the
 archive rather than pre-declaring a size, so a JSONL that grows mid-read does not

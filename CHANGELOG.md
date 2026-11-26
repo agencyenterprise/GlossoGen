@@ -17,7 +17,8 @@ the commit log.
   `inspect_log.json` with one sample per agent. `glossogen export --raw
   --trajectories inspect` writes one such log at the root of the zip, and the log
   holds every selected run. The Export dialog's **Inspect log for Docent** choice
-  writes the same log.
+  writes the same log. A run's page has an **Export Inspect log for Docent**
+  button, which downloads that run's Inspect log.
   [ATIF export](docs/atif-export.md#the-inspect-format) describes the format.
 - **A docs page gives the steps to search runs with Docent.**
   [Searching runs with Docent](docs/docent.md) gives the steps to run Docent on

@@ -4,7 +4,8 @@ A bundle is a tar.gz archive of the entire run directory, enabling full
 run portability between machines. A separate zip export produces a
 human-extractable archive: ``{run_dir_name}.zip`` containing a single
 top-level ``{run_dir_name}/`` folder, so it drops straight into a
-scenario's runs directory.
+scenario's runs directory. The Inspect export writes the run's agents as one
+Inspect-format log for Docent.
 """
 
 import asyncio
@@ -17,10 +18,17 @@ from typing import IO, NamedTuple
 
 import orjson
 from fastapi import APIRouter, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
+from glossogen.atif_export.inspect_log_builder import (
+    INSPECT_LOG_FILE_NAME,
+    InspectLog,
+    build_inspect_samples,
+    serialize_inspect_log,
+)
 from glossogen.models.event import RunStatus, SimulationStarted
 from glossogen.run_export.export_limits import ExportTooLargeError, check_raw_bytes
+from glossogen.run_export.run_trajectory_loader import load_run_trajectories
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_storage.archive_member_filter import is_always_excluded
 from glossogen.run_storage.event_parsing import parse_event_bytes
@@ -162,6 +170,53 @@ async def export_run_zip(
         build=build,
         filename=f"{folder_name}.zip",
         media_type="application/zip",
+    )
+
+
+def _build_run_inspect_log(run_dir: Path, scenario_name: str) -> bytes | None:
+    """The run's Inspect log, or None when the run has no trajectories to put in it."""
+    trajectories = load_run_trajectories(run_dir=run_dir, scenario_name=scenario_name)
+    if not trajectories:
+        return None
+    log = InspectLog(samples=build_inspect_samples(trajectories=trajectories))
+    return serialize_inspect_log(log=log).encode("utf-8")
+
+
+@router.get(
+    "/runs/{scenario}/{run_dir_name}/export/inspect",
+    responses={
+        200: {
+            "description": "The run's agents as one Inspect-format log, for Docent.",
+            "content": {"application/json": {}},
+        },
+    },
+)
+async def export_run_inspect_log(
+    scenario: str,
+    run_dir_name: str,
+    request: Request,
+) -> Response:
+    """Export every agent of a run as one Inspect-format log file."""
+    resolved = await resolve_run_or_404(
+        request=request,
+        scenario=scenario,
+        run_dir_name=run_dir_name,
+    )
+    payload = await asyncio.to_thread(
+        _build_run_inspect_log,
+        resolved.run_dir,
+        resolved.scenario_name,
+    )
+    if payload is None:
+        raise HTTPException(
+            status_code=422,
+            detail="This run has no agent trajectories: its event log is missing or unreadable.",
+        )
+    filename = f"{resolved.scenario_name}_{resolved.run_dir.name}_{INSPECT_LOG_FILE_NAME}"
+    return Response(
+        content=payload,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

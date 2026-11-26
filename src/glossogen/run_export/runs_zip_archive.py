@@ -25,13 +25,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import IO, NamedTuple
 
-import orjson
-from pydantic import ValidationError
-
-from glossogen.atif_export.atif_models import AtifTrajectory
-from glossogen.atif_export.atif_run_context import load_atif_run_context_blocking
 from glossogen.atif_export.atif_trajectory_builder import (
-    build_run_trajectories,
     serialize_trajectory,
     trajectory_file_name,
 )
@@ -44,8 +38,8 @@ from glossogen.atif_export.inspect_log_builder import (
 )
 from glossogen.atif_export.trajectory_format import TrajectoryFormat
 from glossogen.run_export.export_limits import check_raw_bytes
+from glossogen.run_export.run_trajectory_loader import load_run_trajectories
 from glossogen.run_storage.archive_member_filter import should_include_in_archive
-from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.run_storage.run_summary_models import RunSummary
 
 logger = logging.getLogger(__name__)
@@ -131,25 +125,6 @@ def add_run_to_zip(
     return RunZipTally(file_count=file_count, byte_count=byte_count)
 
 
-def _load_run_trajectories(run_dir: Path, scenario_name: str) -> list[AtifTrajectory]:
-    """Every agent generation's trajectory, built from the run's event log.
-
-    A run with no event log yet (claimed, never started) has no agents. Neither
-    does a run whose log this build cannot parse, such as an old run whose events
-    have since gained required fields: its files are archived without trajectories
-    rather than failing the whole archive.
-    """
-    log_path = event_log_path(run_dir=run_dir, scenario_name=scenario_name)
-    if not log_path.exists():
-        return []
-    try:
-        context = load_atif_run_context_blocking(run_dir=run_dir, scenario_name=scenario_name)
-    except ValidationError, orjson.JSONDecodeError:
-        logger.exception("Archiving %s without trajectories: its event log does not parse", run_dir)
-        return []
-    return build_run_trajectories(context=context, cutoff_round=None)
-
-
 def _add_atif_trajectories(
     archive: zipfile.ZipFile,
     run_dir: Path,
@@ -157,7 +132,7 @@ def _add_atif_trajectories(
     scenario_name: str,
 ) -> RunZipTally:
     """Write one ATIF trajectory per agent generation under ``arc_root/atif/``."""
-    trajectories = _load_run_trajectories(run_dir=run_dir, scenario_name=scenario_name)
+    trajectories = load_run_trajectories(run_dir=run_dir, scenario_name=scenario_name)
     byte_count = 0
     for trajectory in trajectories:
         payload = serialize_trajectory(trajectory=trajectory).encode("utf-8")
@@ -250,7 +225,7 @@ def write_runs_zip(
             if trajectory_format == TrajectoryFormat.INSPECT:
                 inspect_samples.extend(
                     build_inspect_samples(
-                        trajectories=_load_run_trajectories(
+                        trajectories=load_run_trajectories(
                             run_dir=run_dir, scenario_name=summary.scenario_name
                         )
                     )
