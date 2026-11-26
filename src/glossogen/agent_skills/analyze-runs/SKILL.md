@@ -11,7 +11,7 @@ Terms used here:
 - A **condition** is one setting of what the experiment varies, such as one knob value or one model.
 - A **code** is any convention that agents use to carry meaning, such as a table of letters for objects, a fixed message layout, or a standard encoding like hexadecimal.
 - A round's **ground truth** is what the agents had to find or do in that round, as the scenario recorded it in the log.
-- The **behaviour list** is [references/behaviour-list.md](references/behaviour-list.md). It holds kinds of behaviour seen in earlier runs.
+- The **behaviour list** is [references/behaviour-list.md](references/behaviour-list.md). It holds kinds of behaviour to check for after the first reading.
 - The **findings file** is the file that the analysis ends with. Its format is in [references/findings-file.md](references/findings-file.md).
 
 Run `glossogen` the way the project runs it, for example `uv run glossogen`. [references/run-data.md](references/run-data.md) lists what a run directory holds and which command reads each part.
@@ -25,9 +25,9 @@ Ask the researcher for anything that is missing:
 - earlier results that this analysis builds on, so that a finding can be compared with them;
 - the folder for the transcripts and the findings file.
 
-For runs on a remote glossogen server, connect Claude Code to that server's MCP endpoint (see the glossogen docs on MCP integration). Its `export_run_artifacts` tool gives a download link for a run's directory. Extract each download into a local runs directory, and follow the steps below on the local copy.
+For runs on a remote glossogen server, connect Claude Code to that server's MCP endpoint (see the glossogen docs on MCP integration). Its `export_run_artifacts` tool returns a link to a tar.gz of a run's directory. Extract each one into `<runs dir>/<scenario>/<run id>/`, and follow the steps below on the local copy.
 
-Before you start more than a few subagents, tell the researcher how many you will start, on which model, and about how many tokens they will read. A transcript's character count divided by 4 approximates its tokens. Use a smaller model, such as Haiku or Sonnet, for subagents that read transcripts. Keep the larger model for merging and checking.
+Before you start more than a few subagents, tell the researcher how many you will start, on which model, and about how many tokens they will read. For English text, a transcript's character count divided by 4 approximates its tokens. Use a smaller model, such as Haiku or Sonnet, for subagents that read transcripts. Keep the larger model for merging and checking.
 
 ## 2. Check what ran
 
@@ -37,7 +37,7 @@ For each run, read what the log recorded, not the labels alone:
 - `agent_registered`: each agent's model, provider and system prompt;
 - `labels.json`, and the manifest of a derived run, such as a fork (run-data.md lists them).
 
-`glossogen export --frames run_level` writes a table with one row per run, its knob values and its models. Compare every run with the planned runs: the model of each agent, the knob values, the seed, the round count and, for a derived run, its source. List each mismatch and each duplicate run, and ask the researcher whether to leave those runs out.
+`glossogen export --out <dir> --frames run_level` writes a table with one row per run, its knob values and its models. Compare every run with the planned runs: the model of each agent, the knob values, the seed, the round count and, for a derived run, its source. List each mismatch and each duplicate run, and ask the researcher whether to leave those runs out.
 
 When the conditions were run at different times, list every difference between them besides the one under study. Compare the glossogen versions, the system prompts, the judge model (the model that scores rounds, when the scenario has one) and the agents' model settings in `scenario_config`. Each difference goes in the findings file's limits.
 
@@ -49,7 +49,7 @@ Render one run first:
 glossogen transcript <scenario> --run-dir <run dir> --out-dir <work dir>/<run id>
 ```
 
-The first line of `round_00.txt` gives the path of the scenario's README. Read the README, but leave its section called "Analyzing runs", if it has one, for step 6.
+The first line of `round_00.txt` gives the path of the scenario's README in the installed glossogen, which can be another version than the run's `glossogen_build`. Read the README, but leave its section called "Analyzing runs", if it has one, for step 6.
 
 From `round_00.txt` and `round_01.txt`, write down:
 
@@ -58,11 +58,11 @@ From `round_00.txt` and `round_01.txt`, write down:
 - what the scenario limits, such as characters, messages or moves;
 - where the log records each round's ground truth, such as a scenario event at the start of the round or the briefings.
 
-With these notes, you can tell apart a code that an agent made and information that both agents already had.
+You need these notes in step 7, to tell a code that an agent made up apart from information that both agents already had.
 
 ## 4. First reading, without the behaviour list
 
-Do not open the behaviour list yet. Keep it, your own guesses and earlier findings out of every brief. Subagents then report what is in the runs, not what a list told them to look for.
+Do not open the behaviour list yet. Keep it, your own guesses and earlier findings out of every brief. Subagents then report only what they read in the runs.
 
 1. Render every run with `glossogen transcript ... --out-dir`.
 2. Start one subagent per run. When a run's transcript is over about 100,000 tokens, start one subagent per range of rounds instead, such as rounds 1 to 5 and rounds 6 to 10. Use the first-reading brief in [references/subagent-briefs.md](references/subagent-briefs.md).
@@ -75,12 +75,12 @@ Start subagents with the counting brief. Each one reads every message of its run
 
 - Do not use a regular expression, a keyword list or an `if` on what agents wrote. This also holds for choosing which messages a subagent reads. Agents phrase one idea in many ways, and they repeat words from their own prompt, so a keyword count both misses cases and counts false ones.
 - Values that the platform records as event fields are data: round outcomes, character counts, moves, tokens. Compute those with code.
-- Give a second subagent the same definitions and about one run in five. Report the share of rows on which the two subagents agree, next to the counts. When they agree on fewer than about four rows in five, sharpen the definitions and count again. Settle the remaining disagreements yourself from the transcript.
+- Give a second subagent the same definitions and about one run in five. For each behaviour, report the rows that both subagents returned, the rows that only one of them returned, and the number of runs in the sample. When fewer than about four rows in five are shared, sharpen the definitions and count again. Settle the remaining disagreements yourself from the transcript.
 - Check a sample of the rows against the transcripts yourself.
 
 ## 6. Check the behaviour list
 
-Now read the behaviour list and the README's "Analyzing runs" section. Start a separate subagent with the behaviour list brief. It checks the runs for each listed behaviour that step 4 did not find. Its results go in their own section of the findings file. Check each one in the transcript before you use it.
+Now read the behaviour list and the README's "Analyzing runs" section. Start one subagent per run with the brief for checking the behaviour list. Each one checks its run for each listed behaviour that step 4 did not find. Its results go in their own section of the findings file. Check each one in the transcript before you use it.
 
 ## 7. Check every claim
 
@@ -114,4 +114,4 @@ When the agents of a condition built no code, say so, with the number of runs.
 
 ## 10. Write the findings file
 
-Follow [references/findings-file.md](references/findings-file.md). Write one fact per sentence. Define each term where it first appears and keep that term. Give the full model names. Every "all", "none", "never" or "only" carries its count and denominator. Next to each measure, say what it misses.
+Follow [references/findings-file.md](references/findings-file.md). Write one fact per sentence. Define each term where it first appears and keep that term. Give the full model names. Every "all", "none", "never" or "only" carries its count and denominator. Next to each measure, say what it misses and what it over-counts.

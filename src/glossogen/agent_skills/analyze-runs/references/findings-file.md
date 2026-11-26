@@ -28,10 +28,10 @@ One subsection per finding:
   - *read by subagents*: it rests on subagent rows that you spot-checked;
   - *interpretation*: it is your reading of the data and was not tested. Write "we think" in its sentences.
 
-## Findings from the behaviour list check
+## Findings from checking the behaviour list
 
-The same format, for behaviours that only the behaviour list check found.
+The same format, for behaviours that only the check of the behaviour list found.
 
 ## How the codes formed
 
-The grid, the table of conventions with the round in which each first appeared, the rounds quoted side by side, and the decoded examples from step 9.
+The grid, the table of codes with the round in which each first appeared, the rounds quoted side by side, and the decoded examples from step 9.

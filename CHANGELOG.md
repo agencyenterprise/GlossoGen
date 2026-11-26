@@ -22,7 +22,7 @@ the commit log.
   "Analyzing runs" that the skill reads.
 - **`glossogen transcript` prints a run's event log as plain text, round by
   round.** It keeps what each agent was told, wrote, called and received, and
-  leaves out ids, timestamps, token counts and wait records. `--out-dir`
+  leaves out event ids, timestamps, token counts and waits that give no reason. `--out-dir`
   writes one file per round.
 - **A run's log records the glossogen code that wrote it.** `simulation_started`
   holds `glossogen_build`: the installed version, the git commit when one is

@@ -27,7 +27,7 @@ In a clone of the glossogen repository, `.claude/skills/analyze-runs` links to t
 
 ## Use it
 
-Ask Claude Code a question about your runs, for example "analyze the runs labelled `budget_sweep`: do the codes that agents build at budget 150 differ from those at 800?". Claude loads the skill for such requests, and `/analyze-runs` loads it directly. Claude asks for anything that the analysis needs and the request leaves out: the question, the runs of each condition, and earlier results to compare with.
+Ask Claude Code a question about your runs, for example "analyze the runs labelled `budget_sweep`: do the codes that agents build at budget 150 differ from those at 800?". Claude can load the skill when a request matches the skill's description, and `/analyze-runs` loads it directly. Claude asks for anything that the analysis needs and the request leaves out: the question, the runs of each condition, and earlier results to compare with.
 
 The skill tells Claude to say how many subagents it will start, on which model, and about how many tokens they will read, before it starts them.
 
@@ -42,9 +42,9 @@ glossogen transcript veyru --run-dir runs/veyru/1777638061
 glossogen transcript veyru --run-dir runs/veyru/1777638061 --out-dir transcripts/1777638061
 ```
 
-`--out-dir` writes one file per round: `round_00.txt` holds the setup and each agent's system prompt, and `round_NN.txt` holds round NN. The first line gives the path of the scenario's README.
+`--out-dir` writes one file per round: `round_00.txt` holds the setup and each agent's system prompt, and `round_NN.txt` holds round NN. The first line gives the path of the scenario's README in the installed glossogen.
 
-A transcript keeps what each agent was told, wrote, called and received, in log order: briefings, reasoning text, messages, tool calls with their arguments, and tool results. It leaves out event ids, timestamps, token counts and the `agent_resumed` events. It also leaves out the `tool_call_invoked` events, because the model response before each one already lists its tool calls. It keeps a `wait_registered` event only when the agent gave a reason for waiting. Other events, including the scenario's own events, are printed with their fields as JSON.
+A transcript keeps what each agent was told, wrote, called and received, in log order: briefings, reasoning text, messages, tool calls with their arguments, and tool results. It leaves out event ids, timestamps, token counts and the `agent_resumed` events. It also leaves out the `tool_call_invoked` events, because the model response before each one already lists its tool calls. It keeps a `wait_registered` event only when the agent gave a reason for waiting. Other events, including the scenario's own events, are printed with their fields as JSON. Under channel noise, a message line shows the text that the channel delivered, and the sender's `send_message` call shows what the sender wrote.
 
 ### The scenario's notes
 

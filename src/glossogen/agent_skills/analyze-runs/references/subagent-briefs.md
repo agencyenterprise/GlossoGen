@@ -48,15 +48,14 @@ Return nothing for text that fits no definition. When you are unsure, add
 "unsure" to the row. At the end, list the round files that you read.
 ```
 
-## Behaviour list check
+## Checking the behaviour list
 
 ```text
 You are reading the transcript of one run of a multi-agent simulation.
 
 The setup: <as in the first reading>.
 
-The behaviours below were seen in earlier runs. For each one, decide whether
-this run shows it.
+For each behaviour below, decide whether this run shows it.
 
 <the items of the behaviour list and of the scenario README's "Analyzing runs"
 section that the first reading did not find, with their definitions>

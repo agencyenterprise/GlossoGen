@@ -17,10 +17,10 @@ A local run lives in `<runs dir>/<scenario>/<run id>/`. The files that an analys
 | Event | What to read from it |
 |---|---|
 | `simulation_started` | `scenario_config` (every knob value), `glossogen_build` (version and commit), `scenario_description` |
-| `agent_registered` | each seat's `model`, `provider`, `system_prompt` and tools. A resumed or derived run logs it again |
+| `agent_registered` | each agent's `model`, `provider`, `system_prompt` and tools. A resumed or derived run logs it again |
 | `injection_delivered` | the briefing that an agent got at the start of a round or a discussion phase |
-| `message_sent` | a channel message, as its sender wrote it |
-| `tool_result_received` | what an agent received, including the delivered text of a message under channel noise |
+| `message_sent` | a channel message, as the channel delivered it |
+| `tool_result_received` | what an agent received from a tool call |
 | `llm_response_received` | an agent's reasoning (`thinking`), text and tool calls |
 | `round_result_recorded` | whether the round succeeded, and why |
 | `round_ended` | what ended the round (`trigger`) |
@@ -29,7 +29,7 @@ A local run lives in `<runs dir>/<scenario>/<run id>/`. The files that an analys
 
 A model's reasoning is in the log only when its provider returned it. An empty `thinking` does not show that the model did not reason.
 
-Under channel noise, `message_sent` holds what the sender wrote. What the receiver read is in the receiver's `tool_result_received`, and in the `delivered_text` column of `message_level.csv`.
+Under channel noise, `message_sent` holds the text that the channel delivered, which is also the `delivered_text` column of `message_level.csv`. What the sender wrote is the `text` argument of its `send_message` call, and the `text` column of `message_level.csv`.
 
 A derived run's log starts with the rounds that it copied from its source. Its `glossogen_build` is the build that derived it. A history-transfer run's log does not hold the transferred history. That history is in the source run's log, which the manifest names.
 
