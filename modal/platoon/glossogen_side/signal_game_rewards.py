@@ -1,4 +1,4 @@
-"""How the GRPO loop scores a signal_game game: one score per player per round.
+"""How a signal_game game is scored for training: one score per player per round.
 
 The rewards:
 
@@ -6,8 +6,8 @@ The rewards:
 - ``first_item`` scores 1 when the player ended the round on a square that holds the
   alphabetically first item of its own grid, whatever its partner did.
 
-To train on another scenario, write a module like this one. It reads a run's events and gives
-each agent a score in each round.
+``score_game.py`` reads a game's events with this module. To train on another scenario, write a
+module like this one: it reads a run's events and gives each agent a score in each round.
 """
 
 from enum import Enum

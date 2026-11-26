@@ -1,0 +1,83 @@
+# Train Qwen3.8-27B on signal_game with platoon. docs/rl-training.md explains each setting.
+# Run from modal/platoon, with TINKER_BASE_URL and TINKER_API_KEY set for the Tinker-API service.
+log_path: ../../runs/platoon
+
+environments:
+  - name: signal-game
+    service: table
+    service_kwargs: {path: signal_game_tasks.jsonl}
+    package: glossogen_platoon.signal_game
+    harness: glossogen-signal-game
+    harness_options:
+      game_config: signal_game_shapes.json
+      runs_dir: ../../runs
+      labels: [platoon]
+      external_seats: {}
+      max_agent_turns: 400
+    eval_overrides:
+      harness_options:
+        labels: [platoon_eval]
+    program: glossogen-signal-game
+    credit: glossogen-round-baseline
+    credit_options:
+      kl_policy: base
+      kl_coef: 0.02
+      max_kl: 0.3
+
+train:
+  model_name: Qwen/Qwen3.8-27B
+  renderer_name: chat_template
+  renderer_kwargs: {tool_call_parser: auto, enable_thinking: false, preserve_thinking: false}
+  sample_timeout_seconds: 900
+  lora_rank: 32
+  batch_size: 4
+  max_training_steps: 10
+  # A group's games span up to about 1,000 s: up to one median game (322 s) waiting for a free slot, then
+  # the slowest game (about 700 s). Steps take at least about 500 s, so a group sees at most 2 new policy
+  # versions while it plays and waits at most one more step to train.
+  max_staleness: 3
+  max_concurrent_rollouts: 12
+  permit_release: rollout
+  loss_fn: cispo
+  loss_fn_config: {clip_low_threshold: 0.0, clip_high_threshold: 5.0}
+  optimizer:
+    learning_rate: 1.0e-4
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-8
+    weight_decay: 0.0
+    grad_clip_norm: 1.0
+  workflow_config:
+    group_size: 6
+    rollout_config:
+      max_steps: 400
+      timeout: 3600
+      extra: {glossogen_reward: first_item}
+
+policies:
+  base:
+    model_name: Qwen/Qwen3.8-27B
+    renderer_name: chat_template
+    renderer_kwargs: {tool_call_parser: auto, enable_thinking: false, preserve_thinking: false}
+    sample_timeout_seconds: 900
+    trainable: false
+
+eval:
+  every: 5
+  at_start: true
+  max_concurrent_rollouts: 12
+  workflow_config:
+    group_size: 6
+
+checkpoint:
+  every: 5
+  recovery_every: 1
+  keep_recovery: 4
+
+watchdog:
+  timeout_seconds: 3600
+
+stats:
+  experiment_name: signal-game
+  trial_name: first-item
+  wandb: {mode: disabled}

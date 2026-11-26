@@ -1,9 +1,10 @@
 # Passing --exclude replaces black's default excludes, which match .venv at any
-# depth, and stops black reading .gitignore. Every entry here is anchored at the
-# root. .claude is listed because Claude Code keeps worktrees under
-# .claude/worktrees/, each with its own source tree and .venv, and black would
-# otherwise reformat all of it.
-BLACK_EXCLUDE := ^/(\.claude|\.venv|frontend|runs|build|dist)/|vulture_whitelist\.py
+# depth, and stops black reading .gitignore. Every entry but the .venv one is
+# anchored at the root; the .venv one matches at any depth, because
+# modal/platoon is a uv project with a .venv of its own. .claude is listed
+# because Claude Code keeps worktrees under .claude/worktrees/, each with its own
+# source tree and .venv, and black would otherwise reformat all of it.
+BLACK_EXCLUDE := ^/(\.claude|frontend|runs|build|dist)/|/\.venv/|vulture_whitelist\.py
 
 # Installation
 install: install-server install-frontend
