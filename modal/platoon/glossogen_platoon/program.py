@@ -4,10 +4,12 @@ rounds as spans.
 Each trajectory of a seat that platoon served gets the sum of its round scores as its reward, and
 ``misc["spans"]``: one span for each round of the game, in round order, holding the seat's model
 calls of that round with the round's score as the span's reward. A span's place in the list is
-therefore its round. A call is matched to its round by order: the seat's n-th recorded call is its
-n-th ``llm_response_received`` in the event log, whose round the scorer gives. Calls before the
-seat's first tool call (round 0) are in no span, so they train on no round's score. A seat whose
-recorded calls and logged responses differ in number fails the episode.
+therefore its round. A call is matched to its round by order: the seat's n-th answered call is its
+n-th ``llm_response_received`` in the event log, whose round the scorer gives. An answered call
+holds text or a tool call. pydantic-ai asks the model again after an empty answer, and GlossoGen
+logs no response for it, so an empty call is in no span. Calls before the seat's first tool call
+(round 0) are in no span either. A call in no span trains on no round's score. A seat whose
+answered calls and logged responses differ in number fails the episode.
 
 The rollout setting ``extra.glossogen_reward`` names the reward that trains, ``first_item`` or
 ``win``. The episode's outcome holds the mean score per player-round under that reward (``reward``),
@@ -25,9 +27,24 @@ REWARD_SETTING = "glossogen_reward"
 PRIMARY_REWARD = "reward"
 
 
+def is_answered(*, step: Any) -> bool:
+    """Whether a recorded call's answer holds text or a tool call."""
+    message = step.misc["message"]
+    if message.get("tool_calls"):
+        return True
+    content = message.get("content")
+    if content is None:
+        return False
+    return str(content).strip() != ""
+
+
 def call_ids(*, trajectory: Any) -> list[str]:
-    """The ids of a trajectory's recorded model calls, in order."""
-    return [step.misc["action_misc"]["completion_id"] for step in trajectory.steps]
+    """The ids of a trajectory's answered model calls, in order."""
+    return [
+        step.misc["action_misc"]["completion_id"]
+        for step in trajectory.steps
+        if is_answered(step=step)
+    ]
 
 
 def round_spans(
@@ -37,7 +54,7 @@ def round_spans(
     score."""
     if len(calls) != len(seat.answer_rounds):
         raise ValueError(
-            f"{len(calls)} recorded calls, but {len(seat.answer_rounds)} logged responses"
+            f"{len(calls)} answered calls, but {len(seat.answer_rounds)} logged responses"
         )
     calls_by_round: dict[int, list[str]] = defaultdict(list)
     for call, round_number in zip(calls, seat.answer_rounds, strict=True):
@@ -72,6 +89,9 @@ class SeatRewards:
             trajectory.misc["spans"] = spans
             trajectory.misc["calls_outside_rounds"] = sum(
                 1 for round_number in seat.answer_rounds if round_number == 0
+            )
+            trajectory.misc["empty_calls"] = sum(
+                1 for step in trajectory.steps if not is_answered(step=step)
             )
             trajectory.reward = sum(span["reward"] for span in spans)
 
