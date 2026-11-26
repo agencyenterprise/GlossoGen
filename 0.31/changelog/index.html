@@ -2059,6 +2059,16 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong><code>record_token_ids</code> also records the logprob of each answer token.</strong> Each
+  request of a self-hosted agent asks the server for <code>logprobs</code> as well as
+  <code>return_token_ids</code>, and each <code>llm_response_received</code> event holds
+  <code>token_logprobs</code>, one value per id in <code>token_ids</code>. A response that carries
+  token ids without one logprob per answer token raises <code>TokenLogprobsMismatch</code>.
+  The runner tries the request up to 3 times. If all 3 attempts fail, it logs
+  <code>agent_run_cycle_failed</code> and starts a new run cycle. <code>glossogen.run_storage.recorded_token_ids</code>
+  returns the logprobs as <code>RecordedTokenIds.token_logprobs</code>, a new field, which
+  is None for an event that holds token ids without logprobs. See
+  <a href="../rl-training/#token-ids-in-the-event-log">Training a model with RL</a>.</li>
 <li><strong>Qwen3.8-27B can be trained by reinforcement learning on signal_game.</strong>
   <code>modal/grpo/</code> holds a Modal app with a LoRA trainer and a vLLM server that
   serves each new adapter. It also holds the loop that runs on your machine.
