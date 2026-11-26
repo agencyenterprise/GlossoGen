@@ -129,6 +129,7 @@ nav:
       - MCP integration: mcp-integration.md
       - Exporting runs: exporting-runs.md
       - ATIF export: atif-export.md
+      - Searching runs with Docent: docent.md
       - Analysis and dashboards: analysis.md
       - Analyzing runs with Claude Code: analyzing-runs-with-claude-code.md
       - Reading runs from code: reading-runs-from-code.md

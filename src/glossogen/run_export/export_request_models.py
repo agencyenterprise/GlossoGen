@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from glossogen.atif_export.trajectory_format import TrajectoryFormat
 from glossogen.models.event import RunStatus
 from glossogen.run_storage.knob_filter import (
     KnobFilter,
@@ -124,13 +125,15 @@ class ExportPreviewRequest(BaseModel):
 class RawExportRequest(BaseModel):
     """Body for the raw run-folder zip.
 
-    ``include_atif`` adds each agent's ATIF trajectory, generated from the run's
-    event log, under ``atif/`` in every run's folder.
+    ``trajectory_format`` adds the agents' trajectories, generated from each run's
+    event log. ``atif`` writes each agent's ATIF trajectory under ``atif/`` in
+    every run's folder. ``inspect`` writes one ``inspect_log.json`` at the archive
+    root, with one sample per agent of every run. None adds no trajectories.
     """
 
     selection: RunSelection
     include_logs: bool
-    include_atif: bool
+    trajectory_format: TrajectoryFormat | None
 
 
 class CsvExportRequest(BaseModel):

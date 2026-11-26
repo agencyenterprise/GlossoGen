@@ -417,6 +417,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Run Inspect Log
+         * @description Export every agent of a run as one Inspect-format log file.
+         */
+        get: operations["export_run_inspect_log_api_g__group_slug__runs__scenario___run_dir_name__export_inspect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/g/{group_slug}/runs/import": {
         parameters: {
             query?: never;
@@ -3126,16 +3146,17 @@ export interface components {
          * RawExportRequest
          * @description Body for the raw run-folder zip.
          *
-         *     ``include_atif`` adds each agent's ATIF trajectory, generated from the run's
-         *     event log, under ``atif/`` in every run's folder.
+         *     ``trajectory_format`` adds the agents' trajectories, generated from each run's
+         *     event log. ``atif`` writes each agent's ATIF trajectory under ``atif/`` in
+         *     every run's folder. ``inspect`` writes one ``inspect_log.json`` at the archive
+         *     root, with one sample per agent of every run. None adds no trajectories.
          */
         RawExportRequest: {
             /** Selection */
             selection: components["schemas"]["FilterRunSelection"] | components["schemas"]["ExplicitRunSelection"];
             /** Include Logs */
             include_logs: boolean;
-            /** Include Atif */
-            include_atif: boolean;
+            trajectory_format: components["schemas"]["TrajectoryFormat"] | null;
         };
         /**
          * ReasoningEntry
@@ -4340,6 +4361,16 @@ export interface components {
             result_round_number: number | null;
         };
         /**
+         * TrajectoryFormat
+         * @description The file format of an agent trajectory export.
+         *
+         *     ``ATIF`` writes one ATIF document per agent. ``INSPECT`` writes one Inspect-format
+         *     log with one sample per agent, the file that Docent imports
+         *     with Add Data > Upload Inspect Log.
+         * @enum {string}
+         */
+        TrajectoryFormat: "atif" | "inspect";
+        /**
          * UnrecognizedEventEntry
          * @description A logged event that neither the platform nor the run's loaded scenario declares.
          *
@@ -5171,6 +5202,38 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "application/zip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_run_inspect_log_api_g__group_slug__runs__scenario___run_dir_name__export_inspect_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario: string;
+                run_dir_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run's agents as one Inspect-format log, for Docent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

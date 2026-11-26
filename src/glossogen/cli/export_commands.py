@@ -5,6 +5,9 @@ import asyncio
 import logging
 from pathlib import Path
 
+import aiofiles
+
+from glossogen.atif_export.atif_models import AtifTrajectory
 from glossogen.atif_export.atif_run_context import load_atif_run_context
 from glossogen.atif_export.atif_trajectory_builder import (
     build_agent_trajectories,
@@ -12,6 +15,13 @@ from glossogen.atif_export.atif_trajectory_builder import (
     serialize_trajectory,
     trajectory_file_name,
 )
+from glossogen.atif_export.inspect_log_builder import (
+    INSPECT_LOG_FILE_NAME,
+    InspectLog,
+    build_inspect_samples,
+    serialize_inspect_log,
+)
+from glossogen.atif_export.trajectory_format import TrajectoryFormat
 from glossogen.cli.local_run_selection import add_run_selection_flags, resolved_local_runs
 from glossogen.cli.subcommand_parsers import SubcommandParsers
 from glossogen.run_export.csv_export_archive import (
@@ -89,9 +99,15 @@ def add_export_parser(subparsers: SubcommandParsers) -> None:
         help="Keep debug and stdout logs in the raw zip (they are dropped by default)",
     )
     export_parser.add_argument(
-        "--include-atif",
-        action="store_true",
-        help="Add each agent's ATIF trajectory under atif/ in every run of the raw zip",
+        "--trajectories",
+        type=str,
+        choices=[trajectory_format.value for trajectory_format in TrajectoryFormat],
+        default=None,
+        help=(
+            "Add the agents' trajectories to the raw zip: atif writes atif/<agent_id>.json "
+            "in every run's folder, inspect writes one inspect_log.json at the zip root "
+            "for Docent. Omit for none."
+        ),
     )
     export_parser.add_argument(
         "--max-runs",
@@ -177,7 +193,10 @@ def add_export_atif_parser(subparsers: SubcommandParsers, scenario_names: list[s
     """Add the ``export-atif`` subcommand and its flags."""
     export_atif_parser = subparsers.add_parser(
         "export-atif",
-        help="Export a run's agents as ATIF trajectories, one JSON file per agent",
+        help=(
+            "Export a run's agents as trajectories: ATIF files, one per agent, or one "
+            "Inspect-format log for Docent"
+        ),
     )
     export_atif_parser.add_argument(
         "scenario_name",
@@ -207,10 +226,22 @@ def add_export_atif_parser(subparsers: SubcommandParsers, scenario_names: list[s
         ),
     )
     export_atif_parser.add_argument(
+        "--format",
+        dest="format",
+        type=str,
+        choices=[trajectory_format.value for trajectory_format in TrajectoryFormat],
+        required=True,
+        help=(
+            "atif writes one <agent_id>.json ATIF file per agent. inspect writes one "
+            f"{INSPECT_LOG_FILE_NAME} with one sample per agent, which Docent imports "
+            "with Add Data > Upload Inspect Log."
+        ),
+    )
+    export_atif_parser.add_argument(
         "--out-dir",
         type=str,
         required=True,
-        help="Directory to write <agent_id>.json files into (created if missing)",
+        help="Directory to write the files into (created if missing)",
     )
 
 
@@ -238,8 +269,11 @@ async def handle_export(args: argparse.Namespace) -> None:
     frames_requested = _requested_frames(raw=args.frames)
     if args.include_logs and not args.raw:
         raise SystemExit("--include-logs only affects the raw zip; pass --raw as well.")
-    if args.include_atif and not args.raw:
-        raise SystemExit("--include-atif only affects the raw zip; pass --raw as well.")
+    if args.trajectories is not None and not args.raw:
+        raise SystemExit("--trajectories only affects the raw zip; pass --raw as well.")
+    trajectory_format: TrajectoryFormat | None = None
+    if args.trajectories is not None:
+        trajectory_format = TrajectoryFormat(args.trajectories)
 
     selection, summaries = await resolved_local_runs(args=args)
     records = await load_export_run_records(runs=summaries)
@@ -282,12 +316,12 @@ async def handle_export(args: argparse.Namespace) -> None:
         zip_path = out_dir / "runs.zip"
         try:
             with zip_path.open("wb") as handle:
-                # In a worker thread: the ATIF writer runs its own event loop per run.
+                # In a worker thread: the trajectory writer runs its own event loop per run.
                 tally = await asyncio.to_thread(
                     write_runs_zip,
                     runs=summaries,
                     include_logs=args.include_logs,
-                    include_atif=args.include_atif,
+                    trajectory_format=trajectory_format,
                     destination=handle,
                 )
         except ExportTooLargeError as exc:
@@ -298,9 +332,10 @@ async def handle_export(args: argparse.Namespace) -> None:
 
 
 async def handle_export_atif(args: argparse.Namespace) -> None:
-    """Write one ATIF trajectory file per agent to ``--out-dir``.
+    """Write the run's agents to ``--out-dir`` as ATIF files or as one Inspect-format log.
 
-    A seat swapped to another model mid-run gets one file per generation.
+    A seat swapped to another model mid-run gets one ATIF file, or one Inspect
+    sample, per generation.
     """
     context = await load_atif_run_context(
         run_dir=Path(args.run_dir).resolve(),
@@ -316,15 +351,33 @@ async def handle_export_atif(args: argparse.Namespace) -> None:
         )
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    if TrajectoryFormat(args.format) == TrajectoryFormat.ATIF:
+        await _write_atif_files(trajectories=trajectories, out_dir=out_dir)
+    else:
+        await _write_inspect_log(trajectories=trajectories, out_dir=out_dir)
+
+
+async def _write_atif_files(trajectories: list[AtifTrajectory], out_dir: Path) -> None:
+    """Write one ATIF document per trajectory into ``out_dir``."""
     for trajectory in trajectories:
         out_path = out_dir / trajectory_file_name(trajectory=trajectory)
-        out_path.write_text(serialize_trajectory(trajectory=trajectory) + "\n")
+        async with aiofiles.open(out_path, mode="w") as handle:
+            await handle.write(serialize_trajectory(trajectory=trajectory) + "\n")
         logger.info(
             "Wrote ATIF trajectory %s (%d steps) -> %s",
             trajectory.trajectory_id,
             trajectory.final_metrics.total_steps,
             out_path,
         )
+
+
+async def _write_inspect_log(trajectories: list[AtifTrajectory], out_dir: Path) -> None:
+    """Write one Inspect-format log with one sample per trajectory into ``out_dir``."""
+    log = InspectLog(samples=build_inspect_samples(trajectories=trajectories))
+    out_path = out_dir / INSPECT_LOG_FILE_NAME
+    async with aiofiles.open(out_path, mode="w") as handle:
+        await handle.write(serialize_inspect_log(log=log) + "\n")
+    logger.info("Wrote an Inspect log with %d samples -> %s", len(log.samples), out_path)
 
 
 async def handle_export_thread(args: argparse.Namespace) -> None:

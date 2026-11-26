@@ -12,6 +12,18 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Agent trajectories can be exported as an Inspect-format log that Docent
+  imports.** `glossogen export-atif --format inspect` writes one
+  `inspect_log.json` with one sample per agent. `glossogen export --raw
+  --trajectories inspect` writes one such log at the root of the zip, and the log
+  holds every selected run. The Export dialog's **Inspect log for Docent** choice
+  writes the same log. A run's page has an **Export Inspect log for Docent**
+  button, which downloads that run's Inspect log.
+  [ATIF export](docs/atif-export.md#the-inspect-format) describes the format.
+- **A docs page gives the steps to search runs with Docent.**
+  [Searching runs with Docent](docs/docent.md) gives the steps to run Docent on
+  your own machine, upload an Inspect log in its web UI, and search the runs with a
+  rubric.
 - **Claude Code can analyze a group of runs with the `analyze-runs` skill.**
   `glossogen install-skill` copies the skill into a project's `.claude/skills/`,
   and this repository links it there. The skill has Claude check the runs
@@ -126,6 +138,11 @@ the commit log.
   [README](src/glossogen/scenarios/spot_the_intersection/README.md#discussion-phase).
 
 ### Changed
+- **Breaking for scripts that call the export: `glossogen export-atif` needs
+  `--format atif` or `--format inspect`.** `POST .../runs/export/raw` takes
+  `trajectory_format` (`"atif"`, `"inspect"` or `null`) in place of
+  `include_atif`, and `glossogen export --raw` takes `--trajectories atif` or
+  `--trajectories inspect` in place of `--include-atif`.
 - `AutonomousSupervisor` takes `list_offered_tool_definitions` in place of
   `list_tool_definitions`. The argument's type is `ToolDefinitionLister`, in
   `glossogen.runtime.agent_tool_specs`. A `ToolDefinitionLister` takes
@@ -1177,7 +1194,7 @@ the commit log.
   a checkout. `python-dotenv` locates the file relative to the module that calls
   it, which lands in `site-packages` once glossogen is a dependency, so a
   project's own `.env` was ignored and its `ANTHROPIC_API_KEY` with it. Nothing
-  reported this: the key was simply absent and the run failed later against the
+  reported this: the key was absent and the run failed later against the
   provider.
 
 ## v0.1.3

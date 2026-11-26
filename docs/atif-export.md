@@ -2,40 +2,48 @@
 
 `glossogen export-atif` writes a run's agents as
 [ATIF](https://docs.harborframework.com/agents/atif) (Agent Trajectory
-Interchange Format) trajectories: one JSON document per agent, holding its
-prompts, responses, tool calls and token usage in a schema other agent tooling
-reads.
+Interchange Format) trajectories, one JSON document per agent, or as one
+[Inspect-format log](#the-inspect-format) for Docent. An ATIF trajectory holds the
+agent's prompts, responses, tool calls and token usage in a schema that other agent
+tooling reads.
 
 ```bash
 glossogen export-atif veyru \
   --run-dir ./runs/veyru/1782395813 \
+  --format atif \
   --out-dir ./atif
 ```
 
-It logs one line per trajectory written, with its step count.
+With `--format atif`, it logs one line for each trajectory that it writes, with the
+trajectory's step count. With `--format inspect`, it logs one line with the number
+of samples.
 
 | Flag | Effect |
 |---|---|
 | `--run-dir DIR` | the run to export (required) |
-| `--out-dir DIR` | where to write `<agent_id>.json`, created if missing (required) |
+| `--format FORMAT` | `atif` writes `<agent_id>.json` per agent; `inspect` writes one `inspect_log.json` (required) |
+| `--out-dir DIR` | where to write the files, created if missing (required) |
 | `--agent-id ID` | only this agent; omit for every agent |
 | `--round R` | exclusive cutoff, as for `export-thread`: keeps rounds `1..R-1` |
 
 Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.
 
-## Other ways to get it
+## Other ways to get ATIF
 
 | Surface | Call |
 |---|---|
 | REST | `GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/agents/{agent_id}/atif?round=R` |
 | MCP | `export_agent_atif` with `run_id`, `agent_id`, `cutoff_round` |
-| Raw zip | the export modal's raw tab (on by default), `glossogen export --raw --include-atif`, or `include_atif` on `POST .../runs/export/raw` |
+| Raw zip | the Export dialog's **Raw run folders** tab (ATIF by default), `glossogen export --raw --trajectories atif`, or `"trajectory_format": "atif"` on `POST .../runs/export/raw`; `inspect` in place of `atif` gives the Inspect log |
 | Single-run zip | always included in a run's zip download |
+| Run page | the **Export Inspect log for Docent** button downloads the run's Inspect log, which `GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/export/inspect` also serves |
 
-REST and MCP return `{"trajectories": [...]}` for one agent. The raw zip writes
-every agent of every selected run under `atif/` in that run's folder, as described
-in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
+REST and MCP return `{"trajectories": [...]}` for one agent. With `atif`, the raw
+zip writes every agent of every selected run under `atif/` in that run's folder.
+With `inspect`, it writes one `inspect_log.json` at the zip root that holds every
+selected run. [Exporting runs](exporting-runs.md#what-the-raw-zip-holds) describes
+both.
 
 ## How events map to steps
 
@@ -52,8 +60,10 @@ in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 Scenario injections, world events and the other agents' channel messages are not
 steps of their own. The model receives them as the results of its
 `read_notifications` and `read_channel` calls, and that is where a trajectory
-holds them. Round verdicts and postmortem phases are not part of any trajectory;
-read the event log or the [CSV tables](exporting-runs.md) for those.
+holds them. Round verdicts and the start and end of a postmortem phase are not
+steps either. An agent's own postmortem messages appear in its agent steps, as
+`send_message` calls. Read the event log or the [CSV tables](exporting-runs.md) for the verdicts
+and the phases.
 
 An agent step from the run above, with the tool result cut short:
 
@@ -209,8 +219,35 @@ Trajectory.model_validate(json.load(open(sys.argv[1])))
 print("valid")' ./atif/field_observer.json
 ```
 
+## The Inspect format
+
+Inspect is an evaluation framework, and an Inspect log is its log file.
+`glossogen export-atif --format inspect` writes the ATIF trajectories as one
+Inspect log, `inspect_log.json`, which [Docent](docent.md) imports with
+**Add Data** > **Upload Inspect Log**. Each trajectory becomes one sample, which
+is Inspect's record of one conversation. Each step becomes one or more chat
+messages:
+
+| ATIF step | Inspect message |
+|---|---|
+| `system` step | a `system` message |
+| `user` step | a `user` message |
+| `agent` step | an `assistant` message with the reasoning, the text and the tool calls |
+| each observation result | a `tool` message with the call's id and its function name |
+
+A sample's metadata holds the run id, the scenario, the agent id, the model, the
+provider, the [generation](#swapped-and-replaced-seats) and the scenario config. A
+`system`, `user` or `assistant` message's metadata holds its step id, whether the
+step is [copied context](#copied-context), and the step's `extra`. A `tool`
+message's metadata holds only its step id. The log holds only the fields that
+Docent's importer reads, so Inspect's own tools do not open it.
+
+A run's page in the web UI has an **Export Inspect log for Docent** button, which
+downloads the same log for that one run.
+
 ## Next
 
+- [Searching runs with Docent](docent.md) to load these files into a local Docent and search the run
 - [Exporting runs](exporting-runs.md) for CSV tables and raw run folders
 - [Evaluation](evaluation.md#exporting-an-agents-thread) for an agent's thread as a provider request body
 - [MCP integration](mcp-integration.md) for the other run-browsing tools

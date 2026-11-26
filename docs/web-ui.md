@@ -102,7 +102,7 @@ the group can open. See [analysis and dashboards](analysis.md).
 | 3 | Channel tabs: every channel's messages interleaved in send order, or one channel at a time |
 | 4 | Agent tabs: the run as one agent saw it. A seat swapped mid-run gets one tab per occupant |
 | 5 | The evaluation log, when an evaluation has run |
-| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the run as a PDF or a bundle |
+| 6 | Timeline controls: show or hide reasoning, filter tool calls, export the run as a PDF, a bundle or an [Inspect log for Docent](docent.md) |
 | 7 | An injection: the briefing the scenario handed one agent at the start of the round |
 | 8 | The round's verdict and why it ended (agents idle, timeout, or the scenario's own trigger) |
 | 9 | The evaluation report's headline scores |

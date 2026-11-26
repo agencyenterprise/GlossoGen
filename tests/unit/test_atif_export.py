@@ -1,6 +1,7 @@
 """Building ATIF trajectories from a run's event log, and the endpoint that serves them."""
 
 import io
+import json
 import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -27,6 +28,13 @@ from glossogen.atif_export.copied_context import (
     NO_COPIED_CONTEXT,
     CopiedContext,
     load_copied_context,
+)
+from glossogen.atif_export.inspect_log_builder import (
+    INSPECT_LOG_FILE_NAME,
+    InspectAssistantMessage,
+    InspectLog,
+    InspectToolMessage,
+    build_inspect_samples,
 )
 from glossogen.atif_export.seed_history_steps import build_seed_steps
 from glossogen.atif_export.tool_definition_reconstruction import reconstruct_tool_definitions
@@ -851,7 +859,8 @@ def test_the_cli_raw_export_writes_atif_from_inside_its_event_loop(
             "--run-id",
             "veyru/1700000000",
             "--raw",
-            "--include-atif",
+            "--trajectories",
+            "atif",
         ],
     )
 
@@ -950,3 +959,105 @@ async def test_the_endpoint_answers_404_for_an_agent_the_run_never_registered(
 
     assert response.status_code == 404
     assert "ghost" in response.json()["detail"]
+
+
+def test_an_inspect_sample_holds_each_step_as_a_chat_message() -> None:
+    trajectory = _only(_build(events=_single_agent_run(), cutoff_round=None))
+
+    [sample] = build_inspect_samples(trajectories=[trajectory])
+
+    assert [message.role for message in sample.messages] == [
+        "system",
+        "user",
+        "assistant",
+        "tool",
+        "user",
+        "assistant",
+        "tool",
+    ]
+    assistant = sample.messages[2]
+    assert isinstance(assistant, InspectAssistantMessage)
+    assert [part.type for part in assistant.content] == ["reasoning", "text"]
+    assert assistant.tool_calls is not None
+    assert [call.id for call in assistant.tool_calls] == ["c1"]
+    tool = sample.messages[3]
+    assert isinstance(tool, InspectToolMessage)
+    assert (tool.tool_call_id, tool.function, tool.content) == ("c1", "send_message", "sent")
+
+
+def test_an_inspect_sample_names_its_run_agent_and_model() -> None:
+    trajectory = _only(_build(events=_single_agent_run(), cutoff_round=None))
+
+    [sample] = build_inspect_samples(trajectories=[trajectory])
+
+    assert sample.id == "veyru/1700000000/field_observer"
+    assert sample.metadata["glossogen_run"] == RUN_ID
+    assert sample.metadata["agent_id"] == "field_observer"
+    assert sample.metadata["model"] == "claude-sonnet-4-6"
+    assert sample.metadata["scenario_config"] == {"round_count": 3}
+
+
+def _write_single_agent_run(runs_dir: Path) -> Path:
+    run_dir = runs_dir / "veyru" / "1700000000"
+    run_dir.mkdir(parents=True)
+    lines = [event.model_dump_json() for event in _single_agent_run()]
+    (run_dir / "veyru.jsonl").write_text("\n".join(lines) + "\n")
+    return run_dir
+
+
+def test_export_atif_in_inspect_format_writes_one_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = _write_single_agent_run(runs_dir=tmp_path / "runs")
+    out_dir = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "glossogen",
+            "export-atif",
+            "veyru",
+            "--run-dir",
+            str(run_dir),
+            "--format",
+            "inspect",
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    main()
+
+    assert [path.name for path in out_dir.iterdir()] == [INSPECT_LOG_FILE_NAME]
+    log = InspectLog.model_validate_json((out_dir / INSPECT_LOG_FILE_NAME).read_text())
+    assert [sample.id for sample in log.samples] == ["veyru/1700000000/field_observer"]
+
+
+def test_the_raw_zip_holds_one_inspect_log_at_its_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_single_agent_run(runs_dir=tmp_path / "runs")
+    out_dir = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "glossogen",
+            "export",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+            "--out",
+            str(out_dir),
+            "--run-id",
+            "veyru/1700000000",
+            "--raw",
+            "--trajectories",
+            "inspect",
+        ],
+    )
+
+    main()
+
+    with zipfile.ZipFile(out_dir / "runs.zip") as archive:
+        names = set(archive.namelist())
+        log = json.loads(archive.read(INSPECT_LOG_FILE_NAME))
+    assert not any("/atif/" in name for name in names)
+    assert [sample["metadata"]["glossogen_run"] for sample in log["samples"]] == [RUN_ID]

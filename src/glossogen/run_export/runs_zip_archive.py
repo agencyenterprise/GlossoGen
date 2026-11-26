@@ -10,6 +10,10 @@ A multi-run archive nests each run under `{scenario_name}/{run_dir_name}/`,
 because run directory names are unix timestamps and two scenarios can hold the
 same one. A single-run archive keeps the bare `{run_dir_name}/` it has always
 used, so it still drops into one scenario's runs directory.
+
+A multi-run archive can also hold the agents' trajectories, generated from each
+run's event log: as ATIF files under `atif/` in each run's folder, or as one
+Inspect-format log at the archive root that holds every agent of every run.
 """
 
 import csv
@@ -21,18 +25,21 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import IO, NamedTuple
 
-import orjson
-from pydantic import ValidationError
-
-from glossogen.atif_export.atif_run_context import load_atif_run_context_blocking
 from glossogen.atif_export.atif_trajectory_builder import (
-    build_run_trajectories,
     serialize_trajectory,
     trajectory_file_name,
 )
+from glossogen.atif_export.inspect_log_builder import (
+    INSPECT_LOG_FILE_NAME,
+    InspectLog,
+    InspectSample,
+    build_inspect_samples,
+    serialize_inspect_log,
+)
+from glossogen.atif_export.trajectory_format import TrajectoryFormat
 from glossogen.run_export.export_limits import check_raw_bytes
+from glossogen.run_export.run_trajectory_loader import load_run_trajectories
 from glossogen.run_storage.archive_member_filter import should_include_in_archive
-from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.run_storage.run_summary_models import RunSummary
 
 logger = logging.getLogger(__name__)
@@ -124,22 +131,8 @@ def _add_atif_trajectories(
     arc_root: PurePosixPath,
     scenario_name: str,
 ) -> RunZipTally:
-    """Write one ATIF trajectory per agent generation under ``arc_root/atif/``.
-
-    A run with no event log yet (claimed, never started) has no agents to write.
-    Neither does a run whose log this build cannot parse, such as an old run whose
-    events have since gained required fields: its files are archived without
-    trajectories rather than failing the whole archive.
-    """
-    log_path = event_log_path(run_dir=run_dir, scenario_name=scenario_name)
-    if not log_path.exists():
-        return RunZipTally(file_count=0, byte_count=0)
-    try:
-        context = load_atif_run_context_blocking(run_dir=run_dir, scenario_name=scenario_name)
-    except ValidationError, orjson.JSONDecodeError:
-        logger.exception("Archiving %s without ATIF: its event log does not parse", run_dir)
-        return RunZipTally(file_count=0, byte_count=0)
-    trajectories = build_run_trajectories(context=context, cutoff_round=None)
+    """Write one ATIF trajectory per agent generation under ``arc_root/atif/``."""
+    trajectories = load_run_trajectories(run_dir=run_dir, scenario_name=scenario_name)
     byte_count = 0
     for trajectory in trajectories:
         payload = serialize_trajectory(trajectory=trajectory).encode("utf-8")
@@ -149,6 +142,17 @@ def _add_atif_trajectories(
         archive.writestr(info, payload)
         byte_count += len(payload)
     return RunZipTally(file_count=len(trajectories), byte_count=byte_count)
+
+
+def _add_inspect_log(archive: zipfile.ZipFile, samples: list[InspectSample]) -> int:
+    """Write one Inspect-format log at the archive root and return its size in bytes."""
+    payload = serialize_inspect_log(log=InspectLog(samples=samples)).encode("utf-8")
+    info = zipfile.ZipInfo(
+        filename=INSPECT_LOG_FILE_NAME, date_time=zip_date_time(mtime=time.time())
+    )
+    info.compress_type = zipfile.ZIP_DEFLATED
+    archive.writestr(info, payload)
+    return len(payload)
 
 
 def write_single_run_zip(
@@ -187,16 +191,19 @@ def _manifest_bytes(rows: list[tuple[str, str, str, str, str, int]]) -> bytes:
 def write_runs_zip(
     runs: list[RunSummary],
     include_logs: bool,
-    include_atif: bool,
+    trajectory_format: TrajectoryFormat | None,
     destination: IO[bytes],
 ) -> RunsZipTally:
     """Write many runs into one zip, each under ``{scenario_name}/{run_dir_name}/``.
 
-    Adds a ``manifest.csv`` at the archive root naming what went in. Raises
-    :class:`~glossogen.run_export.export_limits.ExportTooLargeError` if the run
-    folders total more than the raw export ceiling.
+    Adds a ``manifest.csv`` at the archive root naming what went in.
+    ``trajectory_format`` adds the agents' trajectories: ATIF files under each run's
+    ``atif/``, or one ``inspect_log.json`` at the archive root. None adds none.
+    Raises :class:`~glossogen.run_export.export_limits.ExportTooLargeError` if the
+    archive's files total more than the raw export ceiling.
     """
     manifest_rows: list[tuple[str, str, str, str, str, int]] = []
+    inspect_samples: list[InspectSample] = []
     total_files = 0
     total_bytes = 0
 
@@ -210,11 +217,19 @@ def write_runs_zip(
                 arc_root=PurePosixPath(summary.scenario_name) / run_dir_name,
                 scenario_name=summary.scenario_name,
                 include_logs=include_logs,
-                include_atif=include_atif,
+                include_atif=trajectory_format == TrajectoryFormat.ATIF,
             )
             total_files += tally.file_count
             total_bytes += tally.byte_count
             check_raw_bytes(total_bytes=total_bytes)
+            if trajectory_format == TrajectoryFormat.INSPECT:
+                inspect_samples.extend(
+                    build_inspect_samples(
+                        trajectories=load_run_trajectories(
+                            run_dir=run_dir, scenario_name=summary.scenario_name
+                        )
+                    )
+                )
             manifest_rows.append(
                 (
                     summary.run_id,
@@ -226,6 +241,11 @@ def write_runs_zip(
                 )
             )
 
+        if trajectory_format == TrajectoryFormat.INSPECT:
+            inspect_bytes = _add_inspect_log(archive=archive, samples=inspect_samples)
+            total_files += 1
+            total_bytes += inspect_bytes
+            check_raw_bytes(total_bytes=total_bytes)
         archive.writestr(_MANIFEST_MEMBER_NAME, _manifest_bytes(rows=manifest_rows))
 
     logger.info(

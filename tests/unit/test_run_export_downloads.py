@@ -217,7 +217,11 @@ async def test_the_raw_export_nests_the_run_under_its_scenario(
     async with client:
         response = await client.post(
             f"{GROUP_API}/runs/export/raw",
-            json={"selection": explicit_selection(), "include_logs": True, "include_atif": False},
+            json={
+                "selection": explicit_selection(),
+                "include_logs": True,
+                "trajectory_format": None,
+            },
         )
 
     assert response.status_code == 200
@@ -250,7 +254,11 @@ async def test_a_raw_export_that_outgrows_its_estimate_is_refused_as_too_large(
         )
         response = await client.post(
             f"{GROUP_API}/runs/export/raw",
-            json={"selection": explicit_selection(), "include_logs": False, "include_atif": True},
+            json={
+                "selection": explicit_selection(),
+                "include_logs": False,
+                "trajectory_format": "atif",
+            },
         )
 
     assert response.status_code == 413
@@ -320,6 +328,30 @@ async def test_a_run_whose_log_does_not_parse_zips_without_trajectories(
     assert not any("/atif/" in name for name in names)
 
 
+async def test_the_run_inspect_log_holds_one_sample_per_agent(client: httpx.AsyncClient) -> None:
+    async with client:
+        response = await client.get(f"{GROUP_API}/runs/{RUN_ID}/export/inspect")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    expected_filename = f"{SCENARIO}_{RUN_DIR_NAME}_inspect_log.json"
+    assert f'filename="{expected_filename}"' in response.headers["content-disposition"]
+    samples = orjson.loads(response.content)["samples"]
+    assert [sample["metadata"]["agent_id"] for sample in samples] == ["field_observer"]
+    assert samples[0]["metadata"]["glossogen_run"] == RUN_ID
+
+
+async def test_a_run_whose_log_does_not_parse_has_no_inspect_log(
+    client: httpx.AsyncClient, run_dir: Path
+) -> None:
+    write_malformed_run(runs_dir=run_dir.parent.parent)
+
+    async with client:
+        response = await client.get(f"{GROUP_API}/runs/{MALFORMED_RUN_ID}/export/inspect")
+
+    assert response.status_code == 422
+
+
 async def test_a_run_whose_log_does_not_parse_leaves_the_others_trajectories_in_the_raw_export(
     client: httpx.AsyncClient, run_dir: Path
 ) -> None:
@@ -331,7 +363,7 @@ async def test_a_run_whose_log_does_not_parse_leaves_the_others_trajectories_in_
             json={
                 "selection": {"kind": "explicit", "run_ids": [RUN_ID, MALFORMED_RUN_ID]},
                 "include_logs": False,
-                "include_atif": True,
+                "trajectory_format": "atif",
             },
         )
 

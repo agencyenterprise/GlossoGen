@@ -1242,6 +1242,53 @@
         }
       }
     },
+    "/api/g/{group_slug}/runs/{scenario}/{run_dir_name}/export/inspect": {
+      "get": {
+        "summary": "Export Run Inspect Log",
+        "description": "Export every agent of a run as one Inspect-format log file.",
+        "operationId": "export_run_inspect_log_api_g__group_slug__runs__scenario___run_dir_name__export_inspect_get",
+        "parameters": [
+          {
+            "name": "scenario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "run_dir_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Dir Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's agents as one Inspect-format log, for Docent.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/g/{group_slug}/runs/import": {
       "post": {
         "summary": "Import Run Bundle",
@@ -7044,19 +7091,25 @@
             "type": "boolean",
             "title": "Include Logs"
           },
-          "include_atif": {
-            "type": "boolean",
-            "title": "Include Atif"
+          "trajectory_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrajectoryFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "selection",
           "include_logs",
-          "include_atif"
+          "trajectory_format"
         ],
         "title": "RawExportRequest",
-        "description": "Body for the raw run-folder zip.\n\n``include_atif`` adds each agent's ATIF trajectory, generated from the run's\nevent log, under ``atif/`` in every run's folder."
+        "description": "Body for the raw run-folder zip.\n\n``trajectory_format`` adds the agents' trajectories, generated from each run's\nevent log. ``atif`` writes each agent's ATIF trajectory under ``atif/`` in\nevery run's folder. ``inspect`` writes one ``inspect_log.json`` at the archive\nroot, with one sample per agent of every run. None adds no trajectories."
       },
       "ReasoningEntry": {
         "properties": {
@@ -9714,6 +9767,15 @@
         ],
         "title": "ToolUseEntry",
         "description": "A scenario-specific tool invocation with its result.\n\nEach entry represents one tool call made by an agent. The ``result``\nfield is filled once the tool execution completes. ``timestamp``\nanchors to ``tool_call_invoked``; ``result_timestamp`` anchors to\n``tool_result_received`` so the UI can render call and result at\ntheir true chronological positions. ``round_number`` is the round\nthe call was issued in; ``result_round_number`` is the round the\nresult was received in. They differ for tool calls that hang across\na round boundary (e.g. ``read_notifications`` blocking until the\nnext round's injection arrives)."
+      },
+      "TrajectoryFormat": {
+        "type": "string",
+        "enum": [
+          "atif",
+          "inspect"
+        ],
+        "title": "TrajectoryFormat",
+        "description": "The file format of an agent trajectory export.\n\n``ATIF`` writes one ATIF document per agent. ``INSPECT`` writes one Inspect-format\nlog with one sample per agent, the file that Docent imports\nwith Add Data > Upload Inspect Log."
       },
       "UnrecognizedEventEntry": {
         "properties": {
