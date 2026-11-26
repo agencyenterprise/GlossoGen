@@ -106,7 +106,11 @@ def recorded_step(*, completion_id: str, content: str | None, tool_calls: list[A
 
 
 def test_an_empty_answer_matches_no_logged_response() -> None:
-    tool_call = {"id": "call-1", "type": "function", "function": {"name": "move", "arguments": "{}"}}
+    tool_call = {
+        "id": "call-1",
+        "type": "function",
+        "function": {"name": "move", "arguments": "{}"},
+    }
     trajectory = SimpleNamespace(
         steps=[
             recorded_step(completion_id="text", content="I see a blue star.", tool_calls=[]),
