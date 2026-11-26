@@ -3,11 +3,13 @@
 The version comes from the installed distribution. The commit comes from the
 install's ``direct_url.json`` (PEP 610): a git install records its commit there,
 and an editable install records the checkout folder, whose ``HEAD`` and status are
-read with git.
+read with git. When git is not installed or cannot read the checkout, the commit is
+recorded as unknown.
 """
 
 import asyncio
 import json
+import logging
 from importlib import metadata
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -17,11 +19,13 @@ from pydantic import BaseModel
 
 from glossogen.models.glossogen_build import GlossogenBuild
 
+logger = logging.getLogger(__name__)
+
 _DISTRIBUTION_NAME = "glossogen"
 
 
-class GitStateUnreadable(RuntimeError):
-    """git failed in a glossogen checkout that has a ``.git`` entry."""
+class _GitUnavailable(RuntimeError):
+    """git is not installed, or it failed in a glossogen checkout that has a ``.git`` entry."""
 
 
 class _VcsInfo(BaseModel):
@@ -58,15 +62,16 @@ class _GitState(BaseModel):
 async def read_glossogen_build() -> GlossogenBuild:
     """Return the version and commit of the glossogen that this process runs.
 
-    Raises ``GitStateUnreadable`` when the install is an editable git checkout and
-    git cannot read it, and a pydantic ``ValidationError`` when the install's
+    The commit is None when the install records none, and when the install is an
+    editable git checkout that git cannot read, for example because git is not
+    installed. Raises a pydantic ``ValidationError`` when the install's
     ``direct_url.json`` does not parse.
     """
     distribution = metadata.distribution(_DISTRIBUTION_NAME)
     version = distribution.version
     raw_direct_url = distribution.read_text("direct_url.json")
     if raw_direct_url is None:
-        return GlossogenBuild(version=version, git_commit=None, has_uncommitted_changes=None)
+        return _build_without_commit(version=version)
     direct_url = _DirectUrl.model_validate(json.loads(raw_direct_url))
     if direct_url.vcs_info is not None:
         return GlossogenBuild(
@@ -75,11 +80,13 @@ async def read_glossogen_build() -> GlossogenBuild:
             has_uncommitted_changes=False,
         )
     if direct_url.dir_info is None or not direct_url.dir_info.editable:
-        return GlossogenBuild(version=version, git_commit=None, has_uncommitted_changes=None)
+        return _build_without_commit(version=version)
     checkout = _local_path(file_url=direct_url.url)
     if not await aiofiles.os.path.exists(checkout / ".git"):
-        return GlossogenBuild(version=version, git_commit=None, has_uncommitted_changes=None)
+        return _build_without_commit(version=version)
     git_state = await _read_git_state(checkout=checkout)
+    if git_state is None:
+        return _build_without_commit(version=version)
     return GlossogenBuild(
         version=version,
         git_commit=git_state.commit,
@@ -87,34 +94,51 @@ async def read_glossogen_build() -> GlossogenBuild:
     )
 
 
+def _build_without_commit(version: str) -> GlossogenBuild:
+    """A build whose commit is unknown."""
+    return GlossogenBuild(version=version, git_commit=None, has_uncommitted_changes=None)
+
+
 def _local_path(file_url: str) -> Path:
     """The folder that a ``file://`` URL names."""
     return Path(unquote(urlparse(file_url).path))
 
 
-async def _read_git_state(checkout: Path) -> _GitState:
-    """Read ``checkout``'s ``HEAD`` and whether ``src/`` has changes, tracked or untracked."""
-    commit = await _run_git(checkout=checkout, arguments=["rev-parse", "HEAD"])
-    status = await _run_git(
-        checkout=checkout,
-        arguments=["status", "--porcelain", "--untracked-files=normal", "--", "src"],
-    )
+async def _read_git_state(checkout: Path) -> _GitState | None:
+    """Read ``checkout``'s ``HEAD`` and whether ``src/`` has changes, tracked or untracked.
+
+    Returns None, and logs why, when git is not installed or cannot read ``checkout``.
+    """
+    try:
+        commit = await _run_git(checkout=checkout, arguments=["rev-parse", "HEAD"])
+        status = await _run_git(
+            checkout=checkout,
+            arguments=["status", "--porcelain", "--untracked-files=normal", "--", "src"],
+        )
+    except _GitUnavailable:
+        logger.exception("Recording the glossogen commit as unknown")
+        return None
     return _GitState(commit=commit, has_uncommitted_changes=status != "")
 
 
 async def _run_git(checkout: Path, arguments: list[str]) -> str:
     """Run git in ``checkout`` and return its stripped output."""
-    process = await asyncio.create_subprocess_exec(
-        "git",
-        "-C",
-        str(checkout),
-        *arguments,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "-C",
+            str(checkout),
+            *arguments,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError as error:
+        raise _GitUnavailable(
+            f"git is not installed, so it cannot read the glossogen checkout {checkout}"
+        ) from error
     stdout, stderr = await process.communicate()
     if process.returncode != 0:
-        raise GitStateUnreadable(
+        raise _GitUnavailable(
             f"git {' '.join(arguments)} failed in the glossogen checkout {checkout}: "
             f"{stderr.decode().strip()}"
         )

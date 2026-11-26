@@ -9,7 +9,8 @@ class GlossogenBuild(BaseModel):
     ``version`` is the installed distribution's version. ``git_commit`` is the commit
     that the install came from: the commit that a git install recorded, or the
     checkout's ``HEAD`` for an editable install. It is None for an install that
-    records no commit, such as one built from a wheel or a source folder.
+    records no commit, such as one built from a wheel or a source folder, and for an
+    editable checkout that git cannot read, for example because git is not installed.
 
     ``has_uncommitted_changes`` says whether an editable checkout held changes under
     ``src/`` that ``git_commit`` does not contain, tracked or untracked. It is False

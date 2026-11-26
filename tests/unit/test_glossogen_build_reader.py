@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from glossogen.models.glossogen_build import GlossogenBuild
 from glossogen.runtime import glossogen_build_reader
-from glossogen.runtime.glossogen_build_reader import GitStateUnreadable, read_glossogen_build
+from glossogen.runtime.glossogen_build_reader import read_glossogen_build
 
 
 class _FakeDistribution:
@@ -140,12 +140,31 @@ async def test_an_editable_folder_without_git_records_no_commit(
     )
 
 
-async def test_a_broken_checkout_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+async def test_a_checkout_that_git_cannot_read_records_no_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     (tmp_path / ".git").write_text("gitdir: /nowhere\n")
     _install(monkeypatch=monkeypatch, direct_url=_editable_url(checkout=tmp_path))
 
-    with pytest.raises(GitStateUnreadable):
-        await read_glossogen_build()
+    assert await read_glossogen_build() == GlossogenBuild(
+        version="9.8.7", git_commit=None, has_uncommitted_changes=None
+    )
+    assert "git rev-parse HEAD failed" in caplog.text
+
+
+async def test_a_checkout_without_git_installed_records_no_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    checkout = _committed_checkout(root=tmp_path)
+    _install(monkeypatch=monkeypatch, direct_url=_editable_url(checkout=checkout))
+    empty_bin = tmp_path / "empty_bin"
+    empty_bin.mkdir()
+    monkeypatch.setenv("PATH", str(empty_bin))
+
+    assert await read_glossogen_build() == GlossogenBuild(
+        version="9.8.7", git_commit=None, has_uncommitted_changes=None
+    )
+    assert "git is not installed" in caplog.text
 
 
 async def test_a_direct_url_that_does_not_parse_raises(monkeypatch: pytest.MonkeyPatch) -> None:
