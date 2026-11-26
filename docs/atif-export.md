@@ -24,9 +24,6 @@ It logs one line per trajectory written, with its step count.
 Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.
 
-[Searching runs with Docent](docent.md) has the steps to load these files into
-a local Docent and search the run.
-
 ## Other ways to get it
 
 | Surface | Call |
@@ -55,8 +52,10 @@ in [exporting runs](exporting-runs.md#what-the-raw-zip-holds).
 Scenario injections, world events and the other agents' channel messages are not
 steps of their own. The model receives them as the results of its
 `read_notifications` and `read_channel` calls, and that is where a trajectory
-holds them. Round verdicts and postmortem phases are not part of any trajectory;
-read the event log or the [CSV tables](exporting-runs.md) for those.
+holds them. Round verdicts and the start and end of a postmortem phase are not
+steps either. An agent's own postmortem messages appear in its agent steps, as
+`send_message` calls. Read the event log or the [CSV tables](exporting-runs.md) for the verdicts
+and the phases.
 
 An agent step from the run above, with the tool result cut short:
 
@@ -214,6 +213,7 @@ print("valid")' ./atif/field_observer.json
 
 ## Next
 
+- [Searching runs with Docent](docent.md) to load these files into a local Docent and search the run
 - [Exporting runs](exporting-runs.md) for CSV tables and raw run folders
 - [Evaluation](evaluation.md#exporting-an-agents-thread) for an agent's thread as a provider request body
 - [MCP integration](mcp-integration.md) for the other run-browsing tools
