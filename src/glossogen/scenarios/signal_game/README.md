@@ -280,6 +280,18 @@ with both grids and the final squares as the ground truth, so
 `get_primary_channels()` is empty, so `perplexity`, `mean_chars_per_round`,
 `mean_chars_per_message` and the language-emergence judges skip.
 
+## Analyzing runs
+
+These notes are for reading signal_game runs, for example with the `analyze-runs` skill that `glossogen install-skill` installs.
+
+- **Moves carry the signal.** The run has no channel, so a code is a pattern of moves. `glossogen transcript` lists both players' `signal_game_move_made` events in the order that they happened.
+- **The reasoning is private.** Under `move_reasoning`, the sentence that a player gives with `move` or `end_round` is logged, and the partner does not see it. It says what the player meant. A code exists only when the partner's moves, or the partner's own reasoning, show that the partner read the pattern.
+- **Decode with each player's own lists.** Each player's prompt lists the colours and shapes in an order drawn for that player (see [What a player is told](#what-a-player-is-told)). "The first colour in my list" names a different colour for each player. Decode with the orders in `signal_game_round_started`: `colour_orders` and `shape_orders`.
+- **A win does not show a code.** A rule that uses no moves can win some rounds, for example when both lists start with the same colour. Before you credit a code with a round, check that round's moves.
+- **How the round ended.** The `trigger` of `signal_game_round_resolved` says whether both players finished or the round ended with both players waiting (see [Waiting](#waiting)). A round that ended before a player moved is not a failed code.
+- **The last result is not shown.** The players do not see the final round's result (see [Known limitations](#known-limitations)), so it cannot change what they do.
+- **Settings that changed between runs.** The system prompt and the presets have changed over time (see [What a player is told](#what-a-player-is-told) and [Waiting](#waiting)). Compare `agent_registered.system_prompt` and `agent_model_settings.parallel_tool_calls` in `scenario_config` between the runs that you compare.
+
 ## Events
 
 | Event | Holds |

@@ -246,6 +246,17 @@ Cost: ~$0.20 for the consolidation call + ~$0.03 per run for relabeling. At 440 
 
 Failure auditing: every non-zero exit row in `STATUS_LOG` corresponds to a `/tmp/pipeline_<id>_<phase>.log` with the full traceback. Re-running the same phase re-attempts the failed runs (sidecar presence is the idempotency key).
 
+## Analyzing runs
+
+These notes are for reading veyru runs, for example with the `analyze-runs` skill that `glossogen install-skill` installs.
+
+- **Link codes can be agreed in the discussion phase.** With `postmortem_enabled`, the agents talk at no cost in the team discussion channel between rounds. Read the discussion before a round to decode that round's link messages. A reading of the link alone misses the definitions that the agents made there.
+- **Each agent sees a different part of the case.** The observer sees the symptoms, and the engineer sees the stellar table. Each round's `veyru_case_started` event holds both. A message can carry only what its sender saw or was told.
+- **Shorthand sent to the judge.** The observer can pass its link shorthand as the `stabilize_veyru` action. The judge reads the action without the expected procedure, and it accepts the action only when every parameter is written in English words (see [the judge-decodability exploit](../../../../docs/judge-decodability-exploit.md)). Compare each `stabilize_veyru` call with the verdict in the `veyru_stabilization_judged` event that follows it. Calls in shorthand show the agents testing what the judge accepts.
+- **One reason covers three ways to lose a round.** `round_result_recorded` gives `Veyru collapsed` when the link spent the time budget, when both agents stopped acting, and when the round reached its duration limit. The `trigger` of `round_ended` tells them apart: `veyru_collapsed`, `all_agents_idle` and `round_timeout`. The `round_ended_idle` and `round_ended_timeout` metrics count the last two.
+- **Refused requests.** Claude's safety classifier sometimes blocks the engineer's requests. Each block is an `agent_run_cycle_failed` event with `error_type` `ContentFilterError`, and the `content_filter_refusal` metric counts them. Count them before you read a lost round as a failed protocol.
+- **Swaps and interns.** In two-team swap mode and intern mode, `protocol_learned_after_swap` and `round_success_after_resume` measure whether the new agent took up the protocol. Two-team runs report each metric per team, under names that end in `_team_a` and `_team_b`.
+
 ## Knobs
 
 | Knob | Description |

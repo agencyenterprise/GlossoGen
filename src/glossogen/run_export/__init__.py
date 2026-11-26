@@ -1,4 +1,4 @@
-"""Exporting many runs at once, as raw run folders or as CSV tables.
+"""Exporting runs: many at once as run folders or CSV tables, and one as a plain-text transcript.
 
 Nothing here imports FastAPI, so the same code answers a REST request and a
 `glossogen export` invocation that never starts a server. The wire models are

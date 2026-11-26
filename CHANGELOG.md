@@ -12,6 +12,22 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Claude Code can analyze a group of runs with the `analyze-runs` skill.**
+  `glossogen install-skill` copies the skill into a project's `.claude/skills/`,
+  and this repository links it there. The skill has Claude check the runs
+  against the plan, have subagents read every transcript, check each claim
+  against the event logs, and write a findings file.
+  [Analyzing runs with Claude Code](docs/analyzing-runs-with-claude-code.md)
+  describes it. The veyru and signal_game READMEs have a section called
+  "Analyzing runs" that the skill reads.
+- **`glossogen transcript` prints a run's event log as plain text, round by
+  round.** It keeps what each agent was told, wrote, called and received, and
+  leaves out ids, timestamps, token counts and wait records. `--out-dir`
+  writes one file per round.
+- **A run's log records the glossogen code that wrote it.** `simulation_started`
+  holds `glossogen_build`: the installed version, the git commit when one is
+  known, and whether an editable checkout had uncommitted changes under `src/`.
+  A fork or an agent replacement records the code that derived it.
 - **Qwen3.8-27B can be trained by reinforcement learning on signal_game.**
   `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
   serves each new adapter. It also holds the loop that runs on your machine.
