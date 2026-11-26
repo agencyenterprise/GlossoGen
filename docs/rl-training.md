@@ -170,7 +170,8 @@ In step k:
 2. The loop plays 6 games on each of the step's 4 seeds, seeds 1000 + 4k to 1003 + 4k. The model
    plays both seats of every game at temperature 1.0, so the 6 games of a seed differ. Every game
    runs with `record_token_ids=true`, so its event log holds the token ids of every prompt and
-   answer.
+   answer, and the logprob of each answer token. The loop trains on the ids and does not use the
+   logprobs.
 3. The reward gives each player a score of 0 or 1 in each round. A player's advantage in a round
    is its score minus the mean score of its seat in that round, over the seed's finished games.
 4. The loop builds each player's prompts and answers from the logged token ids. It marks every
@@ -239,6 +240,47 @@ records are in `<records dir>/<run>/`:
 | `eval.jsonl` | one line per test: the rounds won and the first-item count of each game, grouped by seed, and the totals |
 | `configs/` | each seed's game config |
 | `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log` |
+
+### Token ids in the event log
+
+The loop refuses a game config that does not set `record_token_ids` to true. With it, each request
+of an agent under `--provider self-hosted` asks the server for `return_token_ids` and `logprobs`.
+Each `llm_response_received` event of that agent then holds these fields:
+
+| Field | What it holds |
+| --- | --- |
+| `token_ids_index` | the response's position among the agent's recorded responses, counted from 0 when the agent's runner starts |
+| `token_ids` | the token ids of the model's answer |
+| `token_logprobs` | the logprob of each answer token, in the same order |
+| `prompt_prefix_tokens` | the length of the prompt's prefix: the tokens at its start that match the agent's previous prompt followed by its previous answer |
+| `prompt_tail_ids` | the token ids of the prompt after its prefix |
+
+The server returns `token_ids` and `token_logprobs`, and GlossoGen computes the other fields.
+`glossogen.run_storage.recorded_token_ids` rebuilds the full prompts of one agent, with each
+answer's ids and logprobs.
+
+GlossoGen treats a request as failed in two cases. In the first, the server returns token ids but
+not exactly one logprob for each answer token. In the second, the server gives an answer token a
+logprob that is not a finite number, or that is -9999 or lower. vLLM gives -9999 to a token whose
+logprob it does not have. GlossoGen tries the request up to 3 times. If all 3 attempts fail, it
+logs `agent_run_cycle_failed` and starts a new turn. The failed turn counts toward
+`--max-agent-turns`.
+
+The policy server uses vLLM's default `--logprobs-mode`, which takes logprobs before temperature
+and the sampling filters. `signal_game_shapes.json` sets temperature 1.0, top-p 1.0, top-k -1,
+min-p 0 and presence penalty 0. These values turn every filter and the penalty off. GlossoGen
+sends them with every request of a player. vLLM fills each sampling value that a request leaves
+out from the model's `generation_config.json`. Qwen3.8-27B's file sets top-k 20 and top-p 0.95,
+so a request without them would sample with those filters on. With the game config's values,
+the logged logprobs are those of the distribution that the server sampled from. With another
+temperature or filter, they differ from it.
+
+pydantic-ai marks a tool `strict` when the tool's schema allows it. vLLM then uses a grammar to
+force the model's tool calls to match the tool schemas. It computes the logged logprobs after the
+grammar has removed the tokens it forbids. A token that the grammar leaves as the only choice is
+logged with a logprob near 0, a probability near 1, even when the model without the grammar gives
+it a low probability. This loop's trainer computes its own logprobs and does not read the logged
+ones. A trainer that compares the two finds the logged logprob higher at those tokens.
 
 ### Resuming after a stop
 
@@ -378,14 +420,14 @@ the started games finished. A game that failed before `glossogen run` printed it
 does not count as started.
 
 **Expect a few retried requests.** Modal answers HTTP 303 to a request that has run for 150
-seconds. GlossoGen then sends the request again, up to 3 attempts, and then restarts the agent's
-turn. In one step of our runs, 8 of 2,156 requests got a 303, and every game finished. An
+seconds. GlossoGen tries the request up to 3 times. If all 3 attempts fail, it starts a
+new turn. In one step of our runs, 8 of 2,156 requests got a 303, and every game finished. An
 answer that takes more than 150 seconds to generate never reaches the batch.
 
 ## Where to go next
 
 - [Running simulations](running-simulations.md#self-hosted-and-local-models) explains
-  `record_token_ids` and the self-hosted provider.
+  the self-hosted provider.
 - [Reading runs from code](reading-runs-from-code.md) covers the event log, which
   `signal_game_rewards.py` reads.
 - [modal/grpo/README.md](../modal/grpo/README.md) lists the files and how to run their tests.

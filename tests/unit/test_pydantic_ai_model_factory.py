@@ -279,7 +279,8 @@ def test_a_probe_of_a_self_hosted_agent_carries_the_run_and_agent_headers() -> N
 
 
 def test_recording_token_ids_asks_for_them_and_keeps_the_runs_extra_body() -> None:
-    """pydantic-ai replaces ``extra_body`` whole, so the run's own keys have to be carried."""
+    """The settings ask for token ids and logprobs. pydantic-ai replaces ``extra_body`` whole, so
+    the run's own keys have to be carried."""
     template_option: dict[str, JsonValue] = {"chat_template_kwargs": {"enable_thinking": False}}
     settings = agent_model_settings(
         provider=Provider.SELF_HOSTED,
@@ -291,6 +292,7 @@ def test_recording_token_ids_asks_for_them_and_keeps_the_runs_extra_body() -> No
     )
 
     assert settings.get("extra_body") == {**template_option, RETURN_TOKEN_IDS_OPTION: True}
+    assert settings.get("openai_logprobs") is True
 
 
 @pytest.mark.parametrize(
@@ -305,6 +307,7 @@ def test_token_ids_are_asked_for_only_from_a_self_hosted_model_with_the_knob_on(
     )
 
     assert "extra_body" not in settings
+    assert "openai_logprobs" not in settings
 
 
 @pytest.mark.parametrize("value", ["extreme", 3])
