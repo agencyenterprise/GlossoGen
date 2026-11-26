@@ -1,4 +1,4 @@
-"""Agent trajectories as an Inspect-format log, the file that Docent's Upload Runs dialog imports.
+"""Agent trajectories as an Inspect-format log, which Docent imports with Upload Inspect Log.
 
 Each ATIF trajectory becomes one sample, and each sample holds one agent's messages
 in Inspect's chat message shape. The log holds the fields that Docent's Inspect

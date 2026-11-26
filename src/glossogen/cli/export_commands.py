@@ -233,8 +233,8 @@ def add_export_atif_parser(subparsers: SubcommandParsers, scenario_names: list[s
         required=True,
         help=(
             "atif writes one <agent_id>.json ATIF file per agent. inspect writes one "
-            f"{INSPECT_LOG_FILE_NAME} with one sample per agent, which Docent's Upload Runs "
-            "dialog imports."
+            f"{INSPECT_LOG_FILE_NAME} with one sample per agent, which Docent imports "
+            "with Add Data > Upload Inspect Log."
         ),
     )
     export_atif_parser.add_argument(

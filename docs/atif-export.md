@@ -29,7 +29,7 @@ written to the run directory.
 ## The Inspect format
 
 `--format inspect` writes the same trajectories as one Inspect-format log, which
-[Docent](docent.md)'s Upload Runs dialog imports. Each trajectory becomes one
+[Docent](docent.md) imports with **Add Data** > **Upload Inspect Log**. Each trajectory becomes one
 sample, and each step becomes one or more chat messages:
 
 | ATIF | Inspect message |

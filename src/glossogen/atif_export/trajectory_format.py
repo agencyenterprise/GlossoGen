@@ -7,7 +7,8 @@ class TrajectoryFormat(str, Enum):
     """The file format of an agent trajectory export.
 
     ``ATIF`` writes one ATIF document per agent. ``INSPECT`` writes one Inspect-format
-    log with one sample per agent, the file that Docent's Upload Runs dialog imports.
+    log with one sample per agent, the file that Docent imports
+    with Add Data > Upload Inspect Log.
     """
 
     ATIF = "atif"

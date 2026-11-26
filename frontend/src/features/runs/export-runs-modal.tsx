@@ -43,7 +43,7 @@ const TRAJECTORY_CHOICES: Array<{
   {
     format: "inspect",
     title: "Inspect log for Docent",
-    detail: "One inspect_log.json for all the runs, for Docent's Upload Runs dialog",
+    detail: "One inspect_log.json for all the runs, for Docent's Upload Inspect Log",
   },
   { format: null, title: "None", detail: "" },
 ];

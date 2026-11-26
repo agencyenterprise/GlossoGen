@@ -9728,7 +9728,7 @@
           "inspect"
         ],
         "title": "TrajectoryFormat",
-        "description": "The file format of an agent trajectory export.\n\n``ATIF`` writes one ATIF document per agent. ``INSPECT`` writes one Inspect-format\nlog with one sample per agent, the file that Docent's Upload Runs dialog imports."
+        "description": "The file format of an agent trajectory export.\n\n``ATIF`` writes one ATIF document per agent. ``INSPECT`` writes one Inspect-format\nlog with one sample per agent, the file that Docent imports\nwith Add Data > Upload Inspect Log."
       },
       "UnrecognizedEventEntry": {
         "properties": {
