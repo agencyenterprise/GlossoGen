@@ -16,9 +16,9 @@ the commit log.
   request of a self-hosted agent asks the server for `logprobs` as well as
   `return_token_ids`, and each `llm_response_received` event holds
   `token_logprobs`, one value per id in `token_ids`. A response that carries
-  token ids without one logprob per answer token raises `TokenLogprobsMismatch`,
-  which fails the agent's run cycle; the runner logs `agent_run_cycle_failed`
-  and starts the cycle again. `glossogen.run_storage.recorded_token_ids`
+  token ids without one logprob per answer token raises `TokenLogprobsMismatch`.
+  The runner sends the request again, up to 3 times in all, and then logs
+  `agent_run_cycle_failed` and starts a new run cycle. `glossogen.run_storage.recorded_token_ids`
   returns the logprobs as `RecordedTokenIds.token_logprobs`, a new field, which
   is None for an event that holds token ids without logprobs. See
   [Running simulations](docs/running-simulations.md).

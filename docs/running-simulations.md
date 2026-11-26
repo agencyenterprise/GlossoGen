@@ -215,8 +215,9 @@ token in the run's own event log, with no proxy. Each request of a self-hosted a
 then asks the server for `return_token_ids` and `logprobs`, and each
 `llm_response_received` event holds the ids and logprobs that the server returned.
 A response that carries token ids without one logprob per answer token fails the
-agent's run cycle: the runner logs `agent_run_cycle_failed` and starts the cycle
-again. The knob has no effect on agents under other providers, and the server has
+request. The runner sends it again, up to 3 times in all. Then it logs
+`agent_run_cycle_failed` and starts a new run cycle, and the failed cycle counts
+toward the agent's turn limit. The knob has no effect on agents under other providers, and the server has
 to support both options, as vLLM does.
 
 ```bash
@@ -235,17 +236,16 @@ fields.
 **Which logprobs vLLM returns.** vLLM's `--logprobs-mode` sets whether logprobs
 are taken before or after temperature and the sampling filters. The default,
 `raw_logprobs`, takes them before. With temperature 1
-and no top-k, top-p, min-p or penalties, the two are the same.
+and no top-k, top-p, min-p or penalties, the logprobs before and after them are
+the same.
 
-**Forced tokens log a logprob near 0.** A constraint that the server applies while
-sampling is part of the distribution that the logprobs come from. pydantic-ai marks
-a tool `strict` when its schema allows it, and when a request holds a strict tool,
-vLLM constrains the model's tool calls with a grammar. In signal_game, `move` and
-`end_round` are strict. In a player's first request, the model alone calls
-`read_notifications` with no argument, and the grammar forces a `wait_for`
-parameter into that call. The first token of the parameter is logged near 0, while
-the model scored without the grammar gives it about −8. A trainer that compares
-these logprobs with its own sees the difference at such tokens.
+**A forced token is logged with a logprob near 0.** pydantic-ai marks a tool
+`strict` when its schema allows it, and vLLM then constrains the model's tool calls
+with a grammar. The logprobs come from the distribution after that constraint. So
+a token that the grammar forces is logged near 0, while the same server, scoring
+the same prompt and answer without the grammar, can give it a much lower logprob.
+A trainer that compares these logprobs with its own sees the difference at such
+tokens.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server

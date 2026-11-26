@@ -99,17 +99,17 @@ class BaseKnobs(BaseModel):
     each request and answer, with vLLM's ``return_token_ids`` request option,
     and for the logprob of each answer token, with the ``logprobs`` option. It
     logs both on each ``LLMResponseReceived``. A response with token ids but not
-    one logprob per answer token fails the agent's run cycle, and the runner
-    starts the cycle again. vLLM's ``--logprobs-mode`` decides whether the
-    logprobs are taken before or after temperature and the sampling filters, and
-    its default takes them before; with temperature 1 and no top-k, top-p, min-p
-    or penalties the two are the same. A constraint that the server applies
-    while sampling, such as the grammar that vLLM applies to tool calls when a
-    request marks tools ``strict``, as pydantic-ai does for tools whose schema
-    allows it, is part of the distribution that the logprobs come from: a token
-    that the constraint forces is logged with a logprob near 0, though the model
-    alone may give it a much lower one. The knob has no effect on agents under
-    other providers. Off by default, so a run's log does not grow.
+    one logprob per answer token fails the request; the runner sends it again,
+    up to 3 times in all, and then fails the agent's run cycle and starts a new
+    one. vLLM's ``--logprobs-mode`` decides whether the logprobs are taken
+    before or after temperature and the sampling filters, and its default takes
+    them before; with temperature 1 and no top-k, top-p, min-p or penalties, the
+    logprobs before and after them are the same. pydantic-ai marks a tool
+    ``strict`` when its schema allows it, and vLLM then constrains tool calls
+    with a grammar. The logprobs come from the distribution after that
+    constraint, so a token that the grammar forces is logged with a logprob near
+    0. The knob has no effect on agents under other providers. Off by default,
+    so a run's log does not grow.
 
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and
