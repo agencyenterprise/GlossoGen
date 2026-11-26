@@ -31,6 +31,7 @@ from glossogen.runtime.agent_tool_specs import ToolDefinitionLister
 from glossogen.runtime.channel_router import compute_per_channel_join_index
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.game_clock import GameClock, IdleRoundEndCheck, PhaseTimeoutCheck
+from glossogen.runtime.glossogen_build_reader import read_glossogen_build
 from glossogen.runtime.scheduler import RoundBoundaryScheduler
 from glossogen.runtime.simulation_state import SimulationRuntime
 from glossogen.runtime.world_context import RuntimeWorldContext
@@ -428,6 +429,7 @@ class AutonomousSupervisor:
                     channel_ids=[ch.channel_id for ch in channels],
                     scenario_config=self._scenario.get_scenario_config(),
                     provider=self._provider,
+                    glossogen_build=await read_glossogen_build(),
                     round_number=0,
                     timestamp=simulation_start_time,
                 )

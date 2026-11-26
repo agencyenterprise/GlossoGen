@@ -46,7 +46,7 @@ The list groups the top-level packages from the bottom up. It is a grouping, not
 4. **Replay**: `run_replay/`. Rebuilds agent histories and simulation state from a run's log. It imports the groups above, and the runtime uses it for resume and in-run swaps.
 5. **Simulation**: `runtime/`, then `runners/`. The runtime owns the runner interface (`AgentRunner` and the `ToolSpec`s it binds) and imports nothing from `runners/` or `evaluation/`; the entry point hands the supervisor a runner factory. The runner does not import `server/`, `db/` or `cli/`, except `runtime.autonomous_supervisor`, which writes run status through `db.run_registry`.
 6. **Scenarios**: `engine/` and `scenarios/`, on top of the scenario contract and the runtime. Platform code reaches a scenario only through `scenario_contract.catalog`, `scenario_contract.loader` and `scenario_contract.scenario_sources`, which decides what the catalog imports. Nothing outside `scenarios/` imports `glossogen.scenarios.*` except `testing/`, which names concrete scenarios by design.
-7. **After-the-run work**: `evaluation/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, and the exporters (`atif_export/`, `thread_export/`). `evaluation/` imports the scenario contract, the contracts, `llm/` and `run_replay/`, and nothing from `runtime/` or `runners/`.
+7. **After-the-run work**: `evaluation/`, `run_derivation/`, `run_export/`, `run_analysis/`, `dashboards/`, the exporters (`atif_export/`, `thread_export/`), and `agent_skills/`, the Claude Code skills that glossogen ships, which imports nothing from glossogen. `evaluation/` imports the scenario contract, the contracts, `llm/` and `run_replay/`, and nothing from `runtime/` or `runners/`.
 8. **Serving**: `server/`, `db/`, `prod_sync/`. Nothing imports `server/`.
 9. **Entry point**: `cli/`. Nothing but `__main__` imports it.
 
@@ -309,7 +309,7 @@ Every simulation event is serialized as one JSON object per line in a JSONL file
 
 A run is read back with the platform's event types plus those its scenario declares in `event_types()`, discriminated on `event_type`; a line of any other type reads back as an `UnrecognizedEvent` holding the line unchanged (see "Scenario Event Parsing"). The platform's include:
 
-- `simulation_started` — run ID, scenario name, scenario description, channel IDs, scenario config
+- `simulation_started` — run ID, scenario name, scenario description, channel IDs, scenario config, and the glossogen version and commit that wrote the log (`glossogen_build`)
 - `agent_registered` — agent ID, role name, system prompt, channel IDs, tool names, model
 - `agent_connected` — agent ID, role name, model (emitted when an autonomous agent connects)
 - `round_advanced` — new round number, trigger reason (`simulation_start`, `all_agents_idle`, `round_timeout`)
