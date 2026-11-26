@@ -5,18 +5,23 @@ Each training step k:
 1. asks the policy server in grpo_app.py to load adapter k under the model name
    ``<run>-step<k>``;
 2. plays ``--games-per-seed`` signal_game games on each of ``--seeds-per-step`` new seeds, with
-   both players on that model and ``record_token_ids`` on;
+   ``record_token_ids`` on. The policy plays every seat, or every seat but the one that the run's
+   frozen partner plays (partner.py);
 3. scores each player in each round with the reward from signal_game_rewards.py. A player's
    advantage in a round is its score minus the mean score of the same seat (player_a or player_b)
    in the same round, over the seed's finished games;
-4. builds training sequences from the token ids that each finished game logged
-   (token_sequences.py), and sends them to the trainer, which saves adapter k+1;
+4. builds training sequences from the token ids that the policy's seats logged in each finished
+   game (token_sequences.py), and sends them to the trainer, which saves adapter k+1;
 5. appends the step's record to ``<records dir>/<run>/steps.jsonl``.
 
 A game that ends without ``simulation_ended`` is left out of the batch. When a seed has fewer
 than 2 finished games, every answer token of its finished game gets advantage 0. Training stops
 after a step whose KL per marked token is above MAX_KL, or in which fewer than MIN_FINISHED_SHARE
 of the games that started finished.
+
+``init --partner`` gives a run its frozen partner, which the trainer saves in the run's settings
+on the volume. ``train`` reads it from there, and ``eval --partner`` tests an adapter against any
+partner.
 
 Run it from the repository root. docs/rl-training.md gives the commands.
 """
@@ -34,6 +39,8 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from grpo_records import StepMetrics, TrainingSequence
+from partner import Partner, load_partner, partner_labels, self_hosted_urls, trained_seats
+from pydantic import BaseModel
 from signal_game_rewards import GameOutcome, PlayerRound, Reward, game_outcome, player_score
 from token_sequences import game_sequences
 
@@ -42,6 +49,7 @@ from glossogen.models.event import SimulationEvent
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.run_storage.run_labels_file import RUN_LABELS_FILENAME
+from glossogen.scenario_contract.loader import get_scenario_class
 from glossogen.scenario_contract.scenario_sources import (
     load_configured_scenario_catalog_unless_loaded,
 )
@@ -107,15 +115,22 @@ class Batch(NamedTuple):
 
 
 class StepRecord(NamedTuple):
-    """What one training step played and what the trainer measured."""
+    """What one training step played and what the trainer measured.
+
+    ``partner`` is the run's frozen partner, and ``trained_seats`` the seats whose answers
+    trained. ``first_item_by_seat`` splits ``first_item`` by seat.
+    """
 
     step: int
     reward: str
+    partner: Partner | None
+    trained_seats: list[str]
     games: int
     finished: int
     rounds: int
     won: int
     first_item: int
+    first_item_by_seat: dict[str, int]
     player_rounds: int
     won_by_seed: dict[str, list[int]]
     moves_per_player_round: float
@@ -134,15 +149,18 @@ class EvalRecord(NamedTuple):
     """What one adapter scored on the evaluated seeds.
 
     ``won_by_seed`` and ``first_item_by_seed`` hold each finished game's rounds won and
-    first-item finishes, in game order, grouped by seed.
+    first-item finishes, in game order, grouped by seed. ``partner`` is the frozen partner that
+    the adapter played with, and ``first_item_by_seat`` splits ``first_item`` by seat.
     """
 
     step: int
+    partner: Partner | None
     won_by_seed: dict[str, list[int]]
     first_item_by_seed: dict[str, list[int]]
     won: int
     rounds: int
     first_item: int
+    first_item_by_seat: dict[str, int]
     player_rounds: int
 
 
@@ -195,24 +213,58 @@ async def load_adapter(*, settings: LoopSettings, step: int) -> None:
     raise RuntimeError(f"the policy server did not load {name} within {ADAPTER_LOAD_WAIT_SECONDS}s")
 
 
-def seed_config(*, settings: LoopSettings, seed: int) -> Path:
-    """The game config for ``seed``: the base config with its seed replaced, written once."""
-    path = run_folder(settings=settings) / "configs" / f"seed_{seed}.json"
-    if path.exists():
-        return path
-    config = json.loads(settings.game_config.read_text())
+def partner_suffix(*, partner: Partner | None) -> str:
+    """The part of a config or log file name that names the partner, empty without one."""
+    if partner is None:
+        return ""
+    return f"_vs_{partner.label()}"
+
+
+def check_partner_seat(*, partner: Partner, config: dict[str, Any]) -> None:
+    """Refuse a partner whose seat is not one of the scenario's agents."""
+    roles = get_scenario_class(name=SCENARIO).get_agent_roles(knobs=config)
+    seats = sorted(role.agent_id for role in roles)
+    if partner.seat not in seats:
+        raise ValueError(f"the partner's seat {partner.seat} is not one of {seats}")
+
+
+def seed_config_text(*, game_config: Path, seed: int, partner: Partner | None) -> str:
+    """The game config for ``seed``: the base config with its seed, and the partner's override."""
+    config = json.loads(game_config.read_text())
     if config.get("record_token_ids") is not True:
-        raise ValueError(f"{settings.game_config} must set record_token_ids to true")
+        raise ValueError(f"{game_config} must set record_token_ids to true")
+    if config.get("model_overrides"):
+        raise ValueError(f"{game_config} must leave model_overrides empty; --partner names one")
     config["seed"] = seed
+    if partner is not None:
+        check_partner_seat(partner=partner, config=config)
+        override = partner.model_override.model_dump(mode="json", exclude_none=True)
+        config["model_overrides"] = {partner.seat: override}
+    return json.dumps(config, indent=2, sort_keys=True) + "\n"
+
+
+def seed_config(*, settings: LoopSettings, seed: int, partner: Partner | None) -> Path:
+    """The game config for ``seed`` and ``partner``, written once.
+
+    A run keeps its game config: when the file exists and the base config now gives another,
+    this raises.
+    """
+    name = f"seed_{seed}{partner_suffix(partner=partner)}.json"
+    path = run_folder(settings=settings) / "configs" / name
+    text = seed_config_text(game_config=settings.game_config, seed=seed, partner=partner)
+    if path.exists():
+        if path.read_text() != text:
+            raise ValueError(f"{path} differs from the config that {settings.game_config} gives")
+        return path
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+    path.write_text(text)
     return path
 
 
-def game_environment(*, model: str, url: str) -> dict[str, str]:
-    """This process's environment for a game, with ``model`` served at ``url``."""
+def game_environment(*, urls: dict[str, str]) -> dict[str, str]:
+    """This process's environment for a game, with each self-hosted model served at its URL."""
     environment = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
-    environment["SELF_HOSTED_BASE_URLS"] = json.dumps({model: url})
+    environment["SELF_HOSTED_BASE_URLS"] = json.dumps(urls)
     return environment
 
 
@@ -229,20 +281,28 @@ async def wait_for_run_id(*, log_path: Path, process: asyncio.subprocess.Process
 
 
 async def play_game(
-    *, settings: LoopSettings, step: int, seed: int, game: int, url: str, labels: list[str]
+    *,
+    settings: LoopSettings,
+    step: int,
+    seed: int,
+    game: int,
+    urls: dict[str, str],
+    labels: list[str],
+    partner: Partner | None,
 ) -> Game:
-    """Play one game with adapter ``step`` and label its run."""
-    name = f"step{step}_seed{seed}_game{game}"
+    """Play one game with adapter ``step``, and ``partner`` in its seat, and label its run."""
+    name = f"step{step}{partner_suffix(partner=partner)}_seed{seed}_game{game}"
     log_path = run_folder(settings=settings) / "game_logs" / f"{labels[0]}_{name}.log"
     if log_path.exists():
         raise RuntimeError(f"{log_path} exists; not playing that game again")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     model = model_name(run_name=settings.run_name, step=step)
+    config = seed_config(settings=settings, seed=seed, partner=partner)
     command = [
         "uv", "run", "--no-sync", "python", "-m", "glossogen", "run", SCENARIO,
         "--model", model, "--provider", "self-hosted",
         "--runs-dir", str(settings.runs_dir), "--max-agent-turns", str(MAX_AGENT_TURNS),
-        "--config", str(seed_config(settings=settings, seed=seed)),
+        "--config", str(config),
     ]  # fmt: skip
     with log_path.open("w") as log_file:
         process = await asyncio.create_subprocess_exec(
@@ -250,11 +310,12 @@ async def play_game(
             cwd=REPO_ROOT,
             stdout=log_file,
             stderr=asyncio.subprocess.STDOUT,
-            env=game_environment(model=model, url=url),
+            env=game_environment(urls=urls),
         )
         run_id = await wait_for_run_id(log_path=log_path, process=process)
         game_labels = [
             *labels,
+            *partner_labels(partner=partner),
             f"run={settings.run_name}",
             f"step={step}",
             f"seed={seed}",
@@ -273,13 +334,18 @@ async def play_games(
     seeds: list[int],
     games_per_seed: int,
     labels: list[str],
+    partner: Partner | None,
 ) -> list[Game]:
     """Play every game of a step, ``settings.concurrency`` at a time.
 
     Once a game gets a slot, it waits LAUNCH_GAP_SECONDS times its index modulo
     ``settings.concurrency`` before it starts.
     """
-    url = await serve_url(app_name=settings.app_name)
+    urls = self_hosted_urls(
+        policy_model=model_name(run_name=settings.run_name, step=step),
+        url=await serve_url(app_name=settings.app_name),
+        partner=partner,
+    )
     slots = asyncio.Semaphore(settings.concurrency)
     specs = [(seed, game) for game in range(1, games_per_seed + 1) for seed in seeds]
 
@@ -287,7 +353,13 @@ async def play_games(
         async with slots:
             await asyncio.sleep(LAUNCH_GAP_SECONDS * (index % settings.concurrency))
             return await play_game(
-                settings=settings, step=step, seed=seed, game=game, url=url, labels=labels
+                settings=settings,
+                step=step,
+                seed=seed,
+                game=game,
+                urls=urls,
+                labels=labels,
+                partner=partner,
             )
 
     results = await asyncio.gather(
@@ -352,12 +424,17 @@ def step_advantages(*, finished: list[FinishedGame], reward: Reward) -> list[Pla
     ]
 
 
-def batch(*, finished: list[FinishedGame], advantages: list[PlayerRoundAdvantage]) -> Batch:
-    """Every finished game's training sequences, one player at a time."""
+def batch(
+    *,
+    finished: list[FinishedGame],
+    advantages: list[PlayerRoundAdvantage],
+    partner: Partner | None,
+) -> Batch:
+    """The training sequences of every finished game's trained seats, one player at a time."""
     sequences: list[TrainingSequence] = []
     answers = answer_tokens = sequence_tokens = chain_breaks = 0
     for game in finished:
-        for player in game.outcome.players:
+        for player in trained_seats(players=game.outcome.players, partner=partner):
             by_round = {
                 advantage.player_round.round_number: advantage.advantage
                 for advantage in advantages
@@ -403,6 +480,17 @@ def first_item_count(outcome: GameOutcome) -> int:
     return len(outcome.first_item_finishes)
 
 
+def first_item_by_seat(*, finished: list[FinishedGame]) -> dict[str, int]:
+    """The player-rounds that ended on the player's first item, counted for each seat."""
+    counts: dict[str, int] = {}
+    for game in finished:
+        for player in game.outcome.players:
+            counts.setdefault(player, 0)
+        for finish in game.outcome.first_item_finishes:
+            counts[finish.player] += 1
+    return dict(sorted(counts.items()))
+
+
 async def run_step(
     *,
     settings: LoopSettings,
@@ -410,6 +498,7 @@ async def run_step(
     reward: Reward,
     seeds_per_step: int,
     games_per_seed: int,
+    partner: Partner | None,
 ) -> StepRecord:
     """Play, score and train one step. Adapter ``step`` plays, and adapter ``step + 1`` is saved."""
     began = time.monotonic()
@@ -420,23 +509,32 @@ async def run_step(
         seeds=seeds_for(step=step, seeds_per_step=seeds_per_step),
         games_per_seed=games_per_seed,
         labels=[TRAINING_LABEL, f"reward={reward.value}"],
+        partner=partner,
     )
     finished = await finished_games(settings=settings, games=games)
-    built = batch(finished=finished, advantages=step_advantages(finished=finished, reward=reward))
+    built = batch(
+        finished=finished,
+        advantages=step_advantages(finished=finished, reward=reward),
+        partner=partner,
+    )
     played = time.monotonic()
     metrics = await trainer(
         app_name=settings.app_name, run_name=settings.run_name
     ).train_step.remote.aio(step=step + 1, sequences=built.sequences)
     rounds = sum(len(game.outcome.rounds) for game in finished)
     player_rounds = sum(len(game.outcome.rounds) * len(game.outcome.players) for game in finished)
+    seats = sorted({seat for game in finished for seat in game.outcome.players})
     return StepRecord(
         step=step,
         reward=reward.value,
+        partner=partner,
+        trained_seats=list(trained_seats(players=tuple(seats), partner=partner)),
         games=len(games),
         finished=len(finished),
         rounds=rounds,
         won=sum(rounds_won(game.outcome) for game in finished),
         first_item=sum(first_item_count(game.outcome) for game in finished),
+        first_item_by_seat=first_item_by_seat(finished=finished),
         player_rounds=player_rounds,
         won_by_seed=counts_by_seed(finished=finished, count=rounds_won),
         moves_per_player_round=sum(game.outcome.moves for game in finished) / max(1, player_rounds),
@@ -454,11 +552,24 @@ async def run_step(
     )
 
 
-def append_record(*, path: Path, record: dict[str, Any]) -> None:
-    """Append one JSON line to ``path``."""
+def jsonable(value: object) -> object:
+    """``value`` with each NamedTuple in it as a JSON object, and each pydantic model dumped."""
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, tuple) and hasattr(value, "_asdict"):
+        return {key: jsonable(item) for key, item in value._asdict().items()}
+    if isinstance(value, dict):
+        return {key: jsonable(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [jsonable(item) for item in value]
+    return value
+
+
+def append_record(*, path: Path, record: tuple[object, ...]) -> None:
+    """Append one record, a NamedTuple, to ``path`` as one JSON line."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as log:
-        log.write(json.dumps(record) + "\n")
+        log.write(json.dumps(jsonable(record)) + "\n")
 
 
 def print_step(*, record: StepRecord) -> None:
@@ -474,6 +585,21 @@ def print_step(*, record: StepRecord) -> None:
     )
 
 
+async def run_partner(*, settings: LoopSettings) -> Partner | None:
+    """The frozen partner that ``init`` saved in the run's settings on the app's volume."""
+    volume = modal.Volume.from_name(settings.app_name)
+    path = f"runs/{settings.run_name}/settings.json"
+    data = b""
+    async for chunk in volume.read_file.aio(path):
+        data += chunk
+    run_settings = json.loads(data)
+    if "partner" not in run_settings:
+        raise ValueError(f"{path} on {settings.app_name} names no partner, not even null")
+    if run_settings["partner"] is None:
+        return None
+    return Partner.model_validate(run_settings["partner"])
+
+
 async def train(
     *,
     settings: LoopSettings,
@@ -483,12 +609,13 @@ async def train(
     seeds_per_step: int,
     games_per_seed: int,
 ) -> None:
-    """Run training steps ``first_step`` to ``last_step``.
+    """Run training steps ``first_step`` to ``last_step``, with the run's frozen partner.
 
     Stop after a step whose KL is above MAX_KL, or in which fewer than MIN_FINISHED_SHARE of the
     games that started finished.
     """
     load_configured_scenario_catalog_unless_loaded()
+    partner = await run_partner(settings=settings)
     for step in range(first_step, last_step + 1):
         record = await run_step(
             settings=settings,
@@ -496,11 +623,9 @@ async def train(
             reward=reward,
             seeds_per_step=seeds_per_step,
             games_per_seed=games_per_seed,
+            partner=partner,
         )
-        append_record(
-            path=run_folder(settings=settings) / "steps.jsonl",
-            record={**record._asdict(), "trainer": record.trainer._asdict()},
-        )
+        append_record(path=run_folder(settings=settings) / "steps.jsonl", record=record)
         print_step(record=record)
         if record.trainer.kl > MAX_KL:
             print(f"stopping: KL {record.trainer.kl:.4f} is above {MAX_KL}", flush=True)
@@ -511,7 +636,12 @@ async def train(
 
 
 async def evaluate(
-    *, settings: LoopSettings, step: int, games_per_seed: int, seeds: list[int]
+    *,
+    settings: LoopSettings,
+    step: int,
+    games_per_seed: int,
+    seeds: list[int],
+    partner: Partner | None,
 ) -> None:
     """Play adapter ``step`` on the given seeds without training, and record what it scored."""
     load_configured_scenario_catalog_unless_loaded()
@@ -522,21 +652,24 @@ async def evaluate(
         seeds=seeds,
         games_per_seed=games_per_seed,
         labels=[EVAL_LABEL],
+        partner=partner,
     )
     finished = await finished_games(settings=settings, games=games)
     rounds = sum(len(game.outcome.rounds) for game in finished)
     record = EvalRecord(
         step=step,
+        partner=partner,
         won_by_seed=counts_by_seed(finished=finished, count=rounds_won),
         first_item_by_seed=counts_by_seed(finished=finished, count=first_item_count),
         won=sum(rounds_won(game.outcome) for game in finished),
         rounds=rounds,
         first_item=sum(first_item_count(game.outcome) for game in finished),
+        first_item_by_seat=first_item_by_seat(finished=finished),
         player_rounds=sum(
             len(game.outcome.rounds) * len(game.outcome.players) for game in finished
         ),
     )
-    append_record(path=run_folder(settings=settings) / "eval.jsonl", record=record._asdict())
+    append_record(path=run_folder(settings=settings) / "eval.jsonl", record=record)
     print(
         f"eval step {step}: {len(finished)}/{len(games)} games finished, "
         f"won {record.won}/{record.rounds} rounds, "
@@ -545,10 +678,27 @@ async def evaluate(
     )
 
 
-def initialize(*, app_name: str, run_name: str) -> None:
-    """Create the training run on the trainer: adapter step 0 and the run's settings."""
-    adapter = trainer(app_name=app_name, run_name=run_name).initialize.remote()
+def partner_json(*, partner: Partner | None) -> str:
+    """The partner as JSON, ``null`` without one."""
+    if partner is None:
+        return "null"
+    return partner.model_dump_json()
+
+
+def initialize(*, app_name: str, run_name: str, partner: Partner | None) -> None:
+    """Create the training run on the trainer: adapter step 0, and the run's settings with
+    ``partner``."""
+    adapter = trainer(app_name=app_name, run_name=run_name).initialize.remote(
+        partner=partner_json(partner=partner)
+    )
     print(f"step 0 adapter: {adapter}", flush=True)
+
+
+def optional_partner(*, path: Path | None) -> Partner | None:
+    """The partner in the file at ``path``, or None when the command line names no file."""
+    if path is None:
+        return None
+    return load_partner(path=path)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -559,6 +709,10 @@ def parser() -> argparse.ArgumentParser:
         command = commands.add_parser(name)
         command.add_argument("--app", required=True, help="GRPO_APP_NAME of the deployed app")
         command.add_argument("--run", required=True, help="name of the training run")
+    for name in ("init", "eval"):
+        commands.choices[name].add_argument(
+            "--partner", type=Path, help="a partner file: the frozen model of one seat"
+        )
     for name in ("train", "eval"):
         command = commands.choices[name]
         command.add_argument("--runs-dir", required=True, type=Path, help="GlossoGen runs dir")
@@ -584,7 +738,11 @@ def main() -> None:
     """Run the command that the command line names."""
     arguments = parser().parse_args()
     if arguments.command == "init":
-        initialize(app_name=arguments.app, run_name=arguments.run)
+        initialize(
+            app_name=arguments.app,
+            run_name=arguments.run,
+            partner=optional_partner(path=arguments.partner),
+        )
         return
     settings = LoopSettings(
         app_name=arguments.app,
@@ -612,6 +770,7 @@ def main() -> None:
                 step=arguments.step,
                 games_per_seed=arguments.games_per_seed,
                 seeds=arguments.seeds,
+                partner=optional_partner(path=arguments.partner),
             )
         )
 

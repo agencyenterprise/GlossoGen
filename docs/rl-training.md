@@ -55,6 +55,10 @@ A run is one training job, and `--run` names it. `init` saves adapter 0 on the a
 adapter is a small set of weights added to the model, and training changes only the adapter.
 Adapter k is the adapter after k training steps. Adapter 0 leaves the model's outputs unchanged.
 
+To train one seat while the base model plays the other seat, add
+`--partner modal/grpo/base_model_partner.json` to `init`. [A frozen partner](#a-frozen-partner)
+explains partners.
+
 ### 3. Train for ten steps
 
 ```bash
@@ -183,6 +187,35 @@ In step k:
 A game that ends without `simulation_ended` is left out of the batch. When a seed has fewer than 2
 finished games, its answer tokens get advantage 0.
 
+### A frozen partner
+
+A frozen partner is a model that plays one seat of every game and does not train. In a run with a
+partner, the policy plays the other seat, and the loop builds training sequences only from that
+seat's answers. Each seat's advantage is computed as in a run without a partner.
+
+`init --partner FILE` saves the partner in the run's `settings.json` on the volume. `train` reads
+the partner from there, so every step of a run plays the same partner. `eval --partner FILE` tests
+an adapter against a partner. `eval` without `--partner` tests the adapter in both seats.
+
+A partner file is a JSON object with three keys:
+
+| Key | What it holds |
+| --- | --- |
+| `seat` | the seat that the partner plays, `player_a` or `player_b` |
+| `model_override` | the seat's entry in the game config's `model_overrides`: `model`, `provider` and `model_settings` |
+| `base_url` | the `/v1` URL of a self-hosted partner on a server of its own; null for every other partner |
+
+[base_model_partner.json](../modal/grpo/base_model_partner.json) puts the base model in
+`player_b`. The policy server serves the base model under its name, `Qwen/Qwen3.8-27B`, next to
+the adapters, so this partner needs no `base_url`. Another self-hosted model needs a server of its
+own, and its `base_url`. A partner on another provider, such as `anthropic`, needs that
+provider's key in your environment. It also needs `model_settings` in its `model_override`. Without
+them, the partner sends the game config's `agent_model_settings`, and those hold options that only
+vLLM accepts.
+
+The game config passed to the loop must leave `model_overrides` empty. The loop writes the
+partner's entry into each seed's config.
+
 ### The loss
 
 The method is GRPO (group relative policy optimization), and a group is the finished games of one
@@ -224,6 +257,7 @@ steps. `win` has not been tested with this loop.
 | Setting | Where |
 | --- | --- |
 | LoRA rank 32 and alpha 64, learning rate 1e-4, k3 weight 0.02, gradient norm clipped at 1.0 | `SETTINGS` in `grpo_app.py`. The trainer uses the deployed settings. `init` also saves them as `runs/<run>/settings.json` on the volume |
+| The frozen partner | `init --partner`, saved in `runs/<run>/settings.json` on the volume |
 | Seeds per step, games per seed, games at a time | the `train` and `eval` flags |
 | Grid, items, rounds, temperature | the game config, `signal_game_shapes.json` |
 
@@ -231,15 +265,19 @@ steps. `win` has not been tested with this loop.
 
 Each game's event log lands in `--runs-dir`, under `signal_game/`. A training game's labels are
 `grpo`, `reward=<reward>`, `run=<run>`, `step=<k>`, `seed=<seed>` and `game=<n>`. A test game
-has the same labels without `reward=`, and with `grpo_eval` in place of `grpo`. The loop's own
-records are in `<records dir>/<run>/`:
+has the same labels without `reward=`, and with `grpo_eval` in place of `grpo`. A game with a
+partner also has the labels `partner_seat=<seat>` and `partner=<model>`. The loop's own records
+are in `<records dir>/<run>/`:
 
 | Path | What it holds |
 | --- | --- |
-| `steps.jsonl` | one line per training step: the printed counts, the rounds won in each game, and the trainer's metrics |
-| `eval.jsonl` | one line per test: the rounds won and the first-item count of each game, grouped by seed, and the totals |
-| `configs/` | each seed's game config |
+| `steps.jsonl` | one line per training step: the printed counts, the rounds won in each game, the first-item count of each seat, the partner, the seats that trained, and the trainer's metrics |
+| `eval.jsonl` | one line per test: the partner, the rounds won and the first-item count of each game, grouped by seed, the first-item count of each seat, and the totals |
+| `configs/` | each seed's game config. A run keeps its configs: the loop refuses a game config that would change one |
 | `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log` |
+
+With a partner, the names of the seed configs and the game logs also hold `_vs_<seat>-<model>`
+after the step or the seed, such as `seed_45_vs_player_b-Qwen-Qwen3.8-27B.json`.
 
 ### Token ids in the event log
 
@@ -296,10 +334,9 @@ To train on another scenario, write a module like `signal_game_rewards.py`. It r
 events and gives each agent a score in each round. `grpo_loop.py` imports `Reward`,
 `PlayerRound`, `GameOutcome`, `game_outcome` and `player_score` from that module. It reads the
 `GameOutcome` fields `finished`, `players`, `rounds`, `won_rounds`, `first_item_finishes`, `moves`
-and `player_rounds_without_move`. Your module has to provide all of them, or `grpo_loop.py` has
+and `player_rounds_without_move`. Your module has to provide these seven fields, or `grpo_loop.py` has
 to change. Set `SCENARIO` in `grpo_loop.py` to the scenario's name, and pass its config as
-`--game-config`. The policy has to play every agent of the game, because the policy server
-serves one adapter under one name.
+`--game-config`. In a run with a partner, the policy plays the agents in the other seats.
 
 ## Our runs
 

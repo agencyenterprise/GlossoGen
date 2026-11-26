@@ -8,8 +8,9 @@ other volume or Dict.
 ``Trainer`` keeps the model, its LoRA adapter and its optimizer in GPU memory until 20 minutes
 after its last call. When a step's games take longer than that, the next call starts a new
 container.
-``initialize`` saves step 0, an adapter whose B matrices are 0, which leaves the base model's
-outputs unchanged.
+``initialize(partner)`` saves step 0, an adapter whose B matrices are 0, which leaves the base
+model's outputs unchanged. It also saves the run's settings, with its frozen partner, to
+``runs/<run>/settings.json``.
 ``train_step(step, sequences)`` takes one GRPO step from adapter ``step - 1`` and saves adapter
 ``step`` on the volume at ``runs/<run>/adapters/step_<step>/``. A new container resumes from the
 volume.
@@ -17,7 +18,8 @@ volume.
 ``serve`` runs vLLM with LoRA enabled. Its loader thread watches the control Dict. When the key
 ``request`` holds a new id, it reloads the volume and asks vLLM to load the adapter at the
 request's path under the request's name. It then unloads the adapter that it loaded before, and
-writes the outcome under ``result``. The adapter is then playable as a model of that name.
+writes the outcome under ``result``. The adapter is then playable as a model of that name. The
+server also serves the base model, without an adapter, under BASE_MODEL.
 
 Deploy from the repository root:
 
@@ -28,7 +30,7 @@ import logging
 import os
 from pathlib import Path
 
-from grpo_records import GrpoSettings, StepMetrics, TrainingSequence
+from grpo_records import BASE_MODEL, GrpoSettings, StepMetrics, TrainingSequence
 
 import modal
 
@@ -37,7 +39,6 @@ logger = logging.getLogger(__name__)
 HERE = Path(__file__).resolve().parent
 APP_NAME = os.environ["GRPO_APP_NAME"]
 CONTROL_DICT = f"{APP_NAME}-adapters"
-MODEL_NAME = "Qwen/Qwen3.8-27B"
 VOLUME_ROOT = Path("/grpo")
 HF_CACHE = Path("/root/.cache/huggingface")
 VLLM_PORT = 8000
@@ -111,7 +112,7 @@ class Trainer:
 
         self.device = torch.device("cuda")
         base = Qwen3_5ForConditionalGeneration.from_pretrained(
-            snapshot_download(repo_id=MODEL_NAME),
+            snapshot_download(repo_id=BASE_MODEL),
             dtype=torch.bfloat16,
             device_map="cuda",
             attn_implementation="sdpa",
@@ -121,8 +122,11 @@ class Trainer:
         self.loaded_step = -1
 
     @modal.method()
-    def initialize(self) -> str:
-        """Save step 0, the untrained adapter, and the run's settings; refuse a run that exists."""
+    def initialize(self, partner: str) -> str:
+        """Save step 0, the untrained adapter, and the run's settings; refuse a run that exists.
+
+        ``partner`` is the JSON of the run's frozen partner, or ``null`` when every seat trains.
+        """
         import json
 
         from grpo_training import save_state
@@ -132,7 +136,8 @@ class Trainer:
             raise ValueError(f"run {self.run_name} already exists on the volume")
         target = adapter_dir(run_name=self.run_name, step=0)
         save_state(model=self.model, optimizer=self.optimizer, directory=target, metrics=None)
-        (run_dir / "settings.json").write_text(json.dumps(SETTINGS._asdict(), indent=1) + "\n")
+        run_settings = {**SETTINGS._asdict(), "partner": json.loads(partner)}
+        (run_dir / "settings.json").write_text(json.dumps(run_settings, indent=1) + "\n")
         grpo_volume.commit()
         self.loaded_step = 0
         return str(target)
@@ -312,7 +317,7 @@ def serve() -> None:
     command = [
         "vllm",
         "serve",
-        MODEL_NAME,
+        BASE_MODEL,
         "--host",
         "0.0.0.0",
         "--port",

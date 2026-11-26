@@ -12,6 +12,19 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL loop can train one seat against a frozen partner.** A frozen partner
+  is a model that plays one seat of every game and does not train. In
+  `modal/grpo/`, `grpo_loop.py init --partner FILE` saves the partner in the
+  run's `settings.json` on the volume, and `train` plays it in every step. The
+  loop builds training sequences only from the other seat's answers. `eval
+  --partner FILE` tests an adapter against a partner. The partner is the base
+  model on the policy server, another self-hosted model, or a model of another
+  provider. `base_model_partner.json` puts the base model in `player_b`. Each
+  line of `steps.jsonl` and `eval.jsonl` records the partner and the
+  first-item count of each seat. The loop refuses a game config that would
+  change a seed config that a run already wrote. `pytest modal/grpo/` leaves
+  out the trainer's tests when torch is not installed. See
+  [Training a model with RL](docs/rl-training.md#a-frozen-partner).
 - **`record_token_ids` also records the logprob of each answer token.** Each
   request of a self-hosted agent asks the server for `logprobs` as well as
   `return_token_ids`, and each `llm_response_received` event holds

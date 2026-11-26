@@ -6,6 +6,10 @@ container. It imports nothing outside the standard library, so the loop needs no
 
 from typing import NamedTuple
 
+BASE_MODEL = "Qwen/Qwen3.8-27B"
+"""The model that the trainer adapts. The policy server also serves it, unadapted, under this
+name."""
+
 
 class GrpoSettings(NamedTuple):
     """The trainer's settings, fixed for a whole training run."""
