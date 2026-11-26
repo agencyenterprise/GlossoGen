@@ -16,7 +16,7 @@
         <link rel="prev" href="../exporting-runs/">
       
       
-        <link rel="next" href="../analysis/">
+        <link rel="next" href="../docent/">
       
       
         
@@ -694,10 +694,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#other-ways-to-get-it" class="md-nav__link">
+  <a href="#other-ways-to-get-atif" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Other ways to get it
+        Other ways to get ATIF
       
     </span>
   </a>
@@ -771,6 +771,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-inspect-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Inspect format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -785,6 +796,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Searching runs with Docent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -917,10 +956,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_14" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_15" >
         
           
-          <label class="md-nav__link" for="__nav_4_14" id="__nav_4_14_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_15" id="__nav_4_15_label" tabindex="0">
             
   
   
@@ -938,8 +977,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_14_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_14">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_15">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1491,10 +1530,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#other-ways-to-get-it" class="md-nav__link">
+  <a href="#other-ways-to-get-atif" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Other ways to get it
+        Other ways to get ATIF
       
     </span>
   </a>
@@ -1568,6 +1607,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-inspect-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Inspect format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1601,14 +1651,18 @@
 <h1 id="atif-export">ATIF export<a class="headerlink" href="#atif-export" title="Permanent link">&para;</a></h1>
 <p><code>glossogen export-atif</code> writes a run's agents as
 <a href="https://docs.harborframework.com/agents/atif">ATIF</a> (Agent Trajectory
-Interchange Format) trajectories: one JSON document per agent, holding its
-prompts, responses, tool calls and token usage in a schema other agent tooling
-reads.</p>
+Interchange Format) trajectories, one JSON document per agent, or as one
+<a href="#the-inspect-format">Inspect-format log</a> for Docent. An ATIF trajectory holds the
+agent's prompts, responses, tool calls and token usage in a schema that other agent
+tooling reads.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>glossogen<span class="w"> </span>export-atif<span class="w"> </span>veyru<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--run-dir<span class="w"> </span>./runs/veyru/1782395813<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--out-dir<span class="w"> </span>./atif
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--format<span class="w"> </span>atif<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--out-dir<span class="w"> </span>./atif
 </code></pre></div>
-<p>It logs one line per trajectory written, with its step count.</p>
+<p>With <code>--format atif</code>, it logs one line for each trajectory that it writes, with the
+trajectory's step count. With <code>--format inspect</code>, it logs one line with the number
+of samples.</p>
 <table>
 <thead>
 <tr>
@@ -1622,8 +1676,12 @@ reads.</p>
 <td>the run to export (required)</td>
 </tr>
 <tr>
+<td><code>--format FORMAT</code></td>
+<td><code>atif</code> writes <code>&lt;agent_id&gt;.json</code> per agent; <code>inspect</code> writes one <code>inspect_log.json</code> (required)</td>
+</tr>
+<tr>
 <td><code>--out-dir DIR</code></td>
-<td>where to write <code>&lt;agent_id&gt;.json</code>, created if missing (required)</td>
+<td>where to write the files, created if missing (required)</td>
 </tr>
 <tr>
 <td><code>--agent-id ID</code></td>
@@ -1637,7 +1695,7 @@ reads.</p>
 </table>
 <p>Trajectories are generated from the JSONL event log on each call. Nothing is
 written to the run directory.</p>
-<h2 id="other-ways-to-get-it">Other ways to get it<a class="headerlink" href="#other-ways-to-get-it" title="Permanent link">&para;</a></h2>
+<h2 id="other-ways-to-get-atif">Other ways to get ATIF<a class="headerlink" href="#other-ways-to-get-atif" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1656,17 +1714,23 @@ written to the run directory.</p>
 </tr>
 <tr>
 <td>Raw zip</td>
-<td>the export modal's raw tab (on by default), <code>glossogen export --raw --include-atif</code>, or <code>include_atif</code> on <code>POST .../runs/export/raw</code></td>
+<td>the Export dialog's <strong>Raw run folders</strong> tab (ATIF by default), <code>glossogen export --raw --trajectories atif</code>, or <code>"trajectory_format": "atif"</code> on <code>POST .../runs/export/raw</code>; <code>inspect</code> in place of <code>atif</code> gives the Inspect log</td>
 </tr>
 <tr>
 <td>Single-run zip</td>
 <td>always included in a run's zip download</td>
 </tr>
+<tr>
+<td>Run page</td>
+<td>the <strong>Export Inspect log for Docent</strong> button downloads the run's Inspect log, which <code>GET /api/g/{slug}/runs/{scenario}/{run_dir_name}/export/inspect</code> also serves</td>
+</tr>
 </tbody>
 </table>
-<p>REST and MCP return <code>{"trajectories": [...]}</code> for one agent. The raw zip writes
-every agent of every selected run under <code>atif/</code> in that run's folder, as described
-in <a href="../exporting-runs/#what-the-raw-zip-holds">exporting runs</a>.</p>
+<p>REST and MCP return <code>{"trajectories": [...]}</code> for one agent. With <code>atif</code>, the raw
+zip writes every agent of every selected run under <code>atif/</code> in that run's folder.
+With <code>inspect</code>, it writes one <code>inspect_log.json</code> at the zip root that holds every
+selected run. <a href="../exporting-runs/#what-the-raw-zip-holds">Exporting runs</a> describes
+both.</p>
 <h2 id="how-events-map-to-steps">How events map to steps<a class="headerlink" href="#how-events-map-to-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1709,8 +1773,10 @@ in <a href="../exporting-runs/#what-the-raw-zip-holds">exporting runs</a>.</p>
 <p>Scenario injections, world events and the other agents' channel messages are not
 steps of their own. The model receives them as the results of its
 <code>read_notifications</code> and <code>read_channel</code> calls, and that is where a trajectory
-holds them. Round verdicts and postmortem phases are not part of any trajectory;
-read the event log or the <a href="../exporting-runs/">CSV tables</a> for those.</p>
+holds them. Round verdicts and the start and end of a postmortem phase are not
+steps either. An agent's own postmortem messages appear in its agent steps, as
+<code>send_message</code> calls. Read the event log or the <a href="../exporting-runs/">CSV tables</a> for the verdicts
+and the phases.</p>
 <p>An agent step from the run above, with the tool result cut short:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;step_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span>
@@ -1878,8 +1944,50 @@ exported file against them without adding that package to the project:</p>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s1">Trajectory.model_validate(json.load(open(sys.argv[1])))</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s1">print(&quot;valid&quot;)&#39;</span><span class="w"> </span>./atif/field_observer.json
 </code></pre></div>
+<h2 id="the-inspect-format">The Inspect format<a class="headerlink" href="#the-inspect-format" title="Permanent link">&para;</a></h2>
+<p>Inspect is an evaluation framework, and an Inspect log is its log file.
+<code>glossogen export-atif --format inspect</code> writes the ATIF trajectories as one
+Inspect log, <code>inspect_log.json</code>, which <a href="../docent/">Docent</a> imports with
+<strong>Add Data</strong> &gt; <strong>Upload Inspect Log</strong>. Each trajectory becomes one sample, which
+is Inspect's record of one conversation. Each step becomes one or more chat
+messages:</p>
+<table>
+<thead>
+<tr>
+<th>ATIF step</th>
+<th>Inspect message</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>system</code> step</td>
+<td>a <code>system</code> message</td>
+</tr>
+<tr>
+<td><code>user</code> step</td>
+<td>a <code>user</code> message</td>
+</tr>
+<tr>
+<td><code>agent</code> step</td>
+<td>an <code>assistant</code> message with the reasoning, the text and the tool calls</td>
+</tr>
+<tr>
+<td>each observation result</td>
+<td>a <code>tool</code> message with the call's id and its function name</td>
+</tr>
+</tbody>
+</table>
+<p>A sample's metadata holds the run id, the scenario, the agent id, the model, the
+provider, the <a href="#swapped-and-replaced-seats">generation</a> and the scenario config. A
+<code>system</code>, <code>user</code> or <code>assistant</code> message's metadata holds its step id, whether the
+step is <a href="#copied-context">copied context</a>, and the step's <code>extra</code>. A <code>tool</code>
+message's metadata holds only its step id. The log holds only the fields that
+Docent's importer reads, so Inspect's own tools do not open it.</p>
+<p>A run's page in the web UI has an <strong>Export Inspect log for Docent</strong> button, which
+downloads the same log for that one run.</p>
 <h2 id="next">Next<a class="headerlink" href="#next" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../docent/">Searching runs with Docent</a> to load these files into a local Docent and search the run</li>
 <li><a href="../exporting-runs/">Exporting runs</a> for CSV tables and raw run folders</li>
 <li><a href="../evaluation/#exporting-an-agents-thread">Evaluation</a> for an agent's thread as a provider request body</li>
 <li><a href="../mcp-integration/">MCP integration</a> for the other run-browsing tools</li>
@@ -1936,13 +2044,13 @@ exported file against them without adding that package to the project:</p>
         
         
           
-          <a href="../analysis/" class="md-footer__link md-footer__link--next" aria-label="Next: Analysis and dashboards">
+          <a href="../docent/" class="md-footer__link md-footer__link--next" aria-label="Next: Searching runs with Docent">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Analysis and dashboards
+                Searching runs with Docent
               </div>
             </div>
             <div class="md-footer__button md-icon">

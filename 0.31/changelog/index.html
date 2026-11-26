@@ -658,6 +658,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../docent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Searching runs with Docent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../analysis/" class="md-nav__link">
         
   
@@ -778,10 +806,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_14" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_15" >
         
           
-          <label class="md-nav__link" for="__nav_4_14" id="__nav_4_14_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_15" id="__nav_4_15_label" tabindex="0">
             
   
   
@@ -799,8 +827,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_14_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_14">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_15">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2087,6 +2115,18 @@ the commit log.</p>
 <h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Agent trajectories can be exported as an Inspect-format log that Docent
+  imports.</strong> <code>glossogen export-atif --format inspect</code> writes one
+  <code>inspect_log.json</code> with one sample per agent. <code>glossogen export --raw
+  --trajectories inspect</code> writes one such log at the root of the zip, and the log
+  holds every selected run. The Export dialog's <strong>Inspect log for Docent</strong> choice
+  writes the same log. A run's page has an <strong>Export Inspect log for Docent</strong>
+  button, which downloads that run's Inspect log.
+  <a href="../atif-export/#the-inspect-format">ATIF export</a> describes the format.</li>
+<li><strong>A docs page gives the steps to search runs with Docent.</strong>
+  <a href="../docent/">Searching runs with Docent</a> gives the steps to run Docent on
+  your own machine, upload an Inspect log in its web UI, and search the runs with a
+  rubric.</li>
 <li><strong>Claude Code can analyze a group of runs with the <code>analyze-runs</code> skill.</strong>
   <code>glossogen install-skill</code> copies the skill into a project's <code>.claude/skills/</code>,
   and this repository links it there. The skill has Claude check the runs
@@ -2202,6 +2242,11 @@ the commit log.</p>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking for scripts that call the export: <code>glossogen export-atif</code> needs
+  <code>--format atif</code> or <code>--format inspect</code>.</strong> <code>POST .../runs/export/raw</code> takes
+  <code>trajectory_format</code> (<code>"atif"</code>, <code>"inspect"</code> or <code>null</code>) in place of
+  <code>include_atif</code>, and <code>glossogen export --raw</code> takes <code>--trajectories atif</code> or
+  <code>--trajectories inspect</code> in place of <code>--include-atif</code>.</li>
 <li><code>AutonomousSupervisor</code> takes <code>list_offered_tool_definitions</code> in place of
   <code>list_tool_definitions</code>. The argument's type is <code>ToolDefinitionLister</code>, in
   <code>glossogen.runtime.agent_tool_specs</code>. A <code>ToolDefinitionLister</code> takes
@@ -3333,7 +3378,7 @@ the commit log.</p>
   a checkout. <code>python-dotenv</code> locates the file relative to the module that calls
   it, which lands in <code>site-packages</code> once glossogen is a dependency, so a
   project's own <code>.env</code> was ignored and its <code>ANTHROPIC_API_KEY</code> with it. Nothing
-  reported this: the key was simply absent and the run failed later against the
+  reported this: the key was absent and the run failed later against the
   provider.</li>
 </ul>
 <h2 id="v013">v0.1.3<a class="headerlink" href="#v013" title="Permanent link">&para;</a></h2>

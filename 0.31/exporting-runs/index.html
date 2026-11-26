@@ -875,6 +875,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../docent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Searching runs with Docent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../analysis/" class="md-nav__link">
         
   
@@ -995,10 +1023,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_14" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_15" >
         
           
-          <label class="md-nav__link" for="__nav_4_14" id="__nav_4_14_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_15" id="__nav_4_15_label" tabindex="0">
             
   
   
@@ -1016,8 +1044,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_14_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_14">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_15">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2134,8 +2162,8 @@ covers runs that were never evaluated and runs still in progress.</p>
 <td>keep debug and stdout logs in that zip</td>
 </tr>
 <tr>
-<td><code>--include-atif</code></td>
-<td>with <code>--raw</code>, add each agent's <a href="../atif-export/">ATIF trajectory</a> to that zip</td>
+<td><code>--trajectories FORMAT</code></td>
+<td>with <code>--raw</code>, add the agents' <a href="../atif-export/">trajectories</a> to that zip: <code>atif</code> or <code>inspect</code></td>
 </tr>
 <tr>
 <td><code>--max-runs N</code></td>
@@ -2245,10 +2273,45 @@ event log. <code>--include-logs</code> or the Export dialog's checkbox puts them
 in flight, so a re-imported run carrying them reads as still running.
 <code>run_summary_cache.json</code> is always left out too, since it names no run and an
 importing server would trust it for the wrong one.</p>
-<p>An <code>atif/</code> folder in each run holds one <a href="../atif-export/">ATIF trajectory</a> per
-agent, generated from the event log while the zip is written. The Export dialog's ATIF
-checkbox starts ticked. The CLI adds it with <code>--include-atif</code>, and the REST body
-with <code>include_atif</code>. A single run's zip download always includes it.</p>
+<p>The zip can also hold the agents' <a href="../atif-export/">trajectories</a>, generated from
+each event log while the zip is written. The Export dialog's <strong>Agent
+trajectories</strong> choice, the CLI's <code>--trajectories</code> flag and the REST body's
+<code>trajectory_format</code> field set their format. The REST field is required:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>CLI</th>
+<th>REST <code>trajectory_format</code></th>
+<th>What the zip holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ATIF, the dialog's default</td>
+<td><code>--trajectories atif</code></td>
+<td><code>"atif"</code></td>
+<td>an <code>atif/</code> folder in each run, with one ATIF file per agent</td>
+</tr>
+<tr>
+<td>Inspect log for <a href="../docent/">Docent</a></td>
+<td><code>--trajectories inspect</code></td>
+<td><code>"inspect"</code></td>
+<td>one <a href="../atif-export/#the-inspect-format">Inspect log</a>, <code>inspect_log.json</code>, at the zip root, with one sample per agent generation of every run</td>
+</tr>
+<tr>
+<td>None</td>
+<td>no flag</td>
+<td><code>null</code></td>
+<td>no trajectories</td>
+</tr>
+</tbody>
+</table>
+<p>A run whose event log does not parse is archived without trajectories, so it adds
+no <code>atif/</code> folder and no samples. A single run's zip download includes the <code>atif/</code>
+folder. A run's page also has an <strong>Export Inspect log for Docent</strong> button, which
+downloads that run's Inspect log as one JSON file. For a run whose event log is
+missing or does not parse, the button downloads nothing and shows an error.</p>
 <p>A run still being written is safe to export. Members are streamed into the
 archive rather than pre-declaring a size, so a JSONL that grows mid-read does not
 corrupt its entry.</p>
