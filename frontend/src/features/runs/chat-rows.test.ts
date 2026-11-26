@@ -19,6 +19,7 @@ function messages(count: number) {
     [],
     {},
     {},
+    {},
     {}
   );
 }

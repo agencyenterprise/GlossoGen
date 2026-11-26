@@ -18,6 +18,7 @@ import {
   judgeMetadataFromExtras,
   mergeEntries,
   notificationDisplaysByCallId,
+  toolCaptionsByCallId,
 } from "./display-entry";
 import { LabelBadges } from "./eval-label-group";
 import { EvalPanel } from "./eval-panel";
@@ -90,6 +91,7 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
       run.unrecognized_events,
       judgeMetadataByCallId,
       toolMetadataByCallId,
+      toolCaptionsByCallId(run.tool_use, scenarioPlugin),
       notificationDisplaysByCallId(run.tool_use, scenarioPlugin)
     );
   }, [

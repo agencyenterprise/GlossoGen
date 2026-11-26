@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { components } from "@/types/api.gen";
 import { parseNotificationResult, TOOL_NAME_READ_NOTIFICATIONS } from "./notification-display";
-import type { ScenarioExtras, ScenarioPlugin } from "./scenario-plugin";
+import type { ScenarioExtras, ScenarioPlugin, ToolCaption } from "./scenario-plugin";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
@@ -79,6 +79,9 @@ export interface DisplayEntry {
    *  the scenario plug-in's ``renderToolMetadata`` hook. Null for tools and
    *  scenarios with nothing to add (e.g. the container-yard move verdict). */
   tool_metadata: ReactNode;
+  /** The tool-call argument shown under the collapsed row, from the scenario
+   *  plug-in's ``toolCaption`` hook. Null when the plug-in shows none. */
+  tool_caption: ToolCaption | null;
   /** The scenario plug-in's rendering of a notification result entry, from its
    *  ``renderNotification`` hook. Null when the platform chip renders it. */
   notification_display: ReactNode;
@@ -108,6 +111,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   paired_message_id: "",
   judge_metadata: null as JudgeGroundTruthMetadata | null,
   tool_metadata: null as ReactNode,
+  tool_caption: null as ToolCaption | null,
   notification_display: null as ReactNode,
   error_type: "",
   cycle: 0,
@@ -125,6 +129,8 @@ const EMPTY_ENTRY_DEFAULTS = {
  *  keyed by tool ``call_id`` (empty for scenarios/tools with nothing to add).
  *  Both are plumbed in by the run-detail page from
  *  ``RunDetailResponse.scenario_extras`` and the live SSE stream.
+ *  ``toolCaptionByCallId`` carries the plug-in's caption for each tool call,
+ *  from ``toolCaptionsByCallId``.
  *  ``notificationDisplayByCallId`` carries the plug-in's rendering of each
  *  ``read_notifications`` result it chose to render, from
  *  ``notificationDisplaysByCallId``. */
@@ -136,6 +142,7 @@ export function mergeEntries(
   unrecognizedEvents: UnrecognizedEventEntry[],
   judgeMetadataByCallId: Record<string, JudgeGroundTruthMetadata>,
   toolMetadataByCallId: Record<string, ReactNode>,
+  toolCaptionByCallId: Record<string, ToolCaption>,
   notificationDisplayByCallId: Record<string, ReactNode>
 ): DisplayEntry[] {
   const channelEntries: DisplayEntry[] = messages.map(m => ({
@@ -216,6 +223,7 @@ export function mergeEntries(
       paired_message_id: split ? resultMessageId : "",
       judge_metadata: judgeMetadataByCallId[t.call_id] ?? null,
       tool_metadata: toolMetadataByCallId[t.call_id] ?? null,
+      tool_caption: toolCaptionByCallId[t.call_id] ?? null,
     });
     if (split && t.result_timestamp !== null) {
       toolEntries.push({
@@ -263,6 +271,25 @@ export function mergeEntries(
     if (ts !== 0) return ts;
     return sortRank(a) - sortRank(b);
   });
+}
+
+/** The scenario plug-in's caption for each tool call that has one, keyed by
+ *  ``call_id``. */
+export function toolCaptionsByCallId(
+  toolUse: ToolUseEntry[],
+  scenarioPlugin: ScenarioPlugin
+): Record<string, ToolCaption> {
+  const out: Record<string, ToolCaption> = {};
+  for (const t of toolUse) {
+    const caption = scenarioPlugin.toolCaption({
+      toolName: t.tool_name,
+      toolArguments: t.arguments,
+    });
+    if (caption !== null) {
+      out[t.call_id] = caption;
+    }
+  }
+  return out;
 }
 
 /** The scenario plug-in's rendering of each ``read_notifications`` result it

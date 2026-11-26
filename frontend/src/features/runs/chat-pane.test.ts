@@ -148,6 +148,7 @@ function props(count: number): ComponentProps<typeof ChatPane> {
     [],
     {},
     {},
+    {},
     {}
   );
   return {
@@ -425,6 +426,7 @@ describe("unrecognized events", () => {
           payload: { event_id: "gone-1", event_type: "gone_board_dealt", board: [[1, 2]] },
         },
       ],
+      {},
       {},
       {},
       {}

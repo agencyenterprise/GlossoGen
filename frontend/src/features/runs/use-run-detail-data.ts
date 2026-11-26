@@ -12,6 +12,7 @@ import {
   judgeMetadataFromExtras,
   mergeEntries,
   notificationDisplaysByCallId,
+  toolCaptionsByCallId,
 } from "./display-entry";
 import type { ScenarioPlugin } from "./scenario-plugin";
 
@@ -298,6 +299,7 @@ export function useRunDetailData({
       restData?.unrecognized_events ?? [],
       judgeMetadataByCallId,
       toolMetadataByCallId,
+      toolCaptionsByCallId(allToolUse, scenarioPlugin),
       notificationDisplaysByCallId(allToolUse, scenarioPlugin)
     );
   }, [

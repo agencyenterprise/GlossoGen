@@ -90,6 +90,7 @@ export const veyruPlugin: ScenarioPlugin = {
   RoundDetailPanel: VeyruRoundDetailPanel,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: {
     sseEventNames: ["veyru_stabilization_judged"],
     judgedToolNames: ["stabilize_veyru"],

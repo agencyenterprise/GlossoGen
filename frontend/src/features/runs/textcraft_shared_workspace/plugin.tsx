@@ -33,6 +33,7 @@ export const textcraftSharedWorkspacePlugin: ScenarioPlugin = {
   RoundDetailPanel: null,
   renderToolMetadata: () => null,
   summarizeToolVerdict: () => null,
+  toolCaption: () => null,
   liveJudge: null,
   getTimelineMarkers: () => [],
   classifyRoundTrigger: classifyWorkspaceTrigger,
