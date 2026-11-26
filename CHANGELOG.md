@@ -12,6 +12,17 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **The RL loop's `train` resumes a stopped run by itself.** `grpo_loop.py
+  train` starts with the step after the last one that `steps.jsonl` records,
+  and takes no `--first-step`. The loop enters each game whose `glossogen run`
+  exited in `games.jsonl`, and a step that stopped partway reuses those games.
+  A game that a stop cut off moves to `game_logs/abandoned/`, its run gets the
+  label `abandoned`, and the loop plays it again. The loop refuses a resumed
+  step whose ended games another adapter played. A cancelled game stops its
+  `glossogen run`. `test_grpo_steps.py` stops runs while a game plays and
+  after the trainer saved a step, and checks that the resumed runs train each
+  game once. See
+  [Training a model with RL](docs/rl-training.md#resuming-after-a-stop).
 - **The RL loop can play a step's games while the trainer trains the step
   before.** With `grpo_loop.py train --overlap`, step k's games play with
   adapter k−1 while the trainer trains step k−1, and the importance ratio

@@ -4,6 +4,9 @@ A game set is every game of one training step, or of one test of an adapter. Its
 ``loop.settings.concurrency`` at a time. Once a game gets a slot, it waits LAUNCH_GAP_SECONDS
 times its index modulo the concurrency before it starts. A game that fails to start or to run
 is printed and left out of the set's games.
+
+Each game that ends is entered in the run's ledger (game_ledger.py). Playing a set again reuses
+the games that the ledger holds, so a step that stopped partway plays only its other games.
 """
 
 import asyncio
@@ -12,6 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from game_ledger import GameKey, abandon, read_ledger, record_game
 from loop_services import (
     SCENARIO,
     Game,
@@ -100,15 +104,19 @@ def seed_config(*, settings: LoopSettings, seed: int, partner: Partner | None) -
     return path
 
 
-def game_log_path(*, settings: LoopSettings, game_set: GameSet, seed: int, game: int) -> Path:
+def game_set_name(*, game_set: GameSet) -> str:
+    """The set's name in its games' log file names and in the ledger."""
+    return f"{game_set.label}_step{game_set.step}{partner_suffix(partner=game_set.partner)}"
+
+
+def game_log_path(*, settings: LoopSettings, name: str, seed: int, game: int) -> Path:
     """The file that takes the terminal output of one game's ``glossogen run``."""
-    suffix = partner_suffix(partner=game_set.partner)
-    name = f"{game_set.label}_step{game_set.step}{suffix}_seed{seed}_game{game}.log"
-    return run_folder(settings=settings) / "game_logs" / name
+    return run_folder(settings=settings) / "game_logs" / f"{name}_seed{seed}_game{game}.log"
 
 
 def game_specs(*, settings: LoopSettings, game_set: GameSet, url: str) -> list[GameSpec]:
     """Every game of the set, game 1 of each seed first."""
+    name = game_set_name(game_set=game_set)
     urls = self_hosted_urls(
         policy_model=model_name(run_name=settings.run_name, step=game_set.adapter),
         url=url,
@@ -128,35 +136,49 @@ def game_specs(*, settings: LoopSettings, game_set: GameSet, url: str) -> list[G
             ]
             specs.append(
                 GameSpec(
+                    game_set=name,
                     seed=seed,
                     game=game,
                     adapter=game_set.adapter,
                     config=seed_config(settings=settings, seed=seed, partner=game_set.partner),
                     labels=labels,
-                    log_path=game_log_path(
-                        settings=settings, game_set=game_set, seed=seed, game=game
-                    ),
+                    log_path=game_log_path(settings=settings, name=name, seed=seed, game=game),
                     urls=urls,
                 )
             )
     return specs
 
 
+def ended_game(*, spec: GameSpec, ended: dict[GameKey, Game]) -> Game | None:
+    """The game that the ledger holds for ``spec``, or None.
+
+    Raises when another adapter played it, as when a run resumes with another ``--overlap``.
+    """
+    game = ended.get(GameKey(game_set=spec.game_set, seed=spec.seed, game=spec.game))
+    if game is None:
+        return None
+    if game.adapter != spec.adapter:
+        raise ValueError(
+            f"{spec.log_path.name} was played by adapter {game.adapter}, "
+            f"and this call plays adapter {spec.adapter}"
+        )
+    return game
+
+
 async def play_spec(*, loop: Loop, spec: GameSpec) -> Game:
-    """Play one game; refuse a game whose log the loop already holds."""
+    """Play one game and enter it in the ledger. The log of an earlier attempt that a stop cut
+    off is moved aside first."""
     if spec.log_path.exists():
-        raise RuntimeError(f"{spec.log_path} exists; not playing that game again")
+        abandon(settings=loop.settings, log_path=spec.log_path)
     spec.log_path.parent.mkdir(parents=True, exist_ok=True)
-    return await loop.launcher.play(spec=spec)
+    game = await loop.launcher.play(spec=spec)
+    record_game(settings=loop.settings, game_set=spec.game_set, game=game)
+    return game
 
 
-async def play_game_set(*, loop: Loop, game_set: GameSet) -> PlayedGames:
-    """Play every game of the set, ``loop.settings.concurrency`` at a time."""
-    began = time.monotonic()
+async def play_specs(*, loop: Loop, specs: list[GameSpec]) -> list[Game]:
+    """Play the games, ``loop.settings.concurrency`` at a time; leave out the ones that fail."""
     concurrency = loop.settings.concurrency
-    specs = game_specs(
-        settings=loop.settings, game_set=game_set, url=await loop.backend.serve_url()
-    )
     slots = asyncio.Semaphore(concurrency)
 
     async def guarded(index: int, spec: GameSpec) -> Game:
@@ -174,4 +196,26 @@ async def play_game_set(*, loop: Loop, game_set: GameSet) -> PlayedGames:
             games.append(result)
         else:
             print(f"a game failed to start or to run: {result!r}", flush=True)
-    return PlayedGames(games=games, seconds=time.monotonic() - began)
+    return games
+
+
+async def play_game_set(*, loop: Loop, game_set: GameSet) -> PlayedGames:
+    """Play every game of the set that the ledger does not hold, and reuse the ones it holds."""
+    began = time.monotonic()
+    specs = game_specs(
+        settings=loop.settings, game_set=game_set, url=await loop.backend.serve_url()
+    )
+    ended = read_ledger(settings=loop.settings)
+    reused: list[Game] = []
+    to_play: list[GameSpec] = []
+    for spec in specs:
+        game = ended_game(spec=spec, ended=ended)
+        if game is None:
+            to_play.append(spec)
+        else:
+            reused.append(game)
+    if reused:
+        name = game_set_name(game_set=game_set)
+        print(f"{name}: {len(reused)} games ended before a stop, and the loop reuses them")
+    played = await play_specs(loop=loop, specs=to_play)
+    return PlayedGames(games=[*reused, *played], seconds=time.monotonic() - began)

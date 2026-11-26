@@ -42,6 +42,7 @@ from loop_records import (
     StepRecord,
     append_record,
     eval_record,
+    next_step,
     print_eval,
     print_step,
     step_record,
@@ -212,8 +213,16 @@ async def train_overlapped(*, loop: Loop, plan: StepPlan, first_step: int, last_
         )
 
 
-async def train(*, loop: Loop, plan: StepPlan, first_step: int, last_step: int) -> None:
-    """Run training steps ``first_step`` to ``last_step`` with the run's frozen partner."""
+async def train(*, loop: Loop, plan: StepPlan, last_step: int) -> None:
+    """Run the training steps after the last one that ``steps.jsonl`` records, to ``last_step``.
+
+    A step that stopped partway reuses the games that ended before the stop (game_sets.py).
+    """
+    first_step = next_step(steps_path=run_folder(settings=loop.settings) / "steps.jsonl")
+    if first_step > last_step:
+        print(f"steps.jsonl already records steps 0 to {first_step - 1}", flush=True)
+        return
+    print(f"training steps {first_step} to {last_step}", flush=True)
     if plan.overlap:
         await train_overlapped(loop=loop, plan=plan, first_step=first_step, last_step=last_step)
     else:
@@ -288,7 +297,6 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--game-config", required=True, type=Path, help="signal_game config")
         command.add_argument("--concurrency", required=True, type=int, help="games at a time")
     train_command = commands.choices["train"]
-    train_command.add_argument("--first-step", required=True, type=int)
     train_command.add_argument("--last-step", required=True, type=int)
     train_command.add_argument(
         "--reward", required=True, choices=[reward.value for reward in Reward]
@@ -325,9 +333,7 @@ async def run_train(*, loop: Loop, arguments: argparse.Namespace) -> None:
         partner=await loop.backend.run_partner(),
         overlap=arguments.overlap,
     )
-    await train(
-        loop=loop, plan=plan, first_step=arguments.first_step, last_step=arguments.last_step
-    )
+    await train(loop=loop, plan=plan, last_step=arguments.last_step)
 
 
 def main() -> None:

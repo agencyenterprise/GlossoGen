@@ -66,7 +66,7 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
   --app $GRPO_APP_NAME --run first-item \
   --runs-dir runs --records-dir ~/grpo-records \
   --game-config modal/grpo/signal_game_shapes.json --concurrency 12 \
-  --reward first_item --first-step 0 --last-step 9 \
+  --reward first_item --last-step 9 \
   --seeds-per-step 4 --games-per-seed 6
 ```
 
@@ -76,7 +76,7 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 | `--runs-dir`, `--records-dir` | where GlossoGen writes each game's event log, and where the loop writes its [records](#records) |
 | `--game-config`, `--concurrency` | the signal_game config, and how many games play at once |
 | `--reward` | `first_item` or `win`, from [Rewards](#rewards) |
-| `--first-step`, `--last-step` | the steps to run |
+| `--last-step` | the last step to run. `train` starts with the step after the last one that `steps.jsonl` records, step 0 in a new run |
 | `--seeds-per-step`, `--games-per-seed` | each step plays 6 games on each of 4 seeds, 24 games in all |
 | `--overlap` | optional: each step's games play while the trainer trains the step before, as [Overlapping play and training](#overlapping-play-and-training) explains |
 
@@ -130,13 +130,13 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
   --app $GRPO_APP_NAME --run first-item \
   --runs-dir runs --records-dir ~/grpo-records \
   --game-config modal/grpo/signal_game_shapes.json --concurrency 12 \
-  --reward first_item --first-step 10 --last-step 29 \
+  --reward first_item --last-step 29 \
   --seeds-per-step 4 --games-per-seed 6
 ```
 
 Then run the `eval` command of section 4 once, with `--step 30`, and compare its count with the
-base model's count from section 4, by the same rule. Do not test `--step 0` again: the loop refuses
-to play a game whose log it already holds. `first-item-rep3` trained to step 29 in two `train`
+base model's count from section 4, by the same rule. Do not test `--step 0` again: the loop would
+reuse the games that it played for that test. `first-item-rep3` trained to step 29 in two `train`
 calls, and its steps 10 to 29 took 9.5 hours, 21 to 48 minutes each. Its adapter 30 ended on the
 first item in 632 of 1,440 player-rounds, against 257 for the base model (see
 [Training longer](#training-longer)).
@@ -314,7 +314,8 @@ are in `<records dir>/<run>/`:
 | `steps.jsonl` | one line per training step: the printed counts, the rounds won in each game, the first-item count of each seat, the partner, the seats that trained, and the trainer's metrics |
 | `eval.jsonl` | one line per test: the partner, the rounds won and the first-item count of each game, grouped by seed, the first-item count of each seat, and the totals |
 | `configs/` | each seed's game config. A run keeps its configs: the loop refuses a game config that would change one |
-| `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log` |
+| `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log`, and in `abandoned/` the logs of games that a stop cut off |
+| `games.jsonl` | one line per game whose `glossogen run` exited: its step or test, seed, game number, adapter, run id and exit code |
 
 With a partner, the names of the seed configs and the game logs also hold `_vs_<seat>-<model>`
 after the step or the seed, such as `seed_45_vs_player_b-Qwen-Qwen3.8-27B.json`.
@@ -369,12 +370,28 @@ providers.
 
 ### Resuming after a stop
 
-The adapters are on the volume, at `runs/<run>/adapters/step_<k>/`. To resume, find the highest k
-for which that folder exists, and run `train` with `--first-step k`. The trainer loads adapter k
-from the volume. The loop refuses to play a game whose log is already in `game_logs/`. To run a
-step again after it stopped partway, first move that step's logs out of `game_logs/`. With
-`--overlap`, also move the logs of the step after it.
-`steps.jsonl` then gets a second line for that step.
+To resume a run after `train` stopped, run the same `train` command again. `train` starts with
+the step after the last one that `steps.jsonl` records. The trainer loads the newest adapter from
+the volume, at `runs/<run>/adapters/step_<k>/`.
+
+A step that stopped partway does not play its games again. The loop enters each game in
+`games.jsonl` once its `glossogen run` has exited, and a resumed step reuses those games. A game
+that has a log in `game_logs/` and no line in `games.jsonl` was playing when the loop stopped. The
+loop moves that game's log to `game_logs/abandoned/`, adds the label `abandoned` to its run, and
+plays the game again. With `--overlap`, the next step's games may also have been playing, and the
+loop treats them the same way.
+
+The loop can also stop after the trainer saved adapter k+1 and before it wrote step k's line in
+`steps.jsonl`. The resumed step k then sends the trainer the same games, and the trainer returns
+the metrics that it saved with the adapter. It does not train on those games a second time.
+
+Resume a run with the `--overlap` setting that its stopped step used. The games that ended before
+the stop were played by the adapter that this setting chose, and the loop refuses a step whose
+ended games were played by another adapter.
+
+A `glossogen run` keeps running when its loop is killed with no chance to stop it, as with
+`kill -9`. Stop such processes before you resume, or they play on the policy server next to the
+resumed games.
 
 ### Another scenario
 

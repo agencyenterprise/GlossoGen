@@ -44,13 +44,15 @@ class LoopSettings(NamedTuple):
 
 
 class GameSpec(NamedTuple):
-    """One game to play: its seed, its number within the seed, and the adapter that plays it.
+    """One game to play: its set, its seed, its number within the seed, and the adapter that
+    plays it.
 
     ``config`` is the seed's game config, ``labels`` the run's labels, ``log_path`` the file
     that takes the terminal output of ``glossogen run``, and ``urls`` the self-hosted models'
     ``SELF_HOSTED_BASE_URLS``.
     """
 
+    game_set: str
     seed: int
     game: int
     adapter: int

@@ -134,6 +134,19 @@ def eval_record(*, step: int, partner: Partner | None, finished: list[FinishedGa
     )
 
 
+def next_step(*, steps_path: Path) -> int:
+    """The step after the last one that ``steps.jsonl`` records, or 0 when it records none.
+
+    Raises when the recorded steps are not 0, 1, 2 and so on, each once.
+    """
+    if not steps_path.exists():
+        return 0
+    steps = [json.loads(line)["step"] for line in steps_path.read_text().splitlines()]
+    if steps != list(range(len(steps))):
+        raise ValueError(f"{steps_path} records the steps {steps}, not 0 to {len(steps) - 1}")
+    return len(steps)
+
+
 def jsonable(value: object) -> object:
     """``value`` with each NamedTuple in it as a JSON object, and each pydantic model dumped."""
     if isinstance(value, BaseModel):

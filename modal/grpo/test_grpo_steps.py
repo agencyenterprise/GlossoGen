@@ -6,12 +6,15 @@ policy server, the trainer and the volume are fakes. Run from the repository roo
     VIRTUAL_ENV= uv run --no-sync pytest modal/grpo/test_grpo_steps.py
 """
 
+import asyncio
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
 from adapter_loader import AdapterRequest, LoadedAdapters
+from game_ledger import ABANDONED_LABEL
 from grpo_loop import StepPlan, train
 from grpo_records import BASE_MODEL
 from loop_fakes import SAMPLED_LOGPROB, FakeBackend, FakeVllm, ScriptedGameLauncher
@@ -64,6 +67,8 @@ def loop_on_fakes(
     monkeypatch: pytest.MonkeyPatch,
     partner: Partner | None,
     kl_at: dict[int, float],
+    fail_after_saving: set[int],
+    interrupt: Callable[[GameSpec], bool],
 ) -> LoopUnderTest:
     """A loop whose services are fakes, with its folders under ``tmp_path``."""
     load_configured_scenario_catalog_unless_loaded()
@@ -80,16 +85,32 @@ def loop_on_fakes(
         adapters_dir=tmp_path / "adapters",
         partner=partner,
         kl_at=kl_at,
-        fail_after_saving=set(),
+        fail_after_saving=fail_after_saving,
     )
     launcher = ScriptedGameLauncher(
-        settings=settings, backend=backend, monkeypatch=monkeypatch, interrupt=never_interrupt
+        settings=settings, backend=backend, monkeypatch=monkeypatch, interrupt=interrupt
     )
     return LoopUnderTest(
         loop=Loop(settings=settings, backend=backend, launcher=launcher),
         backend=backend,
         launcher=launcher,
     )
+
+
+def resumed(*, tested: LoopUnderTest, monkeypatch: pytest.MonkeyPatch) -> LoopUnderTest:
+    """The same run in a new loop process: the same folders, app and policy server."""
+    launcher = ScriptedGameLauncher(
+        settings=tested.loop.settings,
+        backend=tested.backend,
+        monkeypatch=monkeypatch,
+        interrupt=never_interrupt,
+    )
+    return tested._replace(loop=tested.loop._replace(launcher=launcher), launcher=launcher)
+
+
+def trained_run_ids(*, tested: LoopUnderTest) -> list[str]:
+    """The run ids of every game that the trainer trained on, in call order."""
+    return [run_id for call in tested.backend.calls for run_id in call.run_ids]
 
 
 def plan(*, partner: Partner | None, overlap: bool) -> StepPlan:
@@ -138,9 +159,16 @@ def test_the_loader_keeps_the_listed_adapters_and_unloads_the_rest() -> None:
 async def test_steps_in_turn_play_their_own_adapter_and_train_on_their_games(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={})
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=never_interrupt,
+    )
 
-    await train(loop=tested.loop, plan=plan(partner=None, overlap=False), first_step=0, last_step=1)
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=False), last_step=1)
 
     assert adapters_by_step(tested=tested) == {0: {0}, 1: {1}}
     assert [call.step for call in tested.backend.calls] == [1, 2]
@@ -161,9 +189,16 @@ async def test_overlapped_steps_play_the_adapter_before_and_keep_it_loaded(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The launcher fails a game whose adapter the policy server does not hold."""
-    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={})
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=never_interrupt,
+    )
 
-    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), first_step=0, last_step=2)
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), last_step=2)
 
     assert adapters_by_step(tested=tested) == {0: {0}, 1: {0}, 2: {1}}
     assert [call.step for call in tested.backend.calls] == [1, 2, 3]
@@ -180,9 +215,16 @@ async def test_overlapped_steps_play_the_adapter_before_and_keep_it_loaded(
 async def test_a_kl_above_the_limit_stops_the_run_and_the_next_steps_games(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=None, kl_at={2: 0.5})
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={2: 0.5},
+        fail_after_saving=set(),
+        interrupt=never_interrupt,
+    )
 
-    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), first_step=0, last_step=3)
+    await train(loop=tested.loop, plan=plan(partner=None, overlap=True), last_step=3)
 
     assert [call.step for call in tested.backend.calls] == [1, 2]
     assert [line["step"] for line in step_lines(tested=tested)] == [0, 1]
@@ -198,11 +240,16 @@ async def test_a_frozen_partner_trains_only_the_other_seat(
         ),
         base_url=None,
     )
-    tested = loop_on_fakes(tmp_path=tmp_path, monkeypatch=monkeypatch, partner=partner, kl_at={})
-
-    await train(
-        loop=tested.loop, plan=plan(partner=partner, overlap=False), first_step=0, last_step=0
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=partner,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=never_interrupt,
     )
+
+    await train(loop=tested.loop, plan=plan(partner=partner, overlap=False), last_step=0)
 
     [line] = step_lines(tested=tested)
     assert line["trained_seats"] == ["player_a"]
@@ -218,3 +265,100 @@ async def test_a_frozen_partner_trains_only_the_other_seat(
         assert f"partner={BASE_MODEL}" in read_run_labels(run_dir=run_dir)
     assert answers["player_b"] > 0
     assert line["answers"] == answers["player_a"]
+
+
+async def test_a_run_stopped_while_a_game_played_resumes_and_trains_each_game_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The loop is cancelled, as Ctrl-C cancels it, while the third game of step 1 plays."""
+    running: list[asyncio.Task[None]] = []
+    cut_off: list[GameSpec] = []
+
+    def stop_at_step_1_game_3(spec: GameSpec) -> bool:
+        started = [game for game in tested.launcher.played if game.adapter == 1]
+        if spec.game_set != "grpo_step1" or len(started) != 2 or cut_off:
+            return False
+        cut_off.append(spec)
+        running[0].cancel()
+        return True
+
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving=set(),
+        interrupt=stop_at_step_1_game_3,
+    )
+    running.append(
+        asyncio.create_task(
+            train(loop=tested.loop, plan=plan(partner=None, overlap=False), last_step=2)
+        )
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await running[0]
+    assert [line["step"] for line in step_lines(tested=tested)] == [0]
+
+    again = resumed(tested=tested, monkeypatch=monkeypatch)
+    await train(loop=again.loop, plan=plan(partner=None, overlap=False), last_step=2)
+
+    lines = step_lines(tested=again)
+    assert [(line["step"], line["finished"]) for line in lines] == [(0, 4), (1, 4), (2, 4)]
+    assert len(again.launcher.played) == 6
+    trained = trained_run_ids(tested=again)
+    assert len(trained) == len(set(trained)) == 12
+    assert [call.run_ids for call in again.backend.calls] == [line["run_ids"] for line in lines]
+    [spec] = cut_off
+    abandoned_log = spec.log_path.parent / "abandoned" / f"{spec.log_path.stem}.0.log"
+    abandoned_run = abandoned_log.read_text().split("=")[1].strip()
+    assert abandoned_run not in trained
+    run_dir = again.loop.settings.runs_dir / abandoned_run
+    assert ABANDONED_LABEL in read_run_labels(run_dir=run_dir)
+
+
+async def test_an_overlapped_run_stopped_after_the_trainer_saved_trains_each_game_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The trainer saves adapter 2 and the loop stops before it records step 1, while step 2's
+    games play."""
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving={2},
+        interrupt=never_interrupt,
+    )
+    with pytest.raises(ExceptionGroup):
+        await train(loop=tested.loop, plan=plan(partner=None, overlap=True), last_step=3)
+    assert [line["step"] for line in step_lines(tested=tested)] == [0]
+
+    again = resumed(tested=tested, monkeypatch=monkeypatch)
+    await train(loop=again.loop, plan=plan(partner=None, overlap=True), last_step=3)
+
+    lines = step_lines(tested=again)
+    assert [(line["step"], line["adapter"]) for line in lines] == [(0, 0), (1, 0), (2, 1), (3, 2)]
+    assert [call.step for call in again.backend.calls] == [1, 2, 3, 4]
+    trained = trained_run_ids(tested=again)
+    assert len(trained) == len(set(trained)) == 16
+    assert sorted(trained) == sorted(run_id for line in lines for run_id in line["run_ids"])
+
+
+async def test_a_resumed_step_refuses_games_that_another_adapter_played(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Step 1's games played adapter 0 under --overlap; without it, step 1 plays adapter 1."""
+    tested = loop_on_fakes(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        partner=None,
+        kl_at={},
+        fail_after_saving={2},
+        interrupt=never_interrupt,
+    )
+    with pytest.raises(ExceptionGroup):
+        await train(loop=tested.loop, plan=plan(partner=None, overlap=True), last_step=3)
+
+    again = resumed(tested=tested, monkeypatch=monkeypatch)
+    with pytest.raises(ValueError, match="was played by adapter 0"):
+        await train(loop=again.loop, plan=plan(partner=None, overlap=False), last_step=3)
