@@ -13,8 +13,9 @@ the commit log.
 
 ### Added
 - **Qwen3.8-27B trains on signal_game with platoon 0.6.0.** `modal/platoon/`
-  is a uv project of its own, because platoon needs huggingface-hub below 2
-  and GlossoGen needs 2.4 or later. Its harness plays one GlossoGen game per
+  is a uv project of its own, because platoon's tinker-cookbook needs a
+  transformers release that needs huggingface-hub below 2, and GlossoGen
+  needs huggingface-hub 2.4 or later. Its harness plays one GlossoGen game per
   platoon episode, with one platoon agent per seat. Its credit estimator,
   `glossogen-round-baseline`, gives each round's answers the seat's score in
   that round minus the seat's mean in that round over the seed's games, and

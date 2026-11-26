@@ -4,8 +4,8 @@ These steps train Qwen3.8-27B by reinforcement learning (RL) on signal_game, wit
 [platoon](https://github.com/ApGa/platoon) 0.6.0 and the code in
 [modal/platoon/](../modal/platoon/README.md). In signal_game, two players each have their own grid
 of squares, and each square holds an item, such as `blue star`. Each player starts a round on a
-square of its own grid and can move to other squares of that grid. The two places in a game are its seats, player_a and
-player_b.
+square of its own grid and can move to other squares of that grid. A game has two seats, player_a
+and player_b, one per player.
 
 Platoon plays the games on your machine, scores them and computes each answer's advantage. It
 sends each batch of answers to a training service that implements the Tinker API, the API of
@@ -90,7 +90,7 @@ are ordinary GlossoGen runs in the repository's `runs/signal_game/`. A training 
 labels `platoon`, `seed=<seed>` and `task=seed-<seed>`, and an evaluation game has `platoon_eval`
 in place of `platoon`.
 
-The console log prints every metric of every step. These say whether training is healthy:
+The console log prints every metric of every step. Check these metrics on each step:
 
 | Metric | What it is |
 | --- | --- |
@@ -100,7 +100,7 @@ The console log prints every metric of every step. These say whether training is
 | `batch/stale_groups` | the groups that the step dropped because their games are too old ([Games that run ahead of training](#games-that-run-ahead-of-training)) |
 | `optim/kl_sample_train_v1` | the KL estimate between the policy that sampled the answers and the policy that trains on them |
 
-A player-round is one player in one round. Set `stats.wandb.mode=online` to log the metrics to
+A player-round is one player in one round. A group is the 6 games of one seed in one step. Set `stats.wandb.mode=online` to log the metrics to
 Weights & Biases as well. That needs `WANDB_API_KEY`.
 
 ### 4. Read the evaluations
@@ -122,8 +122,7 @@ eval step 0: 72 games finished, won <n>/720 rounds, first item <n>/1440 player-r
 
 `first item` counts the player-rounds in which the player ended on its first item, the
 alphabetically first item on its own grid. To check whether a run learned, subtract the count of
-step 0 from the count of step 10. Count a run as learned when the difference is above 40. That
-threshold is rough, as the next paragraph explains.
+step 0 from the count of step 10. Count a run as learned when the difference is above 40.
 
 Two evaluations of the same policy give different counts. The binomial standard deviation treats
 each player-round as an independent draw. For a count near 250 of 1,440, it is about 14, and the
@@ -148,7 +147,7 @@ VIRTUAL_ENV= uv run --no-sync --project ../.. modal app stop $PLATOON_APP_NAME -
 
 The app keeps two H200 GPUs running until you stop it, even when no game is playing. Stopping the
 app keeps the volume, which holds the checkpoints. To resume a run, deploy the app again and run
-the same `platoon train` command. Platoon starts from the newest checkpoint in the run's folder.
+the same `platoon train` command. Platoon starts from the newest checkpoint of the run, on the volume.
 
 ## Other setups
 
@@ -224,8 +223,8 @@ star. So the first item of a grid that holds a blue circle is the blue circle.
 
 ### Credit
 
-A group is the 6 games of one seed in one step. The credit estimator `glossogen-round-baseline`
-gives each answer token an advantage:
+For each group, the credit estimator `glossogen-round-baseline` gives each answer token an
+advantage:
 
 - A call in a span gets the span's reward minus the seat's baseline in that round. The baseline
   is the mean span reward of the same seat in the same round, over the group's games.
@@ -258,14 +257,14 @@ answer was sampled at most 3 versions before the version that trains on it. A gr
 The value 3 is an estimate from game and step times measured over 60 training steps of
 Qwen3.8-27B on this game config, with 12 games at once, under another trainer on one B200 or H200:
 
-- The slowest of a step's 24 games took about 700 seconds on average, and the median game took
-  322 seconds.
+- The slowest of a step's 24 games took about 700 seconds on average. The median of the 1,440
+  games took 308 seconds.
 - Training a batch took about 500 seconds on average.
 
 At most 12 games play at once, so there are 12 game slots. With `train.permit_release: rollout`,
 each slot comes back when its game ends, and the next game starts on it. A group's last game can
 wait about one median game for a slot, and then take as long as the slowest game. So a group's games
-can span about 322 + 700 ≈ 1,000 seconds. At about 500 seconds per step, the policy moves about
+can span about 308 + 700 ≈ 1,000 seconds. At about 500 seconds per step, the policy moves about
 2 versions in that time. The group then waits up to one more step to train: 2 + 1 = 3. The service's step
 time on two H200 GPUs has not been measured. When `batch/stale_groups` is above 0, raise
 `train.max_staleness`.
@@ -306,8 +305,8 @@ this config, so the sum acts as a mean.
 | `DELETE training_runs/.../checkpoints/...` | deletes a recovery checkpoint that platoon no longer needs |
 
 Platoon opens one Tinker training client per trained policy, and the service gives each client an
-adapter of its own, so one service trains several policies at once. vLLM
-keeps the 6 newest adapters of each policy loaded and unloads older ones. Rollouts can sample a
+adapter of its own, so one service trains several policies at once. The service keeps the 6
+newest adapters of each policy loaded in vLLM and unloads older ones. Rollouts can sample a
 policy up to 3 versions old, so 6 leaves room. The service keeps its adapters, optimizers and
 sampling sessions in memory, and a restart of its container loses them. The running `platoon train` then gets errors
 from the service. A new `platoon train` resumes from the newest checkpoint on the volume.
@@ -317,7 +316,8 @@ from the service. A new `platoon train` resumes from the newest checkpoint on th
 The tests run the service with a unigram model, a scripted sampler, and a tiny random model of
 Qwen3.8-27B's architecture. These have not run on a GPU:
 
-- loading Qwen3.8-27B and vLLM 0.31 in one image, each in its own virtualenv;
+- the image, which installs the trainer's packages and vLLM 0.31, with vLLM in a virtualenv of its
+  own, and loading Qwen3.8-27B in it;
 - vLLM's answers to the service's requests: that the sampled token ids end with `<|im_end|>`, that
   `prompt_logprobs` come back for every prompt token, and that each adapter loads at runtime;
 - Qwen3.8-27B's chat template through platoon's gateway with a real model's answers;
@@ -333,8 +333,8 @@ real answers.
 
 To train on another scenario, write a scorer like `glossogen_side/score_game.py` that gives each
 agent a score in each round, and a harness like `glossogen_platoon/harness.py` that runs the
-scenario with one platoon agent per seat. The episode program and the credit estimator work for any
-scenario whose scorer gives each seat one score per round.
+scenario with one platoon agent per seat. The episode program and the credit estimator need only each
+seat's score in each round and the round of each answer. They have run only on signal_game.
 
 ## Token ids in the event log
 

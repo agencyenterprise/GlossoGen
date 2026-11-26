@@ -32,7 +32,7 @@ train:
   lora_rank: 32
   batch_size: 4
   max_training_steps: 10
-  # A group's games span up to about 1,000 s: up to one median game (322 s) waiting for a free slot, then
+  # A group's games span up to about 1,000 s: up to one median game (308 s) waiting for a free slot, then
   # the slowest game (about 700 s). Steps took about 500 s on average, so a group sees about 2 new policy
   # versions while it plays and waits up to one more step to train. docs/rl-training.md explains it.
   max_staleness: 3
