@@ -15,7 +15,6 @@ from glossogen.llm.self_hosted_chat_model import (
     PROMPT_TOKEN_IDS_DETAIL,
     TOKEN_IDS_DETAIL,
     TOKEN_LOGPROBS_DETAIL,
-    TokenLogprobsMismatch,
 )
 from glossogen.models.event import (
     LLMResponseReceived,
@@ -29,6 +28,7 @@ from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.recorded_token_ids import (
     RecordedTokenIds,
     TokenIdLogGap,
+    TokenLogprobCountMismatch,
     recorded_token_ids,
 )
 from glossogen.runners.pydantic_ai_runner import (
@@ -273,13 +273,6 @@ async def test_an_empty_response_is_logged_when_it_carries_token_ids(tmp_path: P
     assert logged.token_ids == served.token_ids
 
 
-def test_token_ids_without_logprobs_fail_instead_of_logging_ids_alone() -> None:
-    state = _StreamingState(token_id_log=TokenIdLog())
-
-    with pytest.raises(TokenLogprobsMismatch):
-        state.note_token_ids(details={PROMPT_TOKEN_IDS_DETAIL: [1], TOKEN_IDS_DETAIL: [2]})
-
-
 async def test_a_log_written_before_logprobs_reads_back_without_them(tmp_path: Path) -> None:
     """A response logged with token ids and no ``token_logprobs`` reads back with None."""
     served = ServedResponse(prompt_ids=[1, 2], token_ids=[3], token_logprobs=[-0.5])
@@ -297,3 +290,19 @@ async def test_a_log_written_before_logprobs_reads_back_without_them(tmp_path: P
 
     assert rebuilt.token_ids == [3]
     assert rebuilt.token_logprobs is None
+
+
+async def test_an_event_with_more_logprobs_than_token_ids_fails_to_read(tmp_path: Path) -> None:
+    served = ServedResponse(prompt_ids=[1, 2], token_ids=[3], token_logprobs=[-0.5])
+    log_path = tmp_path / "signal_game.jsonl"
+    await log_responses(text="I move left.", log_path=log_path, runs=[[served]])
+    events = await load_events(log_path=log_path)
+    edited: list[SimulationEvent] = []
+    for event in events:
+        if isinstance(event, LLMResponseReceived):
+            edited.append(event.model_copy(update={"token_logprobs": [-0.5, -1.0]}))
+        else:
+            edited.append(event)
+
+    with pytest.raises(TokenLogprobCountMismatch):
+        recorded_token_ids(events=edited, agent_id=AGENT)

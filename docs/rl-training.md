@@ -260,15 +260,20 @@ The server returns `token_ids` and `token_logprobs`, and GlossoGen computes the 
 answer's ids and logprobs.
 
 GlossoGen treats a request as failed in two cases. In the first, the server returns token ids but
-not exactly one logprob for each answer token. In the second, it gives an answer token vLLM's
-missing-logprob value, -9999. GlossoGen sends the request up to 3 times in all. If all 3 fail, it
+not exactly one logprob for each answer token. In the second, the server gives an answer token a
+logprob that is not a finite number, or that is -9999 or lower. vLLM gives -9999 to a token whose
+logprob it does not have. GlossoGen tries the request up to 3 times. If all 3 attempts fail, it
 logs `agent_run_cycle_failed` and starts a new turn. The failed turn counts toward
 `--max-agent-turns`.
 
 The policy server uses vLLM's default `--logprobs-mode`, which takes logprobs before temperature
-and the sampling filters. `signal_game_shapes.json` sets temperature 1.0 and no top-p, top-k or
-min-p filter. With these settings, the logged logprobs are those of the distribution that the
-server sampled from. With another temperature, they differ from it.
+and the sampling filters. `signal_game_shapes.json` sets temperature 1.0, top-p 1.0, top-k -1,
+min-p 0 and presence penalty 0. These values turn every filter and the penalty off. GlossoGen
+sends them with every request of a player. vLLM fills each sampling value that a request leaves
+out from the model's `generation_config.json`. Qwen3.8-27B's file sets top-k 20 and top-p 0.95,
+so a request without them would sample with those filters on. With the game config's values,
+the logged logprobs are those of the distribution that the server sampled from. With another
+temperature or filter, they differ from it.
 
 pydantic-ai marks a tool `strict` when the tool's schema allows it. vLLM then uses a grammar to
 force the model's tool calls to match the tool schemas. It computes the logged logprobs after the
@@ -415,8 +420,8 @@ the started games finished. A game that failed before `glossogen run` printed it
 does not count as started.
 
 **Expect a few retried requests.** Modal answers HTTP 303 to a request that has run for 150
-seconds. GlossoGen then sends the request up to 3 times in all, and then starts a new
-turn. In one step of our runs, 8 of 2,156 requests got a 303, and every game finished. An
+seconds. GlossoGen tries the request up to 3 times. If all 3 attempts fail, it starts a
+new turn. In one step of our runs, 8 of 2,156 requests got a 303, and every game finished. An
 answer that takes more than 150 seconds to generate never reaches the batch.
 
 ## Where to go next

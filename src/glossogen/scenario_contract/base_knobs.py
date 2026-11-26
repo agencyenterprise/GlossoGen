@@ -98,18 +98,13 @@ class BaseKnobs(BaseModel):
     ``record_token_ids`` asks a self-hosted model's server for the token ids of
     each request and answer, with vLLM's ``return_token_ids`` request option,
     and for the logprob of each answer token, with the ``logprobs`` option. It
-    logs both on each ``LLMResponseReceived``. A response with token ids but not
-    one logprob per answer token fails the request; the runner sends it again,
-    up to 3 times in all, and then fails the agent's run cycle and starts a new
-    one. vLLM's ``--logprobs-mode`` decides whether the logprobs are taken
-    before or after temperature and the sampling filters, and its default takes
-    them before; with temperature 1 and no top-k, top-p, min-p or penalties, the
-    logprobs before and after them are the same. pydantic-ai marks a tool
-    ``strict`` when its schema allows it, and vLLM then constrains tool calls
-    with a grammar. The logprobs come from the distribution after that
-    constraint, so a token that the grammar forces is logged with a logprob near
-    0. The knob has no effect on agents under other providers. Off by default,
-    so a run's log does not grow.
+    logs both on each ``LLMResponseReceived``, in ``token_ids`` and
+    ``token_logprobs``. A response with token ids fails the request unless each
+    answer token has one finite logprob above -9999, and the runner retries the
+    request under its retry policy. ``docs/rl-training.md`` describes the
+    fields and which distribution the logprobs come from. The knob has no
+    effect on agents under providers other than ``self-hosted``. Off by
+    default, which keeps these fields out of a run's log.
 
     ``channel_noise_level`` is the per-character corruption probability the
     platform applies to the scenario's noisy channels, and

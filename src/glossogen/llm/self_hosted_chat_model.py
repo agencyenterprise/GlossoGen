@@ -1,5 +1,6 @@
 """The pydantic-ai model that calls a self-hosted, OpenAI-compatible endpoint."""
 
+import math
 from typing import Any, ClassVar, cast
 
 from openai.types import chat
@@ -22,7 +23,8 @@ MISSING_LOGPROB = -9999.0
 
 
 class TokenLogprobsMismatch(ValueError):
-    """A response carries token ids but no logprobs, or not one logprob per answer token."""
+    """A response carries token ids but no logprobs, not one logprob per answer token, or a
+    logprob that is not usable."""
 
 
 class SelfHostedChatModel(OpenAIChatModel):
@@ -44,7 +46,7 @@ class SelfHostedChatModel(OpenAIChatModel):
     response's ``prompt_token_ids``, its first choice's ``token_ids`` and the logprob of each
     answer token are kept in the response's ``provider_details`` under
     ``PROMPT_TOKEN_IDS_DETAIL``, ``TOKEN_IDS_DETAIL`` and ``TOKEN_LOGPROBS_DETAIL``. A response
-    with token ids and no logprob for each of its answer tokens raises
+    with token ids and no usable logprob for each of its answer tokens raises
     :class:`TokenLogprobsMismatch`.
     """
 
@@ -83,8 +85,9 @@ def answer_logprobs(choice: chat.chat_completion.Choice, token_ids: list[int]) -
     """Return the logprob of each answer token, one per id in ``token_ids``.
 
     An answer with no tokens may come without logprobs. Any other answer whose logprobs are
-    missing, are not one per token id, or hold ``MISSING_LOGPROB``, vLLM's value for a logprob
-    it does not have, raises :class:`TokenLogprobsMismatch`.
+    missing or are not one per token id raises :class:`TokenLogprobsMismatch`. So does a
+    logprob that is not a finite number, or that is at or below ``MISSING_LOGPROB``, vLLM's
+    value for a logprob it does not have.
     """
     content = None
     if choice.logprobs is not None:
@@ -100,13 +103,18 @@ def answer_logprobs(choice: chat.chat_completion.Choice, token_ids: list[int]) -
         raise TokenLogprobsMismatch(
             f"The server returned {len(values)} logprobs for {len(token_ids)} answer token ids"
         )
-    missing = sum(1 for value in values if value <= MISSING_LOGPROB)
-    if missing:
+    unusable = sum(1 for value in values if not _usable_logprob(value=value))
+    if unusable:
         raise TokenLogprobsMismatch(
-            f"The server gave {missing} of {len(values)} answer tokens no logprob "
-            f"({MISSING_LOGPROB})"
+            f"The server gave {unusable} of {len(values)} answer tokens no usable logprob "
+            f"(not finite, or at or below {MISSING_LOGPROB})"
         )
     return values
+
+
+def _usable_logprob(value: float) -> bool:
+    """Whether a logprob is a finite number above vLLM's value for a missing logprob."""
+    return math.isfinite(value) and value > MISSING_LOGPROB
 
 
 def _token_ids_field(model: BaseModel, name: str) -> list[int] | None:

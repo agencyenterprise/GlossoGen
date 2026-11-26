@@ -51,7 +51,6 @@ from glossogen.llm.self_hosted_chat_model import (
     PROMPT_TOKEN_IDS_DETAIL,
     TOKEN_IDS_DETAIL,
     TOKEN_LOGPROBS_DETAIL,
-    TokenLogprobsMismatch,
 )
 from glossogen.model_catalog.token_pricing import compute_token_cost_usd, find_pricing
 from glossogen.models.agent_config import AgentConfig
@@ -270,18 +269,17 @@ class _StreamingState:
 
     def note_token_ids(self, details: dict[str, Any] | None) -> None:
         """Keep the token ids and logprobs that a self-hosted model's response carries, if it
-        carries token ids. Token ids without logprobs raise ``TokenLogprobsMismatch``."""
+        carries token ids. ``SelfHostedChatModel`` sets the logprobs whenever it sets the ids."""
         if details is None:
             return
         prompt_ids = details.get(PROMPT_TOKEN_IDS_DETAIL)
         token_ids = details.get(TOKEN_IDS_DETAIL)
         if prompt_ids is None or token_ids is None:
             return
-        token_logprobs = details.get(TOKEN_LOGPROBS_DETAIL)
-        if token_logprobs is None:
-            raise TokenLogprobsMismatch("A response carries token ids and no logprobs")
         self.response_token_ids = _ResponseTokenIds(
-            prompt_ids=prompt_ids, token_ids=token_ids, token_logprobs=token_logprobs
+            prompt_ids=prompt_ids,
+            token_ids=token_ids,
+            token_logprobs=details[TOKEN_LOGPROBS_DETAIL],
         )
 
     def discard_since_attempt_start(self) -> None:
@@ -1099,7 +1097,6 @@ class PydanticAIRunner(AgentRunner):
             logged = state.token_id_log.record(
                 prompt_ids=response_token_ids.prompt_ids,
                 token_ids=response_token_ids.token_ids,
-                token_logprobs=response_token_ids.token_logprobs,
             )
             event = event.model_copy(
                 update={
@@ -1107,7 +1104,7 @@ class PydanticAIRunner(AgentRunner):
                     "prompt_prefix_tokens": logged.prompt_prefix_tokens,
                     "prompt_tail_ids": logged.prompt_tail_ids,
                     "token_ids": logged.token_ids,
-                    "token_logprobs": logged.token_logprobs,
+                    "token_logprobs": response_token_ids.token_logprobs,
                 }
             )
         state.spawn_log_task(event_logger.log(event))

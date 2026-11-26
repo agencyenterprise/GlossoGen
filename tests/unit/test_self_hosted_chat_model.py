@@ -257,9 +257,9 @@ def logprob_entries(values: list[float]) -> dict[str, object]:
 
 
 async def run_with_token_ids(
-    sent: list[dict[str, object]], logprobs: dict[str, object] | None
+    sent: list[dict[str, object]], token_ids: list[int], logprobs: dict[str, object] | None
 ) -> ModelResponse:
-    """Run one turn against a server that returns token ids and, unless None, ``logprobs``."""
+    """Run one turn against a server that returns ``token_ids`` and, unless None, ``logprobs``."""
 
     def respond(request: httpx2.Request) -> httpx2.Response:
         sent.append(json.loads(s=request.content))
@@ -267,20 +267,23 @@ async def run_with_token_ids(
             "index": 0,
             "message": {"role": "assistant", "content": "Done."},
             "finish_reason": "stop",
-            "token_ids": [21, 22],
+            "token_ids": token_ids,
         }
         if logprobs is not None:
             choice["logprobs"] = logprobs
+        body = {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": MODEL,
+            "prompt_token_ids": [11, 12, 13],
+            "choices": [choice],
+        }
+        # Written by hand because httpx refuses NaN, which a server other than vLLM can send.
         return httpx2.Response(
             status_code=200,
-            json={
-                "id": "chatcmpl-1",
-                "object": "chat.completion",
-                "created": 0,
-                "model": MODEL,
-                "prompt_token_ids": [11, 12, 13],
-                "choices": [choice],
-            },
+            content=json.dumps(obj=body, allow_nan=True).encode(),
+            headers={"content-type": "application/json"},
         )
 
     model = SelfHostedChatModel(
@@ -314,7 +317,9 @@ async def test_a_response_keeps_the_token_ids_and_logprobs_that_the_server_retur
     the ids and one logprob per answer token, without pydantic-ai's per-token text and bytes."""
     sent: list[dict[str, object]] = []
 
-    response = await run_with_token_ids(sent=sent, logprobs=logprob_entries(values=[-0.5, -1.25]))
+    response = await run_with_token_ids(
+        sent=sent, token_ids=[21, 22], logprobs=logprob_entries(values=[-0.5, -1.25])
+    )
 
     assert sent[0][RETURN_TOKEN_IDS_OPTION] is True
     assert sent[0]["logprobs"] is True
@@ -327,11 +332,31 @@ async def test_a_response_keeps_the_token_ids_and_logprobs_that_the_server_retur
 
 @pytest.mark.parametrize(
     "logprobs",
-    [None, logprob_entries(values=[-0.5]), logprob_entries(values=[-0.5, -9999.0])],
-    ids=["no logprobs", "one logprob for two token ids", "vLLM's value for a missing logprob"],
+    [
+        None,
+        logprob_entries(values=[-0.5]),
+        logprob_entries(values=[-0.5, -0.5, -0.5]),
+        logprob_entries(values=[-0.5, -9999.0]),
+        logprob_entries(values=[-0.5, float("nan")]),
+    ],
+    ids=[
+        "no logprobs",
+        "one logprob for two token ids",
+        "three logprobs for two token ids",
+        "vLLM's value for a missing logprob",
+        "a logprob that is not a number",
+    ],
 )
 async def test_token_ids_without_one_logprob_per_answer_token_fail_the_request(
     logprobs: dict[str, object] | None,
 ) -> None:
     with pytest.raises(TokenLogprobsMismatch):
-        await run_with_token_ids(sent=[], logprobs=logprobs)
+        await run_with_token_ids(sent=[], token_ids=[21, 22], logprobs=logprobs)
+
+
+async def test_an_answer_without_tokens_needs_no_logprobs() -> None:
+    response = await run_with_token_ids(sent=[], token_ids=[], logprobs=None)
+
+    assert response.provider_details is not None
+    assert response.provider_details[TOKEN_IDS_DETAIL] == []
+    assert response.provider_details[TOKEN_LOGPROBS_DETAIL] == []

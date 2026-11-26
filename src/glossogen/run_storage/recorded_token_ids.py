@@ -5,7 +5,8 @@
 the agent's previous recorded prompt and answer, then ``prompt_tail_ids``. The events
 are read in log order. ``token_ids_index`` starts at 0 when the agent's runner starts,
 and at 0 the prefix is empty. Each recorded answer's ``token_logprobs`` hold one logprob
-per answer token, or None when the event has no ``token_logprobs``.
+per answer token, or None when the event has no ``token_logprobs``. An event whose
+``token_logprobs`` are not one per answer token id raises ``TokenLogprobCountMismatch``.
 """
 
 from collections.abc import Sequence
@@ -30,6 +31,10 @@ class TokenIdLogGap(ValueError):
     """An agent's recorded responses skip an index, so a prompt cannot be rebuilt."""
 
 
+class TokenLogprobCountMismatch(ValueError):
+    """An event holds a different number of answer logprobs than answer token ids."""
+
+
 def recorded_token_ids(events: Sequence[SimulationEvent], agent_id: str) -> list[RecordedTokenIds]:
     """Return the agent's recorded requests in log order, with their full prompts."""
     recorded: list[RecordedTokenIds] = []
@@ -51,6 +56,11 @@ def recorded_token_ids(events: Sequence[SimulationEvent], agent_id: str) -> list
             raise TokenIdLogGap(
                 f"{agent_id}: recorded response {event.token_ids_index} follows "
                 f"{expected_index - 1}"
+            )
+        if event.token_logprobs is not None and len(event.token_logprobs) != len(event.token_ids):
+            raise TokenLogprobCountMismatch(
+                f"{agent_id}: recorded response {event.token_ids_index} holds "
+                f"{len(event.token_logprobs)} logprobs for {len(event.token_ids)} token ids"
             )
         prompt_ids = previous[: event.prompt_prefix_tokens] + event.prompt_tail_ids
         recorded.append(
