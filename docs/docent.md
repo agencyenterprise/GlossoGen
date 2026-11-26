@@ -163,6 +163,12 @@ choose the Inspect log file. You can also drag the file onto the
 **Agent Run List**. Docent shows a preview with the number of agent runs that it
 will create, which is 2 for the example. Click **Import 2 Runs**.
 
+When the import finishes, Docent at commit 7a477df can replace the page with
+"Application error: a client-side exception has occurred". The browser console
+shows React error #185. Docent has stored every agent run by then. Reload the
+page to see them. Five uploads were tried in local Docent, with 2 to 869
+samples, and all five ended in this error.
+
 ![Docent's upload dialog for inspect_log.json: 2 agent runs, and the metadata of the first, viewer_1](../images/docent_upload_dialog.webp)
 
 The example's viewer_1 and viewer_2 become two agent runs. An agent
