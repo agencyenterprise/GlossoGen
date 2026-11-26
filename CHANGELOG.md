@@ -12,6 +12,26 @@ the commit log.
 ## Unreleased
 
 ### Added
+- **Qwen3.8-27B trains on signal_game with platoon 0.6.0.** `modal/platoon/`
+  is a uv project of its own, because platoon needs huggingface-hub below 2
+  and GlossoGen needs 2.4 or later. Its harness plays one GlossoGen game per
+  platoon episode, with one platoon agent per seat. Its credit estimator,
+  `glossogen-round-baseline`, gives each round's answers the seat's score in
+  that round minus the seat's mean in that round over the seed's games, and
+  subtracts a KL penalty to the frozen base model. A run stops when a group's
+  mean KL estimate passes 0.3. The training config lets games run up to 3
+  policy versions ahead of training, with platoon's CISPO loss, gradient
+  clipping at norm 1 and an evaluation on held-out seeds every 5 steps. Two
+  more configs give player_b a frozen partner, or an adapter of its own.
+  `external_seats` sends a seat to a model outside platoon. See
+  [Training a model with RL](docs/rl-training.md).
+- **A Tinker-API service trains LoRA adapters for platoon on Modal.**
+  `modal/platoon/tinker_service` implements the routes of the Tinker API that
+  platoon's training calls. It trains one PEFT LoRA adapter per policy and
+  samples with vLLM, which loads each new adapter at runtime.
+  `modal/platoon/platoon_app.py` runs it on two H200 GPUs. Its CPU tests drive
+  it with the Tinker SDK and with `platoon train` on real GlossoGen games; it
+  has not run on a GPU.
 - **`record_token_ids` also records the logprob of each answer token.** Each
   request of a self-hosted agent asks the server for `logprobs` as well as
   `return_token_ids`, and each `llm_response_received` event holds
@@ -21,7 +41,7 @@ the commit log.
   `agent_run_cycle_failed` and starts a new run cycle. `glossogen.run_storage.recorded_token_ids`
   returns the logprobs as `RecordedTokenIds.token_logprobs`, a new field, which
   is None for an event that holds token ids without logprobs. See
-  [Training a model with RL](docs/rl-training.md#token-ids-in-the-event-log).
+  [Running simulations](docs/running-simulations.md#token-ids-in-the-event-log).
 - **Qwen3.8-27B can be trained by reinforcement learning on signal_game.**
   `modal/grpo/` holds a Modal app with a LoRA trainer and a vLLM server that
   serves each new adapter. It also holds the loop that runs on your machine.
@@ -872,6 +892,9 @@ the commit log.
   See [docs/analysis.md](docs/analysis.md).
 
 ### Removed
+- `modal/grpo/`, the GRPO loop, its Modal trainer and its tests. The
+  signal_game rewards, the game config and the first-item baselines are in
+  `modal/platoon/`.
 - The simulation MCP server, its transports, the per-agent `tools/list` filter
   and `AgentRunner.start`'s `mcp_server_url` / `mcp_server_object` arguments.
   The run browser's MCP server at `/mcp` is unchanged.

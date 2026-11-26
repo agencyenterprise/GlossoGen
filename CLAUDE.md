@@ -50,7 +50,7 @@ make check-frontend    # frontend CI mode (prettier --check, no auto-fix)
 - `src/glossogen/cli/` — one module per subcommand, each with `add_<command>_parser` beside `handle_<command>`
 - `src/glossogen/testing/` — scripted-agent harnesses for testing a scenario or a metric
 - `frontend/` — Next.js app; `src/features/` per surface, scenario plug-ins in `src/features/runs/`
-- `modal/` — self-hosted vLLM endpoints; see `modal/README.md`. `modal/grpo/` holds the code that trains Qwen3.8-27B with RL on signal_game; see [docs/rl-training.md](docs/rl-training.md)
+- `modal/` — self-hosted vLLM endpoints; see `modal/README.md`. `modal/platoon/` holds the code that trains Qwen3.8-27B with RL on signal_game through platoon, as a uv project with its own environment; see [docs/rl-training.md](docs/rl-training.md)
 
 ### Invariants spread across modules
 
