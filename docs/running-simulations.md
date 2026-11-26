@@ -210,42 +210,12 @@ each request on to the server. The proxy can store each request under its run
 and agent. For example, a proxy in front of vLLM can add `return_token_ids` to a
 request, and vLLM then returns the token ids of the prompt and of the answer.
 
-`record_token_ids=true` records those token ids and the logprob of each answer
-token in the run's own event log, with no proxy. Each request of a self-hosted agent
-then asks the server for `return_token_ids` and `logprobs`, and each
-`llm_response_received` event holds the ids and logprobs that the server returned.
-A response that carries token ids without one logprob per answer token fails the
-request. The runner sends it again, up to 3 times in all. Then it logs
-`agent_run_cycle_failed` and starts a new run cycle, and the failed cycle counts
-toward the agent's turn limit. The knob has no effect on agents under other providers, and the server has
-to support both options, as vLLM does.
-
-```bash
-glossogen run signal_game --provider self-hosted ... record_token_ids=true
-```
-
-An event stores the answer's ids in `token_ids`, and their logprobs, in the same
-order, in `token_logprobs`. It stores the prompt as the length
-of the prefix that it shares with the agent's previous recorded prompt and answer,
-`prompt_prefix_tokens`, and the rest of its ids, `prompt_tail_ids`. So a prompt that
-repeats the previous request adds only its new tokens to the log.
-`glossogen.run_storage.recorded_token_ids` rebuilds the full prompts of one agent,
-with each answer's ids and logprobs. Without the knob, the events hold none of these
-fields.
-
-**Which logprobs vLLM returns.** vLLM's `--logprobs-mode` sets whether logprobs
-are taken before or after temperature and the sampling filters. The default,
-`raw_logprobs`, takes them before. With temperature 1
-and no top-k, top-p, min-p or penalties, the logprobs before and after them are
-the same.
-
-**A forced token is logged with a logprob near 0.** pydantic-ai marks a tool
-`strict` when its schema allows it, and vLLM then constrains the model's tool calls
-with a grammar. The logprobs come from the distribution after that constraint. So
-a token that the grammar forces is logged near 0, while the same server, scoring
-the same prompt and answer without the grammar, can give it a much lower logprob.
-A trainer that compares these logprobs with its own sees the difference at such
-tokens.
+With `record_token_ids=true`, GlossoGen writes the token ids of each prompt and
+answer, and the logprob of each answer token, into the run's event log. No proxy
+is needed. The server has to return both, as vLLM does. If it returns no token
+ids, the events hold none of these fields.
+[Training a model with RL](rl-training.md#token-ids-in-the-event-log) lists the
+fields that the knob adds.
 
 **Watch the context budget.** Self-hosted models are served at a small fixed
 context, and input plus the agent's output cap must stay under it or the server
