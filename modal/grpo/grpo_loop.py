@@ -260,7 +260,7 @@ async def train(*, loop: Loop, plan: StepPlan, last_step: int) -> None:
     """Run the training steps after the last one that ``steps.jsonl`` records, to ``last_step``.
 
     A step that stopped partway reuses the games that ended before the stop (game_sets.py). A
-    test that a stop cut off runs before the first step.
+    test that was playing when the loop stopped runs before the first step.
     """
     first_step = next_step(steps_path=run_folder(settings=loop.settings) / "steps.jsonl")
     if first_step > last_step:

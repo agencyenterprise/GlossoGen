@@ -16,7 +16,7 @@ the results of our runs.
 | `grpo_loop.py` | The loop's command line, and the order of a step: load an adapter, play games, train, record |
 | `loop_services.py` | The loop's view of the Modal app and of `glossogen run`, and their implementations |
 | `game_sets.py` | A step's or a test's games: their seed configs, logs and labels, played a few at a time |
-| `game_ledger.py` | The games that ended, which a resumed step reuses, and the games that a stop cut off |
+| `game_ledger.py` | The games that ended, which a resumed step reuses, and the games that were playing when the loop stopped |
 | `step_batch.py` | A step's finished games, their advantages, and the training batch |
 | `loop_records.py` | The lines of `steps.jsonl` and `eval.jsonl` |
 | `partner.py` | The frozen partner: the model of a seat that does not train |

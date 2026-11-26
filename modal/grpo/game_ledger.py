@@ -1,10 +1,10 @@
 """The games of a training run that ended, one JSON line each in ``games.jsonl``.
 
 The ledger is ``<records dir>/<run>/games.jsonl``. The loop enters a game once its ``glossogen
-run`` has exited, whether or not the game finished.
-When the loop plays a set of games again after a stop, it reuses each game that the ledger
-holds. A game that has a log and no ledger entry was cut off by the stop: the loop moves its log
-to ``game_logs/abandoned/``, adds the label ``abandoned`` to its run, and plays it again.
+run`` has exited, whether or not the game finished. When the loop plays a set of games again
+after a stop, it reuses each game that the ledger holds. A game that has a log and no ledger
+entry was playing when the loop stopped. The loop moves its log to ``game_logs/abandoned/``,
+adds the label ``abandoned`` to its run, and plays it again.
 """
 
 import json
@@ -59,7 +59,7 @@ def record_game(*, settings: LoopSettings, game_set: str, game: Game) -> None:
 
 
 def abandon(*, settings: LoopSettings, log_path: Path) -> None:
-    """Move a cut-off game's log aside, and label its run ``abandoned`` when it has one."""
+    """Move aside the log of a game that was playing at a stop, and label its run ``abandoned``."""
     run_id = logged_run_id(log_path=log_path)
     folder = log_path.parent / "abandoned"
     folder.mkdir(parents=True, exist_ok=True)
@@ -70,4 +70,4 @@ def abandon(*, settings: LoopSettings, log_path: Path) -> None:
         return
     run_dir = settings.runs_dir / run_id
     write_labels(run_dir=run_dir, labels=[*read_run_labels(run_dir=run_dir), ABANDONED_LABEL])
-    print(f"abandoned {run_id}, cut off by a stop", flush=True)
+    print(f"abandoned {run_id}, which was playing when the loop stopped", flush=True)

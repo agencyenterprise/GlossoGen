@@ -55,9 +55,8 @@ A run is one training job, and `--run` names it. `init` saves adapter 0 on the a
 adapter is a small set of weights added to the model, and training changes only the adapter.
 Adapter k is the adapter after k training steps. Adapter 0 leaves the model's outputs unchanged.
 
-To train one seat while the base model plays the other seat, add
-`--partner modal/grpo/base_model_partner.json` to `init`. [A frozen partner](#a-frozen-partner)
-explains partners.
+Add `--partner modal/grpo/base_model_partner.json` to `init` to train one seat while the base
+model plays the other. [A frozen partner](#a-frozen-partner) explains partners.
 
 ### 3. Train for ten steps
 
@@ -79,7 +78,7 @@ uv run --no-sync python modal/grpo/grpo_loop.py train \
 | `--last-step` | the last step to run. `train` starts with the step after the last one that `steps.jsonl` records, step 0 in a new run |
 | `--seeds-per-step`, `--games-per-seed` | each step plays 6 games on each of 4 seeds, 24 games in all |
 | `--overlap` | optional: each step's games play while the trainer trains the step before, as [Overlapping play and training](#overlapping-play-and-training) explains |
-| `--eval-every`, `--eval-seeds`, `--eval-games-per-seed` | optional, all three together: test each adapter whose step is a multiple of `--eval-every`, as section 4 explains |
+| `--eval-every`, `--eval-seeds`, `--eval-games-per-seed` | optional, all three together: test each adapter k above 0 for which k is a multiple of `--eval-every`, as section 4 explains |
 
 The loop, `grpo_loop.py`, runs on your machine, so keep the machine awake until `train` ends. In
 our runs, each of steps 0 to 9 took 13 to 41 minutes. The first step also waits for the policy
@@ -116,8 +115,8 @@ eval step 10: 72/72 games finished, won 82/720 rounds, first item 322/1440 playe
 eval step 0: 72/72 games finished, won 84/720 rounds, first item 256/1440 player-rounds
 ```
 
-`eval` plays nothing for a test that `eval.jsonl` already holds: the same adapter, partner,
-seeds and games per seed. It prints `eval.jsonl already holds this test` instead.
+When `eval.jsonl` already holds a line for the same adapter, partner, seeds and games per seed,
+`eval` plays no games. It prints `eval.jsonl already holds this test` instead.
 
 `train` can also run these tests itself. Add these three flags to the `train` command of section 3:
 
@@ -126,10 +125,12 @@ seeds and games per seed. It prints `eval.jsonl already holds this test` instead
 ```
 
 `train` then tests adapter 10 once the trainer has saved it, and adapters 20, 30 and so on in
-longer runs. Each test plays its games between two training steps, and writes one line to
-`eval.jsonl`, the same line that `eval` writes. A test that a stop cut off runs when `train`
-resumes. Adapter 0 needs its own `eval --step 0`. In our runs, one test of 72 games took 29 to 50
-minutes, so a test every 10 steps adds that much time to each ten steps.
+longer runs. Each test plays its games between two training steps, while no step's games play.
+It writes one line to `eval.jsonl`, the same line that `eval` writes. When `train` resumes, it
+first runs a test that was playing when the loop stopped. Adapter 0 needs its own
+`eval --step 0`. In our runs, each `eval` of 72 games took 29 to 50 minutes. A test every 10
+steps should add about that much time to each 10 steps. This is unmeasured: none of the 4 runs
+under [Our runs](#our-runs) tested during training.
 
 ### 5. Check whether the run learned
 
@@ -204,31 +205,35 @@ In step k:
 A game that ends without `simulation_ended` is left out of the batch. When a seed has fewer than 2
 finished games, its answer tokens get advantage 0.
 
-The trainer saves adapter k+1 with `games.json`, the run ids of the finished games that it trained
-on. When the loop asks it to train a step whose adapter exists, it returns that adapter's saved
-metrics if the games are the same, and refuses the step if they differ.
+With adapter k+1, the trainer saves `games.json`, the run ids of the finished games that it
+trained on. The loop can ask the trainer to train step k when adapter k+1 already exists. The
+trainer then compares the games with `games.json`. If they are the same, it returns the metrics
+that it saved with adapter k+1. If they differ, it refuses the step.
 
 ### Overlapping play and training
 
 With `--overlap`, step k's games play while the trainer trains step k−1. Step k's games then play
 with adapter k−1, the newest adapter when they start. Steps 0 and 1 both play adapter 0. The
-trainer trains step k from adapter k, so each batch after step 0's comes from games of the adapter
-before the one that trains on it. The [importance weight](#the-loss) corrects for that
-difference.
+trainer trains step k starting from adapter k. From step 1 on, adapter k−1 played the games of
+step k. The [importance weight](#the-loss) reweights each token for that difference, up to its
+cap of 5.
 
 Once the trainer has saved adapter k+1, the policy server loads it while step k+1's games are
-still playing adapter k. The loop asks the server to keep adapter k loaded until those games end.
-It then unloads it when it loads the next adapter. Each load request lists the adapters to keep,
-and the server unloads each other adapter that it loaded. vLLM runs at most 2 adapters in one
-batch (`--max-loras 2`), and this order needs no more than 2.
+still playing adapter k. Each load request lists the adapters to keep, and the server unloads each
+other adapter that it loaded. The request that loads adapter k+1 keeps adapter k. The loop's next
+load request keeps only adapter k+1, and the server then unloads adapter k. vLLM runs at most 2
+adapters in one batch (`--max-loras 2`). With `--overlap`, the server holds at most 2 adapters.
 
-A step with `--overlap` takes about as long as the longer of its games and the training of the
-step before, instead of their sum. The `play` and `train` times that each step prints are those of
-the step's own games and its own training. Each game's labels include `adapter=<k>`, and each line
-of `steps.jsonl` holds `adapter`, the adapter that played the step's games.
+With `--overlap`, a step should take about as long as the longer of its games and the training
+of the step before. This is unmeasured: none of the 4 runs under [Our runs](#our-runs) used
+`--overlap`. The `play` and `train` times that each step prints are those of the step's own games
+and its own training. Each game's labels include `adapter=<k>`, and each line of `steps.jsonl`
+holds `adapter`, the adapter that played the step's games.
 
-When a step stops training, as [Checks and problems](#checks-and-problems) describes, the next
-step's games are already playing. The loop stops them, and they leave no record.
+The loop can stop training after a step, as [Checks and problems](#checks-and-problems)
+describes. With `--overlap`, the next step's games are playing at that point. The loop stops the
+games that are still playing, and `steps.jsonl` gets no line for the next step. A game that ended
+before the stop keeps its line in `games.jsonl`, and each game keeps its log in `game_logs/`.
 
 ### A frozen partner
 
@@ -252,9 +257,9 @@ A partner file is a JSON object with three keys:
 `player_b`. The policy server serves the base model under its name, `Qwen/Qwen3.8-27B`, next to
 the adapters, so this partner needs no `base_url`. Another self-hosted model needs a server of its
 own, and its `base_url`. A partner on another provider, such as `anthropic`, needs that
-provider's key in your environment. It also needs `model_settings` in its `model_override`. Without
-them, the partner sends the game config's `agent_model_settings`, and those hold options that only
-vLLM accepts.
+provider's key in your environment. It also needs `model_settings` in its `model_override`.
+Without `model_settings`, the partner sends the game config's `agent_model_settings`. Those
+include `extra_body` options for vLLM: `chat_template_kwargs`, `min_p` and `top_k`.
 
 The game config passed to the loop must leave `model_overrides` empty. The loop writes the
 partner's entry into each seed's config.
@@ -268,10 +273,12 @@ averaged over the batch's answer tokens. The policy is the model with its curren
 
 w is the token's importance weight. With r = log p_policy − log p_sampler, w = exp(r), capped
 at 5. p_sampler is the probability that vLLM logged for the token when it sampled it. The
-trainer computes w without a gradient, so w scales the token's term and is not trained. This
-loss is CISPO, platoon's default loss, with platoon's default cap. When the policy is the
-adapter that played the games, w differs from 1 only by the numeric differences between vLLM and
-the trainer. When the games played with an older adapter, w corrects for that.
+trainer computes w without a gradient, so the gradient flows only through log p_policy(token),
+and w scales it. This loss is CISPO, the default loss of the platoon RL library, with platoon's
+default cap. Suppose the policy is the adapter that played the games, and
+`self_hosted_strict_tools` is off. w then differs from 1 only by the numeric differences between
+vLLM and the trainer. When an older adapter played the games, w is the token's probability under
+the policy divided by its probability under the older adapter, up to the cap.
 
 Each line of `steps.jsonl` holds three statistics of the ratio exp(r) before the cap, under
 `trainer`. `ratio_mean` is its mean over the batch's answer tokens, `ratio_max` its largest
@@ -331,7 +338,7 @@ Each game's event log lands in `--runs-dir`, under `signal_game/`. A training ga
 | `steps.jsonl` | one line per training step: the printed counts, the rounds won in each game, the first-item count of each seat, the partner, the seats that trained, and the trainer's metrics |
 | `eval.jsonl` | one line per test: the adapter, the partner, the seeds and games per seed, the rounds won and the first-item count of each game, grouped by seed, the first-item count of each seat, and the totals |
 | `configs/` | each seed's game config. A run keeps its configs: the loop refuses a game config that would change one |
-| `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log`, and in `abandoned/` the logs of games that a stop cut off |
+| `game_logs/` | the terminal output of each `glossogen run`, named `<label>_step<k>_seed<seed>_game<n>.log`, and in `abandoned/` the logs of games that were playing when the loop stopped |
 | `games.jsonl` | one line per game whose `glossogen run` exited: its step or test, seed, game number, adapter, run id and exit code |
 
 With a partner, the names of the seed configs and the game logs also hold `_vs_<seat>-<model>`
@@ -375,15 +382,16 @@ pydantic-ai marks a tool `strict` when the tool's schema allows it. vLLM then us
 force the model's tool calls to match the tool schemas. It computes the logged logprobs after the
 grammar has removed the tokens it forbids. A token that the grammar leaves as the only choice is
 logged with a logprob near 0, a probability near 1, even when the model without the grammar gives
-it a low probability. In one check, the grammar forced the `<` that starts a `wait_for`
-parameter. vLLM logged that token at logprob 0.000, and the trainer's model gave it -8.125.
+it a low probability. In one game that we checked, the grammar forced the `<` that starts a
+`wait_for` parameter. vLLM logged that token at logprob 0.000, and the trainer's model gave it
+-8.125. The token's importance weight w would then be exp(−8.125), about 0.0003.
 
 `signal_game_shapes.json` sets the knob `self_hosted_strict_tools` to false. The players'
-requests then mark no tool `strict`, and they send the same tool schemas. vLLM applies no grammar,
-so the logged logprobs are those of the distribution that the server sampled from. Without the
-grammar, a player can write a tool call that does not match the tool's schema, and pydantic-ai
-rejects that call. The knob is on by default, and it has no effect on agents under other
-providers.
+requests then mark no tool `strict`, and they send the same tool schemas. vLLM then applies no
+grammar, so each logged logprob is the model's own over the whole vocabulary, as the trainer
+computes it. Without the grammar, a player can write a tool call that does not match the tool's
+schema, and pydantic-ai rejects that call. The knob is on by default, and it has no effect on
+agents under other providers.
 
 ### Resuming after a stop
 
@@ -391,24 +399,25 @@ To resume a run after `train` stopped, run the same `train` command again. `trai
 the step after the last one that `steps.jsonl` records. The trainer loads the newest adapter from
 the volume, at `runs/<run>/adapters/step_<k>/`.
 
-A step that stopped partway does not play its games again. The loop enters each game in
-`games.jsonl` once its `glossogen run` has exited, and a resumed step reuses those games. A game
-that has a log in `game_logs/` and no line in `games.jsonl` was playing when the loop stopped. The
-loop moves that game's log to `game_logs/abandoned/`, adds the label `abandoned` to its run, and
-plays the game again. With `--overlap`, the next step's games may also have been playing, and the
-loop treats them the same way.
+A step that stopped partway does not play its ended games again. The loop writes a line for each
+game in `games.jsonl` once the game's `glossogen run` has exited, whether or not the game
+finished. A resumed step reuses those games. A game that has a log in `game_logs/` and no line in
+`games.jsonl` was playing when the loop stopped. The loop moves that game's log to
+`game_logs/abandoned/`, adds the label `abandoned` to its run, and plays the game again. With
+`--overlap`, the next step's games may also have been playing, and the loop treats them the same
+way.
 
-The loop can also stop after the trainer saved adapter k+1 and before it wrote step k's line in
-`steps.jsonl`. The resumed step k then sends the trainer the same games, and the trainer returns
-the metrics that it saved with the adapter. It does not train on those games a second time.
+The loop can also stop after the trainer saved adapter k+1 and before the loop wrote step k's
+line in `steps.jsonl`. The resumed step k then sends the trainer the same games, and the trainer
+returns the metrics that it saved with adapter k+1. The trainer does not train on those games a
+second time.
 
-Resume a run with the `--overlap` setting that its stopped step used. The games that ended before
-the stop were played by the adapter that this setting chose, and the loop refuses a step whose
-ended games were played by another adapter.
+The `--overlap` setting decides which adapter plays step k's games: adapter k without it, and
+adapter k−1 with it. Resume a run with the setting that its stopped step used. The loop refuses
+to resume a step whose ended games another adapter played.
 
-A `glossogen run` keeps running when its loop is killed with no chance to stop it, as with
-`kill -9`. Stop such processes before you resume, or they play on the policy server next to the
-resumed games.
+When the loop is killed with `kill -9`, each `glossogen run` that it started keeps running. Stop
+these processes before you resume, or they play on the policy server next to the resumed games.
 
 ### Another scenario
 
@@ -416,7 +425,7 @@ To train on another scenario, write a module like `signal_game_rewards.py`. It r
 events and gives each agent a score in each round. The loop imports `Reward`, `PlayerRound`,
 `GameOutcome`, `game_outcome` and `player_score` from that module. It reads the `GameOutcome`
 fields `finished`, `players`, `rounds`, `won_rounds`, `first_item_finishes`, `moves` and
-`player_rounds_without_move`. Your module has to provide these seven fields, or the loop has to
+`player_rounds_without_move`. Your module has to provide these fields, or the loop has to
 change. Set `SCENARIO` in `loop_services.py` to the scenario's name, and pass its config as
 `--game-config`. In a run with a partner, the policy plays the agents in the other seats.
 
@@ -424,9 +433,9 @@ change. Set `SCENARIO` in `loop_services.py` to the scenario's name, and pass it
 
 The commands above ran four times, as the runs `tutorial-check`, `first-item-rep1`,
 `first-item-rep2` and `first-item-rep3`. These four runs trained with a loss that had no
-importance weight w. Their players sent strict tools, and they ran without `--overlap` and
-without a partner. No run has tested whether the loop learns as often with w, without strict
-tools, or with `--overlap`. Two of the four learned within ten steps:
+importance weight w. Their players' requests marked tools `strict`, and they ran without
+`--overlap` and without a partner. None of the 4 runs tested whether the loop learns as often
+with w, without strict tools, or with `--overlap`. Two of the four learned within ten steps:
 
 | Run | Base model | Adapter 10 | Difference |
 | --- | --- | --- | --- |
