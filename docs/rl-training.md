@@ -382,9 +382,11 @@ pydantic-ai marks a tool `strict` when the tool's schema allows it. vLLM then us
 force the model's tool calls to match the tool schemas. It computes the logged logprobs after the
 grammar has removed the tokens it forbids. A token that the grammar leaves as the only choice is
 logged with a logprob near 0, a probability near 1, even when the model without the grammar gives
-it a low probability. In one game that we checked, the grammar forced the `<` that starts a
-`wait_for` parameter. vLLM logged that token at logprob 0.000, and the trainer's model gave it
--8.125. The token's importance weight w would then be exp(−8.125), about 0.0003.
+it a low probability. In the one live game that we checked, the grammar forced 2 of 1,383 answer
+tokens: the `<` that starts a `wait_for` parameter in each player's first `read_notifications`
+call. vLLM logged each at logprob 0.000. vLLM's own scoring of the same text, without the
+grammar, gave each -8.125. The trainer has no grammar either, so each token's importance weight w
+would be about exp(−8.125), or 0.0003, and the token would get almost no gradient.
 
 `signal_game_shapes.json` sets the knob `self_hosted_strict_tools` to false. The players'
 requests then mark no tool `strict`, and they send the same tool schemas. vLLM then applies no
