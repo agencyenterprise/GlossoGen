@@ -18,7 +18,7 @@ from glossogen.label_descriptions.label_description_models import (
     LabelDescription,
     LabelDescriptionsResponse,
 )
-from glossogen.label_descriptions.label_description_store_resolution import (
+from glossogen.server.runs.label_description_store_resolution import (
     label_description_store_for,
 )
 from glossogen.server.runs.lookup import get_identity
