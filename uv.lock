@@ -1365,7 +1365,7 @@ wheels = [
 
 [[package]]
 name = "glossogen"
-version = "0.31.34"
+version = "0.31.35"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
