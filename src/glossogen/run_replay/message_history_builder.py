@@ -739,7 +739,8 @@ def build_message_history(
             filter_below_round=filter_below_round,
         )
         # A response that lost every tool call and wrote no text would be left
-        # holding only its reasoning, which providers reject as a turn.
+        # holding only its reasoning. OpenAI rejects a reasoning item sent
+        # without the item that followed it.
         only_reasoning_left = (
             bool(llm_resp.tool_calls) and not kept_tool_calls and not llm_resp.text
         )
