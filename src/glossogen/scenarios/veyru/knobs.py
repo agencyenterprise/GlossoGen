@@ -2,12 +2,14 @@
 
 Controls the per-round time budget, case shuffling seed, round count,
 postmortem discussion, two-team mode, observer swap timing, swap
-announcement, post-swap postmortem availability, intern observer mode, and
-the LLM judge.
+announcement, post-swap postmortem availability, intern observer mode, the
+LLM judge, and whether the agents send text or canvas drawings.
 """
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
+from glossogen.engine.canvas_link import LinkMedium
+from glossogen.engine.drawing_sender import MAX_CANVAS_SIDE
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenario_contract.base_knobs import BaseKnobs
@@ -53,6 +55,11 @@ class VeyruKnobs(BaseKnobs):
     priority-<=2 failure motif (single-stage warmup cases). Every other
     round draws 1-5 motifs from the full pool. Set to an empty list to
     disable the warmup constraint entirely.
+    ``link_medium`` sets what the agents send on the comm link during a round:
+    text (``text``), or drawings on a ``canvas_width`` x ``canvas_height``
+    canvas (``canvas``), which the other agent receives as an image. Under
+    ``canvas`` every painted pixel costs one simulated second where a
+    character would, channel noise is off, and the intern is off.
     """
 
     judge_model: str
@@ -68,6 +75,26 @@ class VeyruKnobs(BaseKnobs):
     intern_join_round: int | None
     intern_takeover_round: int | None
     easy_round_numbers: frozenset[int]
+    link_medium: LinkMedium
+    canvas_width: int = Field(ge=1, le=MAX_CANVAS_SIDE)
+    canvas_height: int = Field(ge=1, le=MAX_CANVAS_SIDE)
+
+    @model_validator(mode="after")
+    def _validate_canvas(self) -> "VeyruKnobs":
+        if self.link_medium != LinkMedium.CANVAS:
+            return self
+        if self.channel_noise_level > 0:
+            raise ValueError(
+                "channel noise corrupts characters, and a canvas run sends drawings, so "
+                f"link_medium={LinkMedium.CANVAS.value!r} needs channel_noise_level=0 "
+                f"(got channel_noise_level={self.channel_noise_level})"
+            )
+        if self.intern_enabled:
+            raise ValueError(
+                f"link_medium={LinkMedium.CANVAS.value!r} needs intern_enabled=false: the "
+                "intern's prompt describes a text link"
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_swap_round(self) -> "VeyruKnobs":

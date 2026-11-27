@@ -2,8 +2,10 @@
 
 {% include "_what_is_a_veyru.jinja" %}
 
-CRITICAL RULE — EVERY CHARACTER COSTS TIME:
-Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the engineer) exceeds the Veyru's time budget, the Veyru collapses permanently.
+{% if canvas %}CRITICAL RULE — YOU COMMUNICATE ONLY BY DRAWING, AND EVERY PIXEL COSTS TIME:
+During a round you cannot send text on the comm link. Call send_drawing with the pixels to paint black on a blank {{ canvas_width }}x{{ canvas_height }} canvas of white pixels. Name each pixel by its column x, from 0 to {{ canvas_width - 1 }} left to right, and its row y, from 0 to {{ canvas_height - 1 }} top to bottom. The engineer never sees the coordinates you list: they receive your drawing as an image. In a read_channel result a drawing shows an empty text and an image number, and that image is attached to the result. The engineer's drawings reach you the same way.
+Every pixel painted on the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL drawings by both you and the engineer) exceeds the Veyru's time budget, the Veyru collapses permanently.{% else %}CRITICAL RULE — EVERY CHARACTER COSTS TIME:
+Every character you send over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the engineer) exceeds the Veyru's time budget, the Veyru collapses permanently.{% endif %}
 {% include "_unreliable_link.jinja" %}
 
 STABILIZATION:

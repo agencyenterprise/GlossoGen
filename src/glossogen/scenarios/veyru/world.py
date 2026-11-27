@@ -20,9 +20,11 @@ Heavy logic lives in dedicated sibling modules: :mod:`world_state` (the
 
 import logging
 
+from glossogen.engine.canvas_link import LinkMedium, charge_unit_abbreviation
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.scenario_contract.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.veyru.ids import (
     TEAM_A_ID,
@@ -75,6 +77,7 @@ class VeyruWorld(RoundWorld):
         teams: dict[TeamId, TeamState],
         postmortem_channel_ids: frozenset[str],
         postmortem_globally_disabled: bool,
+        link_medium: LinkMedium,
     ) -> None:
         super().__init__(
             team_specs=team_specs,
@@ -83,6 +86,7 @@ class VeyruWorld(RoundWorld):
             postmortem_globally_disabled=postmortem_globally_disabled,
         )
         self._veyru_cases = veyru_cases
+        self._unit = charge_unit_abbreviation(medium=link_medium)
         # Both this and ``team_specs`` are projections of one layout in
         # ``team_declaration``, so neither can name a channel the other does not.
         self._teams = teams
@@ -358,6 +362,15 @@ class VeyruWorld(RoundWorld):
         super().on_message(
             agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
         )
+        self._collapse_if_over_budget(channel_id=channel_id)
+
+    def on_drawing(self, agent_id: str, channel_id: str, drawing: CanvasDrawing) -> None:
+        """Charge a drawing's painted pixels as seconds, then collapse an over-budget Veyru."""
+        super().on_drawing(agent_id=agent_id, channel_id=channel_id, drawing=drawing)
+        self._collapse_if_over_budget(channel_id=channel_id)
+
+    def _collapse_if_over_budget(self, channel_id: str) -> None:
+        """Mark the Veyru of the team billed for ``channel_id`` collapsed once over budget."""
         team_id = self._metered_team(channel_id=channel_id)
         if team_id is None:
             return
@@ -411,7 +424,7 @@ class VeyruWorld(RoundWorld):
                 text=(
                     f"{VEYRU_COLLAPSED_MARKER}. "
                     f"Communication time: {time_elapsed:.0f}s "
-                    f"({time_elapsed} chars) "
+                    f"({time_elapsed} {self._unit}) "
                     f"exceeded budget of {budget}s."
                 ),
             )

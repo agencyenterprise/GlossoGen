@@ -16,6 +16,10 @@ from PIL import Image
 from pydantic import ValidationError
 from pydantic_ai.messages import ModelRequest, ToolReturnPart
 
+from glossogen.engine.canvas_link import (
+    SEND_DRAWING_TOOL,
+    TEXT_REFUSED_ON_CANVAS_LINK,
+)
 from glossogen.models.event import MessageSent, ToolResultReceived
 from glossogen.models.mcp_responses import SendStatus
 from glossogen.run_replay.message_history_builder import build_message_history
@@ -24,10 +28,6 @@ from glossogen.scenario_contract.platform_runner_prompts import platform_runner_
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.events import IntersectionSubmissionRecorded
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
-from glossogen.scenarios.spot_the_intersection.link_medium import (
-    SEND_DRAWING_TOOL,
-    TEXT_REFUSED_ON_CANVAS_LINK,
-)
 from glossogen.testing.scenario_runtime import ROUND_SECONDS, build_scenario
 from glossogen.testing.scripted_agent import EventGate, GatedTurn, SayTurn, ToolTurn
 from glossogen.testing.simulation_harness import SimulationResult, never_times_out, run_simulation

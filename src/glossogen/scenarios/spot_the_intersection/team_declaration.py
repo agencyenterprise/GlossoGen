@@ -8,6 +8,7 @@ debrief. A simulated Team B is declared nowhere: only Team A's viewers play,
 under the same names they hold in a two-team run.
 """
 
+from glossogen.engine.canvas_link import LinkMedium
 from glossogen.engine.team_declaration import (
     Debrief,
     DebriefPolicy,
@@ -22,7 +23,6 @@ from glossogen.scenarios.spot_the_intersection.ids import (
     VIEWER_SYSTEM_TEMPLATE,
 )
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
-from glossogen.scenarios.spot_the_intersection.link_medium import LinkMedium
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import PostmortemMode
 from glossogen.scenarios.spot_the_intersection.seats import (
     link_channel_id_for,

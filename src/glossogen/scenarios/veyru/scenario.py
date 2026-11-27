@@ -27,11 +27,18 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
+from glossogen.engine.canvas_link import (
+    TEXT_REFUSED_ON_CANVAS_LINK,
+    LinkMedium,
+    charge_unit_singular,
+)
+from glossogen.engine.drawing_sender import DrawingSender, rejected_send
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import Channel, ChannelTemplateEntry
 from glossogen.models.event import SimulationEvent
 from glossogen.models.event_base import EventBase
+from glossogen.models.mcp_responses import SendMessageResult
 from glossogen.models.round_end_trigger import RoundEndTrigger
 from glossogen.scenario_contract.channel_noise import apply_character_noise
 from glossogen.scenario_contract.communication_round_view import CommunicationRoundView
@@ -41,7 +48,11 @@ from glossogen.scenario_contract.protocol_explanation_config import ProtocolExpl
 from glossogen.scenario_contract.protocol_probe_config import ProtocolProbeConfig
 from glossogen.scenario_contract.registration import scenario
 from glossogen.scenario_contract.run_detail_extension import ScenarioRunDetailExtension
-from glossogen.scenario_contract.scenario_base import PrimaryChannel, RoundResult
+from glossogen.scenario_contract.scenario_base import (
+    PrimaryChannel,
+    RoundResult,
+    SendMessageExecutor,
+)
 from glossogen.scenario_contract.scenario_tool import ScenarioTool
 from glossogen.scenario_contract.scenario_world import ScenarioWorld
 from glossogen.scenarios.veyru.case_event_conversion import case_started_event
@@ -211,7 +222,24 @@ class VeyruScenario(SimulationScenario):
             teams=veyru_team_states(knobs=knobs),
             postmortem_channel_ids=type(self).postmortem_channel_ids,
             postmortem_globally_disabled=knobs.postmortem_disabled_at_start,
+            link_medium=knobs.link_medium,
         )
+        self._drawing_sender = DrawingSender(
+            width=knobs.canvas_width,
+            height=knobs.canvas_height,
+            link_channel_ids=LINK_CHANNEL_IDS,
+            in_postmortem=lambda: self._world.in_postmortem,
+            get_runtime=lambda: self.runtime,
+        )
+
+    def _medium_variables(self) -> dict[str, Any]:
+        """The template variables that word a prompt for the run's link medium."""
+        return {
+            "canvas": self._knobs.link_medium == LinkMedium.CANVAS,
+            "canvas_width": self._knobs.canvas_width,
+            "canvas_height": self._knobs.canvas_height,
+            "unit_singular": charge_unit_singular(medium=self._knobs.link_medium),
+        }
 
     def scenario_description(self) -> str:
         """Return a markdown description reflecting the active knobs."""
@@ -228,6 +256,7 @@ class VeyruScenario(SimulationScenario):
                 "intern_enabled": self._knobs.intern_enabled,
                 "intern_join_round": self._knobs.intern_join_round,
                 "intern_takeover_round": self._knobs.intern_takeover_round,
+                **self._medium_variables(),
             },
         )
 
@@ -243,6 +272,7 @@ class VeyruScenario(SimulationScenario):
                 "failure_motifs": FAILURE_MOTIFS,
                 "channel_noise_level": self._knobs.channel_noise_level,
                 "noise_replacement_mode": self._knobs.noise_replacement_mode.value,
+                **self._medium_variables(),
             },
         )
 
@@ -489,6 +519,22 @@ class VeyruScenario(SimulationScenario):
             )
         return None
 
+    def send_message_executor(self) -> SendMessageExecutor:
+        """Post text, refused on the comm link during a canvas run's rounds."""
+        return self.post_text
+
+    async def post_text(
+        self, agent_id: str, channel_id: str, text: str, force: bool
+    ) -> SendMessageResult:
+        """Post ``text`` on ``channel_id``; under the canvas medium the comm link takes drawings."""
+        if self._knobs.link_medium == LinkMedium.CANVAS and channel_id in LINK_CHANNEL_IDS:
+            return rejected_send(
+                detail=TEXT_REFUSED_ON_CANVAS_LINK, current_round=self.runtime.current_round
+            )
+        return await self.default_send_message(
+            agent_id=agent_id, channel_id=channel_id, text=text, force=force
+        )
+
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Apply per-character drop noise to messages on link channels.
 
@@ -538,6 +584,13 @@ class VeyruScenario(SimulationScenario):
         return self._world
 
     def get_tools(self) -> list[ScenarioTool]:
+        """Return the stabilize_veyru tool, and send_drawing under the canvas medium."""
+        tools = self._stabilize_tools()
+        if self._knobs.link_medium == LinkMedium.CANVAS:
+            tools.append(self._drawing_sender.link_tool())
+        return tools
+
+    def _stabilize_tools(self) -> list[ScenarioTool]:
         """Return the stabilize_veyru tool for field observers."""
         return build_tools(
             world=self._world,
@@ -548,7 +601,12 @@ class VeyruScenario(SimulationScenario):
         )
 
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
-        """Point the platform probe metrics at Veyru's question bank and prompts."""
+        """Point the platform probe metrics at Veyru's question bank and prompts.
+
+        A canvas run has none: the probe asks for the text an agent would send.
+        """
+        if self._knobs.link_medium == LinkMedium.CANVAS:
+            return None
         scenario_root = Path(__file__).resolve().parent
         return ProtocolProbeConfig(
             questions_path=scenario_root / "protocol_probe_questions.json",

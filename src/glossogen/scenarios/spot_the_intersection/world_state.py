@@ -16,15 +16,15 @@ from enum import StrEnum
 from fractions import Fraction
 from typing import NamedTuple, Self
 
-from glossogen.engine.fewest_characters_winner import fewest_characters_winners
-from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
-from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
-from glossogen.scenarios.spot_the_intersection.ids import TEAM_B_ID
-from glossogen.scenarios.spot_the_intersection.link_medium import (
+from glossogen.engine.canvas_link import (
     LinkMedium,
     charge_unit,
     charge_unit_abbreviation,
 )
+from glossogen.engine.fewest_characters_winner import fewest_characters_winners
+from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
+from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
+from glossogen.scenarios.spot_the_intersection.ids import TEAM_B_ID
 
 
 class TeamCharacters(StrEnum):

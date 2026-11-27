@@ -25,6 +25,13 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
+from glossogen.engine.canvas_link import (
+    TEXT_REFUSED_ON_CANVAS_LINK,
+    LinkMedium,
+    charge_unit,
+    charge_unit_singular,
+)
+from glossogen.engine.drawing_sender import DrawingSender, rejected_send
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
@@ -52,7 +59,6 @@ from glossogen.scenarios.spot_the_intersection.discussion_phase import (
     DiscussionPhase,
     DiscussionSendResult,
 )
-from glossogen.scenarios.spot_the_intersection.drawing_tool import DrawingSender
 from glossogen.scenarios.spot_the_intersection.evaluation.build_communication_rounds import (
     build_communication_rounds,
 )
@@ -84,12 +90,6 @@ from glossogen.scenarios.spot_the_intersection.injection_rendering import (
 from glossogen.scenarios.spot_the_intersection.knobs import (
     MAX_TEAM_SIZE,
     SpotTheIntersectionKnobs,
-)
-from glossogen.scenarios.spot_the_intersection.link_medium import (
-    TEXT_REFUSED_ON_CANVAS_LINK,
-    LinkMedium,
-    charge_unit,
-    charge_unit_singular,
 )
 from glossogen.scenarios.spot_the_intersection.messaging import (
     DIRECT_MESSAGES_CLOSED_IN_DISCUSSION,
@@ -239,7 +239,6 @@ class SpotTheIntersectionScenario(SimulationScenario):
             link_channel_ids=_LINK_CHANNELS,
             in_postmortem=lambda: self._world.in_postmortem,
             get_runtime=lambda: self.runtime,
-            channel_for_recipient=self._channel_for_recipient,
         )
 
     def get_knobs(self) -> SpotTheIntersectionKnobs:
@@ -576,13 +575,8 @@ class SpotTheIntersectionScenario(SimulationScenario):
             if self._knobs.link_medium == LinkMedium.CANVAS and _is_round_channel(
                 channel_id=channel_id
             ):
-                return SendMessageResult(
-                    status=SendStatus.REJECTED,
-                    detail=TEXT_REFUSED_ON_CANVAS_LINK,
-                    new_messages=[],
-                    token_count=0,
-                    current_round=self.runtime.current_round,
-                    message_id=None,
+                return rejected_send(
+                    detail=TEXT_REFUSED_ON_CANVAS_LINK, current_round=self.runtime.current_round
                 )
             return await self.runtime.publish_message(
                 agent_id=agent_id, channel_id=channel_id, text=text, force=force
@@ -722,8 +716,14 @@ class SpotTheIntersectionScenario(SimulationScenario):
     def get_tools(self) -> list[ScenarioTool]:
         """Return the submit_object tool, and send_drawing under the canvas medium."""
         tools = build_tools(world=self._world, get_runtime=lambda: self._runtime)
-        if self._knobs.link_medium == LinkMedium.CANVAS:
+        if self._knobs.link_medium != LinkMedium.CANVAS:
+            return tools
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
             tools.append(
-                self._drawing_sender.tool(one_to_one=self._knobs.messaging == Messaging.ONE_TO_ONE)
+                self._drawing_sender.teammate_tool(
+                    channel_for_recipient=self._channel_for_recipient
+                )
             )
+        else:
+            tools.append(self._drawing_sender.link_tool())
         return tools

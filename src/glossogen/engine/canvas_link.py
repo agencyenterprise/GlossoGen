@@ -1,13 +1,14 @@
-"""What viewers send on the link and direct channels during a round, and what it costs.
+"""What agents send on a team's task channel during a round, and what it costs.
 
-With ``LinkMedium.TEXT`` a viewer sends text with ``send_message`` and its team is
-charged a character for each character. With ``LinkMedium.CANVAS`` a viewer
-sends drawings with ``send_drawing``: it names the pixels to paint on a canvas,
-its teammates receive the drawing as an image, and its team is charged a pixel
-for each painted pixel. The discussion phase is text in both media.
+With ``LinkMedium.TEXT`` an agent sends text with ``send_message`` and its team is
+charged one unit per character. With ``LinkMedium.CANVAS`` an agent sends
+drawings with ``send_drawing`` (see :mod:`glossogen.engine.drawing_sender`): it
+names the pixels to paint on a canvas, its teammates receive the drawing as an
+image, and its team is charged one unit per painted pixel. A scenario's
+discussion phase carries text in both media.
 
-The scoring code counts a team's charge without naming the unit, in fields
-called ``characters``. Under ``CANVAS`` those fields hold pixels.
+A scenario's scoring code may count a team's charge in fields called
+``characters``. Under ``CANVAS`` those fields hold pixels.
 """
 
 from enum import StrEnum
@@ -18,7 +19,7 @@ SEND_DRAWING_TOOL = "send_drawing"
 
 
 class LinkMedium(StrEnum):
-    """What a viewer sends on the link and direct channels during a round."""
+    """What an agent sends on its team's task channel during a round."""
 
     TEXT = "text"
     CANVAS = "canvas"
@@ -39,7 +40,7 @@ def charge_unit_singular(medium: LinkMedium) -> str:
 
 
 def charge_unit_abbreviation(medium: LinkMedium) -> str:
-    """The short unit the round result's recorded reason uses."""
+    """The short unit a recorded round reason uses."""
     if medium == LinkMedium.CANVAS:
         return "pixels"
     return "chars"
@@ -81,7 +82,7 @@ def send_drawing_description(width: int, height: int, one_to_one: bool) -> str:
         f"Send a drawing on a blank {width}x{height} canvas of white pixels. List the pixels "
         f"to paint black, each by its column x (0 to {width - 1}, left to right) and its row "
         f"y (0 to {height - 1}, top to bottom). {destination} The recipient sees only the "
-        "image, never the coordinates. Each painted pixel counts toward your team's score. "
-        "If new messages arrived since you last read them, the drawing is held and the new "
-        "messages are returned; set force=true to send regardless."
+        "image, never the coordinates. Each painted pixel is charged to your team as one "
+        "unit. If new messages arrived since you last read them, the drawing is held and the "
+        "new messages are returned; set force=true to send regardless."
     )

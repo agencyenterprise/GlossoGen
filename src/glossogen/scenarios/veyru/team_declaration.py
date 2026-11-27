@@ -12,6 +12,7 @@ this returns.
 
 from typing import NamedTuple
 
+from glossogen.engine.canvas_link import SEND_DRAWING_TOOL, LinkMedium
 from glossogen.engine.team_declaration import (
     Debrief,
     DebriefPolicy,
@@ -67,25 +68,32 @@ def _debrief(channel_id: str, name: str, active: bool) -> DebriefPolicy:
     return Debrief(channel_id=channel_id, name=name, display_name=DEBRIEF_DISPLAY_NAME)
 
 
-def _observer(agent_id: str, role_name: str) -> RoleSpec:
+def _tool_names(tool_names: list[str], link_medium: LinkMedium) -> tuple[str, ...]:
+    """A role's tools, with ``send_drawing`` added under the canvas medium."""
+    if link_medium == LinkMedium.CANVAS:
+        return (*tool_names, SEND_DRAWING_TOOL)
+    return tuple(tool_names)
+
+
+def _observer(agent_id: str, role_name: str, link_medium: LinkMedium) -> RoleSpec:
     """Return an observer role: it can send, and it can stabilize."""
     return RoleSpec(
         agent_id=agent_id,
         role_name=role_name,
         system_template=FIELD_OBSERVER_SYSTEM_TEMPLATE,
-        tool_names=tuple(TOOLS_OBSERVER),
+        tool_names=_tool_names(tool_names=TOOLS_OBSERVER, link_medium=link_medium),
         joins_debrief=True,
         starts_as_member=True,
     )
 
 
-def _engineer(agent_id: str, role_name: str) -> RoleSpec:
+def _engineer(agent_id: str, role_name: str, link_medium: LinkMedium) -> RoleSpec:
     """Return an engineer role: it can send, and nothing else."""
     return RoleSpec(
         agent_id=agent_id,
         role_name=role_name,
         system_template=STABILIZATION_ENGINEER_SYSTEM_TEMPLATE,
-        tool_names=tuple(TOOLS_STABILIZATION_ENGINEER),
+        tool_names=_tool_names(tool_names=TOOLS_STABILIZATION_ENGINEER, link_medium=link_medium),
         joins_debrief=True,
         starts_as_member=True,
     )
@@ -178,8 +186,16 @@ def veyru_teams(knobs: VeyruKnobs) -> tuple[TeamSpec, ...]:
     specs: list[TeamSpec] = []
     for layout in _layouts(knobs=knobs):
         roles = [
-            _observer(agent_id=layout.observer_id, role_name=layout.observer_role),
-            _engineer(agent_id=layout.engineer_id, role_name=layout.engineer_role),
+            _observer(
+                agent_id=layout.observer_id,
+                role_name=layout.observer_role,
+                link_medium=knobs.link_medium,
+            ),
+            _engineer(
+                agent_id=layout.engineer_id,
+                role_name=layout.engineer_role,
+                link_medium=knobs.link_medium,
+            ),
         ]
         if not knobs.two_teams and knobs.intern_enabled:
             roles.append(

@@ -47,7 +47,10 @@
     "intern_enabled": false,
     "intern_join_round": null,
     "intern_takeover_round": null,
-    "easy_round_numbers": []
+    "easy_round_numbers": [],
+    "link_medium": "text",
+    "canvas_width": 16,
+    "canvas_height": 16
    },
    "provider": "anthropic"
   },

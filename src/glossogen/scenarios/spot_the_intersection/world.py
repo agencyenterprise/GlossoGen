@@ -14,6 +14,11 @@ from its log.
 from collections.abc import Mapping, Sequence
 from typing import Any, NamedTuple
 
+from glossogen.engine.canvas_link import (
+    LinkMedium,
+    charge_unit,
+    message_charge,
+)
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
@@ -28,11 +33,6 @@ from glossogen.scenarios.spot_the_intersection.ids import (
     ROUND_LOST_MARKER,
     ROUND_RESULT_MARKER,
     ROUND_WON_MARKER,
-)
-from glossogen.scenarios.spot_the_intersection.link_medium import (
-    LinkMedium,
-    charge_unit,
-    message_charge,
 )
 from glossogen.scenarios.spot_the_intersection.metered_messages import (
     MeteredMessage,
@@ -324,6 +324,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         team = self._charged_team(agent_id=agent_id, channel_id=channel_id)
         if team is None:
             return
+        super().on_drawing(agent_id=agent_id, channel_id=team.link_channel_id, drawing=drawing)
         self._charge(team=team, agent_id=agent_id, amount=message_charge(text="", drawing=drawing))
 
     def _charged_team(self, agent_id: str, channel_id: str) -> TeamState | None:

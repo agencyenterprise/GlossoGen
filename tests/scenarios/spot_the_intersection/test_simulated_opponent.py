@@ -14,11 +14,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from glossogen.engine.canvas_link import LinkMedium
 from glossogen.models.event import RoundResultRecorded, WorldEventDelivered
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.ids import ROUND_LOST_MARKER
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
-from glossogen.scenarios.spot_the_intersection.link_medium import LinkMedium
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
 from glossogen.scenarios.spot_the_intersection.world_state import (
     SimulatedOpponent,

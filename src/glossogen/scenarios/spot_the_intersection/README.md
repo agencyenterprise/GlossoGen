@@ -345,8 +345,6 @@ the run's grid.
 - `metered_messages.py`: the messages a log shows each team was charged for,
   read by the resume and by this scenario's metrics.
 - `messaging.py`: the `messaging` modes and who a viewer may address one-to-one.
-- `link_medium.py`, `drawing_tool.py`: the `link_medium` values, what one
-  message costs, and the `send_drawing` tool of a canvas run.
 - `postmortem_modes.py`, `discussion_phase.py`, `partner_channels.py`: the
   `postmortem_mode` rules and their refusals, what each viewer has sent in the
   current discussion phase, and the pair channels of a `chosen_partner` run.

@@ -10,6 +10,11 @@ agent), and hand variables to the renderer.
 
 import logging
 
+from glossogen.engine.canvas_link import (
+    charge_unit,
+    charge_unit_abbreviation,
+    charge_unit_singular,
+)
 from glossogen.scenarios.veyru.ids import (
     FIELD_OBSERVER_ID,
     FIELD_OBSERVER_INJECTION_TEMPLATE,
@@ -209,6 +214,7 @@ def render_round_injection(
             "partner_display_name": partner,
             "intern_takeover_just_happened": intern_takeover_just_happened,
             "intern_join_round": knobs.intern_join_round,
+            **_unit_variables(knobs=knobs),
         },
     )
     if not rendered:
@@ -251,6 +257,7 @@ def render_postmortem_injection(
         template_variables={
             "round_number": round_number,
             "previous_outcome": outcome,
+            **_unit_variables(knobs=knobs),
         },
     )
     if not rendered:
@@ -262,3 +269,12 @@ def render_postmortem_injection(
         len(rendered),
     )
     return rendered
+
+
+def _unit_variables(knobs: VeyruKnobs) -> dict[str, str]:
+    """The words an injection uses for what a message costs under the run's link medium."""
+    return {
+        "unit": charge_unit(medium=knobs.link_medium),
+        "unit_singular": charge_unit_singular(medium=knobs.link_medium),
+        "unit_abbreviation": charge_unit_abbreviation(medium=knobs.link_medium),
+    }

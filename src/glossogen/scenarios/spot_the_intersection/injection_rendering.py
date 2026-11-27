@@ -7,14 +7,14 @@ is the inverse the audit uses: it recovers the board exactly as delivered, so a
 recorded run can be certified on what its viewers were actually sent.
 """
 
-from glossogen.scenarios.spot_the_intersection.ids import (
-    POSTMORTEM_INJECTION_TEMPLATE,
-    VIEWER_INJECTION_TEMPLATE,
-)
-from glossogen.scenarios.spot_the_intersection.link_medium import (
+from glossogen.engine.canvas_link import (
     LinkMedium,
     charge_unit,
     charge_unit_singular,
+)
+from glossogen.scenarios.spot_the_intersection.ids import (
+    POSTMORTEM_INJECTION_TEMPLATE,
+    VIEWER_INJECTION_TEMPLATE,
 )
 from glossogen.scenarios.spot_the_intersection.messaging import Messaging
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import PostmortemMode

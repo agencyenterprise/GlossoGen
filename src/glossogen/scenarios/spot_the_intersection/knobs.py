@@ -12,13 +12,14 @@ from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
+from glossogen.engine.canvas_link import LinkMedium
+from glossogen.engine.drawing_sender import MAX_CANVAS_SIDE
 from glossogen.scenario_contract.base_knobs import BaseKnobs
 from glossogen.scenarios.spot_the_intersection.board_generation import (
     BoardSettings,
     planted_per_board,
 )
 from glossogen.scenarios.spot_the_intersection.board_model import MAX_GRID_SIZE
-from glossogen.scenarios.spot_the_intersection.link_medium import LinkMedium
 from glossogen.scenarios.spot_the_intersection.messaging import Messaging
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
     NO_CHARACTER_LIMIT,
@@ -27,7 +28,6 @@ from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
 from glossogen.scenarios.spot_the_intersection.world_state import TeamCharacters
 
 MAX_TEAM_SIZE = 12
-MAX_CANVAS_SIDE = 64
 
 PositiveShare = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 

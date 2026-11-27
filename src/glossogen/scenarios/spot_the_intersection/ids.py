@@ -5,7 +5,7 @@ and world notifications. Agent ids are built per seat in :mod:`seats`, since a
 team's size is a knob.
 """
 
-from glossogen.scenarios.spot_the_intersection.link_medium import SEND_DRAWING_TOOL
+from glossogen.engine.canvas_link import SEND_DRAWING_TOOL
 
 TEAM_SOLO_ID = "solo"
 TEAM_A_ID = "team_a"
