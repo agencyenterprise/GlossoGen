@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from episodes import play_episode, seat_trajectories
 from glossogen_platoon.game_process import SeatModel, game_config, self_hosted_urls
-from glossogen_platoon.game_scores import PlayedGame
-from glossogen_platoon.program import call_ids
+from glossogen_platoon.game_scores import PlayedGame, SeatScores, answer_key
+from glossogen_platoon.program import call_rounds, recorded_calls
 from partner_stub import partner_stub
 from platoon.testing import EpisodeRun, ScriptedPolicy
 from scripted_player import signal_game_player
@@ -31,7 +31,7 @@ def test_each_platoon_seat_has_one_span_per_round(first_item_group: list[Episode
             spans = trajectory.misc["spans"]
             assert len(spans) == len(game.scores.rounds)
             calls_in_spans = sum(len(span["calls"]) for span in spans)
-            outside = trajectory.misc["calls_outside_rounds"] + trajectory.misc["empty_calls"]
+            outside = trajectory.misc["calls_outside_rounds"] + trajectory.misc["unlogged_calls"]
             assert calls_in_spans + outside == len(trajectory.steps)
             seat_scores = game.scores.seats[seat].scores["first_item"]
             assert [span["reward"] for span in spans] == [
@@ -105,18 +105,48 @@ def recorded_step(*, completion_id: str, content: str | None, tool_calls: list[A
     )
 
 
-def test_an_empty_answer_matches_no_logged_response() -> None:
-    tool_call = {
-        "id": "call-1",
-        "type": "function",
-        "function": {"name": "move", "arguments": "{}"},
-    }
+def tool_call(*, name: str) -> dict[str, Any]:
+    """A tool call as platoon's gateway records it."""
+    return {"id": f"call-{name}", "type": "function", "function": {"name": name, "arguments": "{}"}}
+
+
+def test_calls_without_a_logged_response_match_no_round() -> None:
     trajectory = SimpleNamespace(
         steps=[
-            recorded_step(completion_id="text", content="I see a blue star.", tool_calls=[]),
+            recorded_step(completion_id="text", content="I see a  blue\nstar.", tool_calls=[]),
             recorded_step(completion_id="empty", content="", tool_calls=[]),
-            recorded_step(completion_id="none", content=None, tool_calls=[]),
-            recorded_step(completion_id="tool", content=None, tool_calls=[tool_call]),
+            recorded_step(
+                completion_id="unknown-1", content=None, tool_calls=[tool_call(name="max_years")]
+            ),
+            recorded_step(
+                completion_id="unknown-2", content=None, tool_calls=[tool_call(name="max_years")]
+            ),
+            recorded_step(completion_id="move", content=None, tool_calls=[tool_call(name="move")]),
         ]
     )
-    assert call_ids(trajectory=trajectory) == ["text", "tool"]
+    seat = SeatScores(
+        answer_rounds=[0, 2, 2],
+        answer_keys=[
+            answer_key(tool_names=[], text="I see a blue star."),
+            answer_key(tool_names=["max_years"], text=None),
+            answer_key(tool_names=["move"], text=""),
+        ],
+        scores={"first_item": {2: 1}},
+    )
+    rounds = call_rounds(calls=recorded_calls(trajectory=trajectory), seat=seat)
+    assert rounds == {"text": 0, "unknown-1": 2, "move": 2}
+
+
+def test_a_logged_response_without_a_recorded_call_fails() -> None:
+    trajectory = SimpleNamespace(
+        steps=[
+            recorded_step(completion_id="move", content=None, tool_calls=[tool_call(name="move")])
+        ]
+    )
+    seat = SeatScores(
+        answer_rounds=[1],
+        answer_keys=[answer_key(tool_names=["end_round"], text=None)],
+        scores={"first_item": {1: 0}},
+    )
+    with pytest.raises(ValueError, match="no recorded call matches"):
+        call_rounds(calls=recorded_calls(trajectory=trajectory), seat=seat)

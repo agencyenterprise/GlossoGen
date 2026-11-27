@@ -16,7 +16,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from glossogen_platoon.game_scores import GameScores, SeatScores
+from glossogen_platoon.game_scores import GameScores, SeatScores, answer_key
 from glossogen_side.signal_game_rewards import PlayerRound, Reward, game_outcome, player_score
 
 from glossogen.models.event import LLMResponseReceived, SimulationEvent, ToolCallInvoked
@@ -45,6 +45,15 @@ def answer_rounds(*, events: list[SimulationEvent], agent_id: str) -> list[int]:
     return rounds
 
 
+def answer_keys(*, events: list[SimulationEvent], agent_id: str) -> list[str]:
+    """The ``answer_key`` of each of the agent's model responses, in the order of the event log."""
+    return [
+        answer_key(tool_names=[call.tool_name for call in event.tool_calls], text=event.text)
+        for event in events
+        if isinstance(event, LLMResponseReceived) and event.agent_id == agent_id
+    ]
+
+
 def seat_scores(*, events: list[SimulationEvent], agent_id: str, rounds: list[int]) -> SeatScores:
     """One seat's answer rounds and its score in each round under each reward."""
     outcome = game_outcome(events=events)
@@ -59,7 +68,11 @@ def seat_scores(*, events: list[SimulationEvent], agent_id: str, rounds: list[in
         }
         for reward in Reward
     }
-    return SeatScores(answer_rounds=answer_rounds(events=events, agent_id=agent_id), scores=scores)
+    return SeatScores(
+        answer_rounds=answer_rounds(events=events, agent_id=agent_id),
+        answer_keys=answer_keys(events=events, agent_id=agent_id),
+        scores=scores,
+    )
 
 
 async def score(*, run_dir: Path) -> GameScores:

@@ -204,9 +204,12 @@ the run trains, or another policy that the config declares.
    the seat's previous tool call. A call before the seat's first tool call belongs to no span.
 6. The episode's reward is the mean score per player-round under the trained reward.
 
-The program matches the gateway's n-th recorded call of a seat to the seat's n-th
-`llm_response_received` in the event log. When a seat's two counts differ, the episode fails and
-trains nothing.
+The program matches each `llm_response_received` of a seat in the event log to a call that the
+gateway recorded for that seat. It compares the names of the answer's tool calls and the first 40
+characters of its text, and takes the next recorded call that has both the same. The gateway
+records some calls that the event log holds no response for: pydantic-ai asks the model again after
+an empty answer or a call to a tool that does not exist. Such a call belongs to no span. A response
+in the event log that matches no recorded call fails the episode, which then trains nothing.
 
 ### Rewards
 
