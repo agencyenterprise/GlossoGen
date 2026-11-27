@@ -22,7 +22,7 @@ pytestmark = pytest.mark.xdist_group("veyru")
 OBSERVER = "field_observer"
 ENGINEER = "stabilization_engineer"
 LINK = "link"
-THREE_PIXELS = [{"x": 0, "y": 0}, {"x": 1, "y": 1}, {"x": 2, "y": 2}]
+THREE_PIXELS = [[0, 0], [1, 1], [2, 2]]
 
 
 def canvas_scenario(budget: int) -> SimulationScenario:

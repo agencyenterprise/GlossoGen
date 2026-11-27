@@ -25,6 +25,9 @@ from glossogen.scenario_contract.scenario_tool import ScenarioTool
 MAX_CANVAS_SIDE = 256
 """The widest or tallest canvas a scenario's knobs accept."""
 
+PixelPair = tuple[int, int]
+"""One pixel to paint, as the tool takes it: its column x and its row y."""
+
 ChannelForRecipient = Callable[[str, str], Awaitable[str]]
 """Turns ``(agent_id, to)`` into the channel a one-to-one message reaches."""
 
@@ -64,7 +67,7 @@ class DrawingSender:
         """The ``send_drawing`` tool that posts to one teammate, named by ``to``."""
 
         async def draw_to_teammate(
-            agent_id: str, to: str, pixels: list[CanvasPixel], force: bool
+            agent_id: str, to: str, pixels: list[PixelPair], force: bool
         ) -> SendMessageResult:
             channel_id = await channel_for_recipient(agent_id, to)
             return await self._send(
@@ -80,7 +83,7 @@ class DrawingSender:
         )
 
     async def draw_on_channel(
-        self, agent_id: str, channel_id: str, pixels: list[CanvasPixel], force: bool
+        self, agent_id: str, channel_id: str, pixels: list[PixelPair], force: bool
     ) -> SendMessageResult:
         """Post a drawing of ``pixels`` on ``channel_id``."""
         return await self._send(
@@ -88,7 +91,7 @@ class DrawingSender:
         )
 
     async def _send(
-        self, agent_id: str, channel_id: str, pixels: list[CanvasPixel], force: bool
+        self, agent_id: str, channel_id: str, pixels: list[PixelPair], force: bool
     ) -> SendMessageResult:
         """Publish the drawing, or refuse it in the discussion phase or off the round channels.
 
@@ -107,7 +110,11 @@ class DrawingSender:
                 detail=DRAWING_REFUSED_ON_CHANNEL, current_round=runtime.current_round
             )
         try:
-            drawing = CanvasDrawing(width=self._width, height=self._height, pixels=pixels)
+            drawing = CanvasDrawing(
+                width=self._width,
+                height=self._height,
+                pixels=[CanvasPixel(x=x, y=y) for x, y in pixels],
+            )
         except ValidationError as error:
             raise ValueError(_drawing_error(error=error)) from error
         return await runtime.publish_drawing(

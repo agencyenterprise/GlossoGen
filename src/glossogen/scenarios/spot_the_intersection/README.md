@@ -174,9 +174,9 @@ and how a viewer chose a teammate.
 With `link_medium: "canvas"`, viewers send drawings instead of text during a
 round. `knobs_canvas.json` sets it, with two viewers per team.
 
-- A viewer calls `send_drawing` with a list of pixels. Each pixel is a column
-  `x` and a row `y` on a `canvas_width` x `canvas_height` canvas, counted from
-  0 at the top left. The preset's canvas is 16x16. With broadcast messaging the
+- A viewer calls `send_drawing` with a list of pixels, each an `[x, y]` pair,
+  such as `[[0, 0], [3, 1]]`. `x` is the column and `y` the row on a
+  `canvas_width` x `canvas_height` canvas, counted from 0 at the top left. The preset's canvas is 16x16. With broadcast messaging the
   drawing goes on the team's link. With one-to-one messaging, `send_drawing`
   takes `to`, a teammate's agent id.
 - The tool refuses a pixel outside the canvas, a pixel listed twice, and an

@@ -80,8 +80,9 @@ def send_drawing_description(width: int, height: int, one_to_one: bool) -> str:
         )
     return (
         f"Send a drawing on a blank {width}x{height} canvas of white pixels. List the pixels "
-        f"to paint black, each by its column x (0 to {width - 1}, left to right) and its row "
-        f"y (0 to {height - 1}, top to bottom). {destination} The recipient sees only the "
+        f"to paint black as [x, y] pairs, for example [[0, 0], [3, 1]]: x is the column (0 to "
+        f"{width - 1}, left to right) and y the row (0 to {height - 1}, top to bottom). "
+        f"{destination} The recipient sees only the "
         "image, never the coordinates. Each painted pixel is charged to your team as one "
         "unit. If new messages arrived since you last read them, the drawing is held and the "
         "new messages are returned; set force=true to send regardless."

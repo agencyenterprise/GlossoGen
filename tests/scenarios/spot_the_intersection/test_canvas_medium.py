@@ -38,7 +38,7 @@ pytestmark = pytest.mark.xdist_group(SCENARIO)
 DRAWER = "viewer_a_1"
 READER = "viewer_a_2"
 LINK = "link_a"
-PIXELS = [{"x": 0, "y": 0}, {"x": 5, "y": 3}, {"x": 15, "y": 15}]
+PIXELS = [[0, 0], [5, 3], [15, 15]]
 
 
 def canvas_scenario() -> SimulationScenario:
@@ -54,7 +54,7 @@ def canvas_scenario() -> SimulationScenario:
     )
 
 
-def draw(pixels: list[dict[str, int]]) -> ToolTurn:
+def draw(pixels: list[list[int]]) -> ToolTurn:
     """A turn sending a drawing of ``pixels`` on Team A's link."""
     return ToolTurn(
         tool_name=SEND_DRAWING_TOOL, args={"channel_id": LINK, "pixels": pixels, "force": True}
@@ -240,7 +240,7 @@ async def test_a_pixel_off_the_canvas_reaches_the_drawer_as_the_tools_error(
         scenario=scenario,
         scripts={
             DRAWER: [
-                draw(pixels=[{"x": 16, "y": 0}]),
+                draw(pixels=[[16, 0]]),
                 submit(obj=answer_of(scenario=scenario)),
                 SayTurn(text="done"),
             ]
