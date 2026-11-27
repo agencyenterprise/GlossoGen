@@ -3,9 +3,9 @@
 Controls how many viewers a team has, the grid and how many objects each board
 holds, whether near-misses make every board necessary, the competing second
 team and whether it is simulated, whether viewers broadcast or message one
-teammate at a time, how a team's characters are counted, the postmortem
-discussion phase with who may post in it and how much, channel noise, and the
-optional per-round character budget.
+teammate at a time, whether they send text or canvas drawings, how a team's
+characters or pixels are counted, the postmortem discussion phase with who may
+post in it and how much, channel noise, and the optional per-round budget.
 """
 
 from typing import Annotated, Self
@@ -18,6 +18,7 @@ from glossogen.scenarios.spot_the_intersection.board_generation import (
     planted_per_board,
 )
 from glossogen.scenarios.spot_the_intersection.board_model import MAX_GRID_SIZE
+from glossogen.scenarios.spot_the_intersection.link_medium import LinkMedium
 from glossogen.scenarios.spot_the_intersection.messaging import Messaging
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
     NO_CHARACTER_LIMIT,
@@ -26,6 +27,7 @@ from glossogen.scenarios.spot_the_intersection.postmortem_modes import (
 from glossogen.scenarios.spot_the_intersection.world_state import TeamCharacters
 
 MAX_TEAM_SIZE = 12
+MAX_CANVAS_SIDE = 64
 
 PositiveShare = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
@@ -61,6 +63,12 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     member sent (``busiest_member``). ``round_time_budget_seconds`` is an
     optional hard cap on that charge (``-1`` for none).
 
+    ``link_medium`` sets what a viewer sends during a round: text (``text``), or
+    drawings on a ``canvas_width`` x ``canvas_height`` canvas (``canvas``), which
+    its teammates receive as images. Under ``canvas`` a team is charged a pixel
+    for each painted pixel where it would be charged a character, and channel
+    noise is off. The canvas size is read only under ``canvas``.
+
     ``postmortem_mode`` sets who posts in each discussion phase: every viewer
     on the team's discussion channel (``whole_team``), one viewer on it
     (``single_author``, ``rotating_author``), or each viewer to one teammate it
@@ -86,6 +94,9 @@ class SpotTheIntersectionKnobs(BaseKnobs):
     team_characters: TeamCharacters
     postmortem_mode: PostmortemMode
     postmortem_character_limit: int
+    link_medium: LinkMedium
+    canvas_width: int = Field(ge=1, le=MAX_CANVAS_SIDE)
+    canvas_height: int = Field(ge=1, le=MAX_CANVAS_SIDE)
 
     @model_validator(mode="after")
     def _validate_count_distributions(self) -> Self:
@@ -194,6 +205,16 @@ class SpotTheIntersectionKnobs(BaseKnobs):
                 "viewer to name a teammate by agent id, which reaches their direct channel, and "
                 "direct channels are closed in the discussion phase "
                 f"(got messaging={self.messaging.value!r})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_canvas_has_no_noise(self) -> Self:
+        if self.link_medium == LinkMedium.CANVAS and self.channel_noise_level > 0:
+            raise ValueError(
+                "channel noise corrupts characters, and a canvas run sends drawings, so "
+                f"link_medium={LinkMedium.CANVAS.value!r} needs channel_noise_level=0 "
+                f"(got channel_noise_level={self.channel_noise_level})"
             )
         return self
 

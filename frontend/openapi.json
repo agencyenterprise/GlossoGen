@@ -3557,6 +3557,57 @@
         "title": "BranchSourceSummary",
         "description": "One source run that has been used as a derivation parent.\n\n``source_run`` is the parent's full summary; ``derived_count`` is how many\nruns (replace-agent, fork-at-round, cross-run-replace-agent source A)\nbranch from it."
       },
+      "CanvasDrawing": {
+        "properties": {
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Height"
+          },
+          "pixels": {
+            "items": {
+              "$ref": "#/components/schemas/CanvasPixel"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Pixels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "pixels"
+        ],
+        "title": "CanvasDrawing",
+        "description": "The pixels one message paints on a ``width`` x ``height`` canvas.\n\nA drawing paints at least one pixel, each pixel inside the canvas, and no\npixel twice."
+      },
+      "CanvasPixel": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "CanvasPixel",
+        "description": "One painted pixel: its column ``x`` and row ``y``, from 0 at the top left."
+      },
       "ChannelMessage": {
         "properties": {
           "message_id": {
@@ -3591,6 +3642,16 @@
           "token_count": {
             "type": "integer",
             "title": "Token Count"
+          },
+          "drawing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CanvasDrawing"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3602,10 +3663,11 @@
           "text",
           "timestamp",
           "round_number",
-          "token_count"
+          "token_count",
+          "drawing"
         ],
         "title": "ChannelMessage",
-        "description": "A message sent by an agent to a channel."
+        "description": "A message sent by an agent to a channel.\n\n``drawing`` holds the pixels of a message sent as a canvas drawing, whose\n``text`` is empty, and is ``None`` for a text message."
       },
       "ChartEncoding": {
         "properties": {
@@ -8698,6 +8760,16 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp"
+          },
+          "drawing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CanvasDrawing"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8709,7 +8781,7 @@
           "timestamp"
         ],
         "title": "SSESimulationMessagePayload",
-        "description": "Nested message payload inside an SSE message_sent event."
+        "description": "Nested message payload inside an SSE message_sent event.\n\n``drawing`` is present only on a message sent as a canvas drawing."
       },
       "SSESimulationStarted": {
         "properties": {

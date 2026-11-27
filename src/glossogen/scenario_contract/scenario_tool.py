@@ -8,11 +8,15 @@ An executor takes ``agent_id`` as its first parameter. The runner supplies it
 from the agent the tool was built for, so the model never names who is calling,
 and the remaining parameters, with their type annotations, are the tool's input
 schema. An executor refuses a call by raising ``ValueError``; the agent reads
-the message as the tool's error.
+the message as the tool's error. It returns text, or a Pydantic model the agent
+reads as JSON; a model that carries images (``CarriesImages``) reaches the agent
+with its images attached.
 """
 
 from collections.abc import Awaitable, Callable
 from typing import NamedTuple
+
+from pydantic import BaseModel
 
 SCENARIO_TOOL_TIMEOUT_SECONDS = 120.0
 """Default cap on a scenario tool body, so a stalled call (a judge HTTP request that
@@ -26,4 +30,4 @@ class ScenarioTool(NamedTuple):
 
     name: str
     description: str
-    executor: Callable[..., Awaitable[str]]
+    executor: Callable[..., Awaitable[str | BaseModel]]

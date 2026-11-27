@@ -60,7 +60,7 @@ class BusiestMemberShareMetric(Metric):
     def _measure(self, traffic: TeamTraffic) -> Measurement | None:
         """The team's measurement, or ``None`` when it was charged for no characters."""
         per_round = _round_shares(traffic=traffic)
-        team_total = sum(message.characters for message in traffic.messages)
+        team_total = sum(message.charge for message in traffic.messages)
         if not per_round or team_total == 0:
             return None
         score = sum(observation.value for observation in per_round) / len(per_round)
@@ -83,7 +83,7 @@ def _round_shares(traffic: TeamTraffic) -> list[RoundObservation]:
     for message in traffic.messages:
         by_agent = by_round.setdefault(message.round_number, {})
         by_agent[message.sender_agent_id] = (
-            by_agent.get(message.sender_agent_id, 0) + message.characters
+            by_agent.get(message.sender_agent_id, 0) + message.charge
         )
     observations: list[RoundObservation] = []
     for round_number, by_agent in sorted(by_round.items()):
@@ -106,9 +106,7 @@ def _member_shares(traffic: TeamTraffic, team_total: int) -> list[AgentObservati
     observations: list[AgentObservation] = []
     for agent_id in traffic.member_agent_ids:
         sent = sum(
-            message.characters
-            for message in traffic.messages
-            if message.sender_agent_id == agent_id
+            message.charge for message in traffic.messages if message.sender_agent_id == agent_id
         )
         observations.append(
             AgentObservation(

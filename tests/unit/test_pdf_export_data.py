@@ -61,6 +61,7 @@ def message(
         timestamp=at(seconds=seconds),
         round_number=round_number,
         token_count=1,
+        drawing=None,
     )
 
 

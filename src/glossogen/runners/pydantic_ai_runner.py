@@ -67,6 +67,7 @@ from glossogen.models.event import (
 from glossogen.models.event_base import TokenUsage
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.run_replay.tool_return_images import SplitToolReturn, split_tool_return
 from glossogen.runners.agent_run_retry import agent_run_retry
 from glossogen.runners.agent_tools import build_agent_tools
 from glossogen.runners.closing_prompt import answer_closing_prompt
@@ -104,6 +105,14 @@ def _serialize_tool_result(content: object) -> str:
         except TypeError, ValueError:
             logger.exception("Failed to JSON-serialize tool result, falling back to str()")
     return str(content)  # pyright: ignore[reportUnknownArgumentType]
+
+
+def _recorded_tool_result(content: object) -> SplitToolReturn:
+    """A tool result's text and attached images, as the event log records them."""
+    split = split_tool_return(content=content)
+    if split is not None:
+        return split
+    return SplitToolReturn(text=_serialize_tool_result(content=content), images=[])
 
 
 def tool_call_arguments(
@@ -1289,7 +1298,8 @@ class PydanticAIRunner(AgentRunner):
             )
 
         elif isinstance(event, FunctionToolResultEvent):
-            result_content = _serialize_tool_result(content=event.part.content)
+            recorded = _recorded_tool_result(content=event.part.content)
+            result_content = recorded.text
             logger.debug(
                 "Agent %s FunctionToolResult call_id=%s content=%.200s",
                 agent_id,
@@ -1306,6 +1316,7 @@ class PydanticAIRunner(AgentRunner):
                             call_id=matched.call_id,
                             arguments=matched.arguments,
                             result=result_content,
+                            images=recorded.images,
                             round_number=round_number,
                         )
                     )

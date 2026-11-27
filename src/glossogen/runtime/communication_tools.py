@@ -11,10 +11,9 @@ as the tool's error.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Any
 
-from glossogen.models.elapsed_time import elapsed_seconds_since_start
-from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
+from glossogen.models.mcp_responses import ReadChannelResult
+from glossogen.runtime.channel_message_views import channel_message_views
 from glossogen.runtime.simulation_state import SimulationRuntime
 
 READ_CHANNEL_DESCRIPTION = (
@@ -27,10 +26,13 @@ LIST_CHANNELS_DESCRIPTION = "See which channels you have access to."
 GET_CHANNEL_MEMBERS_DESCRIPTION = "See who is in a channel."
 
 
-def build_read_channel(runtime: SimulationRuntime) -> Callable[..., Awaitable[dict[str, Any]]]:
-    """The ``read_channel`` executor: recent messages, advancing the agent's read position."""
+def build_read_channel(runtime: SimulationRuntime) -> Callable[..., Awaitable[ReadChannelResult]]:
+    """The ``read_channel`` executor: recent messages, advancing the agent's read position.
 
-    async def read_channel(agent_id: str, channel_id: str, last_n: int) -> dict[str, Any]:
+    A drawing among the messages is attached to the result as an image.
+    """
+
+    async def read_channel(agent_id: str, channel_id: str, last_n: int) -> ReadChannelResult:
         if not runtime.channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
         session = runtime.resolve_session(agent_id=agent_id)
@@ -43,21 +45,14 @@ def build_read_channel(runtime: SimulationRuntime) -> Callable[..., Awaitable[di
             channel_id=channel_id,
             message_count=runtime.channel_router.get_message_count(channel_id=channel_id),
         )
+        views = channel_message_views(
+            messages=visible[-last_n:], simulation_start_time=runtime.simulation_start_time
+        )
         return ReadChannelResult(
             current_round=runtime.current_round,
-            messages=[
-                ChannelMessage(
-                    round=msg.round_number,
-                    sender=msg.sender_display_name,
-                    text=msg.text,
-                    elapsed_seconds=elapsed_seconds_since_start(
-                        when=msg.timestamp,
-                        start=runtime.simulation_start_time,
-                    ),
-                )
-                for msg in visible[-last_n:]
-            ],
-        ).model_dump()
+            messages=views.messages,
+            attached_images=views.images,
+        )
 
     return read_channel
 

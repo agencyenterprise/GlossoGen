@@ -18,6 +18,7 @@ from glossogen.models.event import RoundResultRecorded, WorldEventDelivered
 from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenarios.spot_the_intersection.ids import ROUND_LOST_MARKER
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
+from glossogen.scenarios.spot_the_intersection.link_medium import LinkMedium
 from glossogen.scenarios.spot_the_intersection.scenario import SpotTheIntersectionScenario
 from glossogen.scenarios.spot_the_intersection.world_state import (
     SimulatedOpponent,
@@ -98,7 +99,9 @@ def test_a_correct_team_loses_to_a_smaller_share_of_its_own_characters() -> None
     assert outcome.opponent_correct is True
     assert outcome.opponent_characters == 162
     assert outcome.opponent_simulated
-    assert "simulated opponent 162 chars" in outcome_reason(outcome=outcome)
+    assert "simulated opponent 162 chars" in outcome_reason(
+        outcome=outcome, link_medium=LinkMedium.TEXT
+    )
 
 
 def test_a_share_above_one_lets_a_correct_team_win() -> None:

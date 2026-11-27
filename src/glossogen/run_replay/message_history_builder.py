@@ -55,6 +55,7 @@ from glossogen.models.event import (
 from glossogen.models.mcp_responses import RecordedSendReceipt
 from glossogen.models.runner_prompts import RunnerPrompts
 from glossogen.models.tool_definition import ToolCallRequest
+from glossogen.run_replay.tool_return_images import ToolReturnWithImages, tool_return_with_images
 
 logger = logging.getLogger(__name__)
 
@@ -315,14 +316,20 @@ def _read_channel_content_as_elapsed(
 def _tool_return_content(
     result: ToolResultReceived,
     simulation_start_time: datetime,
-) -> str:
-    """Return a tool result's content, converting read_channel times to elapsed seconds."""
+) -> str | ToolReturnWithImages:
+    """Return a tool result's content, converting read_channel times to elapsed seconds.
+
+    A result recorded with images is rebuilt with them, as the agent received it.
+    """
+    text = result.result
     if result.tool_name == READ_CHANNEL_TOOL_NAME:
-        return _read_channel_content_as_elapsed(
+        text = _read_channel_content_as_elapsed(
             content=result.result,
             simulation_start_time=simulation_start_time,
         )
-    return result.result
+    if not result.images:
+        return text
+    return tool_return_with_images(text=text, images=result.images)
 
 
 class _OrphanGroup(NamedTuple):

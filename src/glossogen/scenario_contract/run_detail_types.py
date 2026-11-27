@@ -11,6 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.canvas import CanvasDrawing
 
 
 class AgentDetail(BaseModel):
@@ -30,7 +31,11 @@ class AgentDetail(BaseModel):
 
 
 class ChannelMessage(BaseModel):
-    """A message sent by an agent to a channel."""
+    """A message sent by an agent to a channel.
+
+    ``drawing`` holds the pixels of a message sent as a canvas drawing, whose
+    ``text`` is empty, and is ``None`` for a text message.
+    """
 
     message_id: str
     channel_id: str
@@ -40,6 +45,7 @@ class ChannelMessage(BaseModel):
     timestamp: datetime
     round_number: int
     token_count: int
+    drawing: CanvasDrawing | None
 
 
 class JudgeGroundTruthMetadata(BaseModel):

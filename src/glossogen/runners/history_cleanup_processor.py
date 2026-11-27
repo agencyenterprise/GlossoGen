@@ -5,7 +5,8 @@ full message history is re-sent on every model request, so two always-on
 transforms shrink it without losing information the agent still holds:
 
 1. Dedup ``read_channel`` messages already delivered in an earlier ``read_channel``
-   result: each channel message survives only in its earliest read.
+   result: each channel message survives only in its earliest read. A dropped
+   drawing takes its attached image with it.
 2. Drop empty ``read_notifications`` poll round-trips (``no_activity``), which carry
    no signal but accumulate in the hundreds.
 
@@ -28,9 +29,11 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
+from glossogen.models.canvas import ToolResultImage
 from glossogen.models.communication_tool_names import READ_CHANNEL_TOOL_NAME
 from glossogen.models.mcp_responses import ChannelMessage, ReadChannelResult
 from glossogen.models.read_notifications_schema import READ_NOTIFICATIONS_TOOL_NAME
+from glossogen.run_replay.tool_return_images import split_tool_return, tool_return_with_images
 from glossogen.scenario_contract.notification_delivery import (
     DELIVERED_NOTIFICATION_ADAPTER,
     DeliveredNoActivity,
@@ -40,10 +43,15 @@ logger = logging.getLogger(__name__)
 
 
 class _ParsedContent(NamedTuple):
-    """A tool return's content parsed as a mapping, plus how to re-serialize it."""
+    """A tool return's content parsed as a mapping, plus how to re-serialize it.
+
+    ``images`` holds the images attached after the JSON when the content was
+    built by ``tool_return_with_images``, and is ``None`` otherwise.
+    """
 
     payload: dict[str, Any] | None
     from_json_string: bool
+    images: list[ToolResultImage] | None
 
 
 class _ChannelMessageKey(NamedTuple):
@@ -63,25 +71,58 @@ def clean_history(messages: list[ModelMessage]) -> list[ModelMessage]:
 
 
 def _parse_tool_return_content(content: object) -> _ParsedContent:
-    """Parse a tool return's content into a mapping regardless of str/dict form."""
+    """Parse a tool return's content into a mapping regardless of str/dict/image-list form."""
+    split = split_tool_return(content=content)
+    if split is not None:
+        return _parse_json_text(text=split.text, images=split.images)
     if isinstance(content, str):
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError, ValueError:
-            return _ParsedContent(payload=None, from_json_string=True)
-        if isinstance(parsed, dict):
-            return _ParsedContent(payload=cast(dict[str, Any], parsed), from_json_string=True)
-        return _ParsedContent(payload=None, from_json_string=True)
+        return _parse_json_text(text=content, images=None)
     if isinstance(content, dict):
-        return _ParsedContent(payload=cast(dict[str, Any], content), from_json_string=False)
-    return _ParsedContent(payload=None, from_json_string=False)
+        return _ParsedContent(
+            payload=cast(dict[str, Any], content), from_json_string=False, images=None
+        )
+    return _ParsedContent(payload=None, from_json_string=False, images=None)
 
 
-def _serialize_content(payload: dict[str, Any], from_json_string: bool) -> object:
-    """Re-serialize a mapping back to the content form it came in as."""
-    if from_json_string:
+def _parse_json_text(text: str, images: list[ToolResultImage] | None) -> _ParsedContent:
+    """Parse JSON text into a mapping, or no mapping when it holds something else."""
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError, ValueError:
+        return _ParsedContent(payload=None, from_json_string=True, images=images)
+    if isinstance(parsed, dict):
+        return _ParsedContent(
+            payload=cast(dict[str, Any], parsed), from_json_string=True, images=images
+        )
+    return _ParsedContent(payload=None, from_json_string=True, images=images)
+
+
+def _serialize_content(payload: dict[str, Any], parsed: _ParsedContent) -> object:
+    """Re-serialize a mapping back to the content form it came in as.
+
+    Content that carried images keeps the images its messages still refer to.
+    """
+    if parsed.images is not None:
+        referenced = _referenced_image_numbers(payload=payload)
+        return tool_return_with_images(
+            text=json.dumps(payload),
+            images=[image for image in parsed.images if image.number in referenced],
+        )
+    if parsed.from_json_string:
         return json.dumps(payload)
     return payload
+
+
+def _referenced_image_numbers(payload: dict[str, Any]) -> set[int]:
+    """The image numbers the messages of a ``read_channel`` payload refer to."""
+    numbers: set[int] = set()
+    for entry in cast(list[Any], payload.get("messages", [])):
+        if not isinstance(entry, dict):
+            continue
+        image = cast(dict[str, Any], entry).get("image")
+        if isinstance(image, int):
+            numbers.add(image)
+    return numbers
 
 
 def _tool_call_parts(response: ModelResponse) -> list[ToolCallPart]:
@@ -206,7 +247,7 @@ def _dedup_channel_return(
     new_payload["messages"] = kept
     return replace(
         part,
-        content=_serialize_content(payload=new_payload, from_json_string=parsed.from_json_string),
+        content=_serialize_content(payload=new_payload, parsed=parsed),
     )
 
 

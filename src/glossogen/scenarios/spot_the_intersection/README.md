@@ -169,6 +169,37 @@ first and with what message. `protocol_explanation` uses
 `viewer_describe_one_to_one.jinja`, which asks who messages whom, in what order,
 and how a viewer chose a teammate.
 
+## Canvas drawings
+
+With `link_medium: "canvas"`, viewers send drawings instead of text during a
+round. `knobs_canvas.json` sets it, with two viewers per team.
+
+- A viewer calls `send_drawing` with a list of pixels. Each pixel is a column
+  `x` and a row `y` on a `canvas_width` x `canvas_height` canvas, counted from
+  0 at the top left. The preset's canvas is 16x16. With broadcast messaging the
+  drawing goes on the team's link. With one-to-one messaging, `send_drawing`
+  takes `to`, a teammate's agent id.
+- The tool refuses a pixel outside the canvas, a pixel listed twice, and an
+  empty list. The viewer reads the reason as the tool's error.
+- The recipients never see the coordinates. `read_channel` lists a drawing with
+  an empty text and an image number, and the drawing is attached to the same
+  result as a PNG. The PNG shows each painted pixel as a black square on white,
+  with grey lines between the squares and no labels.
+- The team is charged one unit per painted pixel. A text run charges one unit
+  per character. `team_characters`, `round_time_budget_seconds` and the
+  fewest-wins rule count pixels in the same way. The prompts, the budget
+  notices and the round results say "pixels".
+- During a round, text on the link or on a direct channel is refused. The
+  discussion phase stays text: viewers post with `send_message` on the
+  discussion channel, and those messages cost nothing.
+- `channel_noise_level` must be 0, because noise changes characters.
+
+The run page draws each drawing as the recipient's image shows it.
+
+`protocol_probe` is off in canvas runs, because its question asks for the text
+a viewer would send. `protocol_explanation` uses `viewer_describe_canvas.jinja`,
+which asks how a drawing shows a shape, a color and a cell.
+
 ## Discussion phase
 
 After each round, a discussion phase lets viewers agree on conventions.
@@ -225,6 +256,9 @@ and `-1`.
   the recorded verdict reason names the opponent as simulated. Above 1 the share
   lets a correct Team A win every round. The run's description, logged at its
   start, says Team B was simulated.
+- `link_medium: "canvas"` with `team_size: 2` (`knobs_canvas.json`): two teams
+  of two viewers who send drawings, each team charged its painted pixels. See
+  [Canvas drawings](#canvas-drawings).
 
 ## Key knobs
 
@@ -233,6 +267,8 @@ and `-1`.
   (each message reaches one teammate). See [Messaging](#messaging).
 - `team_characters`: `total` (a team is charged every character its members
   sent) or `busiest_member` (the most any one member sent).
+- `link_medium`: `text` or `canvas`, and `canvas_width` / `canvas_height`, from
+  1 to 64, which only a canvas run reads. See [Canvas drawings](#canvas-drawings).
 - `simulated_opponent_ratio`: `null` plays both teams. With `two_teams: true`,
   a positive number simulates Team B at that fixed share of Team A's characters,
   and a `[low, high]` pair with `0 < low <= high` draws the share each round in
@@ -259,7 +295,8 @@ and `-1`.
   and two reference costs in object mentions (every board listed in full, and
   each viewer in turn listing what survives on its board).
 - `intersection_submission_recorded`: each submission, whether it was the answer,
-  and the team's charge under `team_characters` at that moment.
+  and the team's charge under `team_characters` at that moment. The field is
+  named `team_characters`, and in a canvas run it holds pixels.
 
 ## Metrics
 
@@ -267,13 +304,15 @@ Generic: `round_success` (`_team_a` / `_team_b` with two teams),
 `round_success_after_resume`, the per-team character and language metrics on
 each team's link and, under one-to-one messaging, on its direct channels,
 `communication_*` via `build_communication_rounds`, and the `protocol_*` family
-via `get_protocol_probe_config` / `get_protocol_explanation_config`.
+via `get_protocol_probe_config` / `get_protocol_explanation_config`. In a
+canvas run, the generic character and language metrics read each drawing as a
+message with empty text, so they count 0 characters for it.
 
 This scenario's own, both per team and both counting only the messages the team
 was charged for (until its last member submits):
 
-- `busiest_member_share`: the busiest member's characters over the team's, per
-  round, averaged over the rounds the team sent anything. With four viewers,
+- `busiest_member_share`: the busiest member's characters (pixels in a canvas
+  run) over the team's, per round, averaged over the rounds the team sent anything. With four viewers,
   0.25 means the team spread its sending evenly and 1.0 means one member sent
   everything. Each member's observation is its share of the team's whole run.
 - `message_routes`: the distinct sender-to-teammate routes the team's messages
@@ -306,6 +345,8 @@ the run's grid.
 - `metered_messages.py`: the messages a log shows each team was charged for,
   read by the resume and by this scenario's metrics.
 - `messaging.py`: the `messaging` modes and who a viewer may address one-to-one.
+- `link_medium.py`, `drawing_tool.py`: the `link_medium` values, what one
+  message costs, and the `send_drawing` tool of a canvas run.
 - `postmortem_modes.py`, `discussion_phase.py`, `partner_channels.py`: the
   `postmortem_mode` rules and their refusals, what each viewer has sent in the
   current discussion phase, and the pair channels of a `chosen_partner` run.

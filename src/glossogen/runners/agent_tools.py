@@ -6,7 +6,9 @@ agent id is bound when the tool is built: an executor receives it as its
 parameters are the schema the model sees. A tool refuses a call by raising
 ``ValueError``, which reaches the model as the tool's error in the executor's
 words; any other exception is logged here and reaches the model as
-``Error executing tool <name>``.
+``Error executing tool <name>``. A result that attaches images, such as a
+``read_channel`` result listing drawings, reaches the model with the images
+after its JSON.
 
 The tools themselves are the runtime's ``ToolSpec`` list
 (:mod:`glossogen.runtime.agent_tool_specs`). ``list_offered_tool_definitions``
@@ -20,6 +22,7 @@ calls it.
 
 import asyncio
 import inspect
+import json
 import logging
 import typing
 from collections.abc import Awaitable, Callable
@@ -28,8 +31,10 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic_ai import ModelRetry, Tool
 
+from glossogen.models.mcp_responses import CarriesImages
 from glossogen.models.read_notifications_schema import read_notifications_tool_definition
 from glossogen.models.tool_definition import RecordedToolDefinition
+from glossogen.run_replay.tool_return_images import tool_return_with_images
 from glossogen.runners.read_notifications_tool import (
     RunTermination,
     build_read_notifications_tool,
@@ -158,9 +163,7 @@ def _bind(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> Tool[Non
         except Exception as exc:
             logger.exception("Tool %s raised for agent %s", spec.name, agent_id)
             raise ModelRetry(f"Error executing tool {spec.name}") from exc
-        if isinstance(result, BaseModel):
-            return result.model_dump()
-        return result
+        return _model_content(result=result)
 
     return Tool(
         _with_schema_of(function=call, spec=spec),
@@ -169,6 +172,21 @@ def _bind(spec: ToolSpec, runtime: SimulationRuntime, agent_id: str) -> Tool[Non
         description=spec.description,
         max_retries=TOOL_ERROR_RETRY_LIMIT,
     )
+
+
+def _model_content(result: Any) -> Any:
+    """What the model receives for an executor's result.
+
+    A result that attaches images becomes its JSON followed by the images, so
+    the model sees each image itself. Any other model is sent as a mapping.
+    """
+    if isinstance(result, CarriesImages) and result.attached_images:
+        return tool_return_with_images(
+            text=json.dumps(result.model_dump()), images=result.attached_images
+        )
+    if isinstance(result, BaseModel):
+        return result.model_dump()
+    return result
 
 
 def _with_schema_of(function: Callable[..., Awaitable[Any]], spec: ToolSpec) -> Executor:

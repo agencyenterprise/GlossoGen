@@ -11,6 +11,7 @@ import { splitRunId } from "@/shared/lib/run-id";
 import type { components } from "@/types/api.gen";
 import { useGroupPath } from "@/features/auth/group-context";
 import { buildAgentColorMap, buildChannelColorMap, deriveInitials } from "../runs/agent-colors";
+import { CanvasDrawingView } from "../runs/canvas-drawing-view";
 import { channelLabel } from "../runs/channel-label";
 import { formatTime, humanize } from "../runs/format";
 import { BranchChildCard } from "./branch-child-card";
@@ -285,6 +286,8 @@ export function BranchesTimeline({ runId }: { runId: string }) {
                             {formatTime(msg.timestamp)}
                           </span>
                         </div>
+
+                        {msg.drawing ? <CanvasDrawingView drawing={msg.drawing} /> : null}
 
                         {/* Message text */}
                         <button

@@ -123,7 +123,8 @@
       "text": "V1: corners very dim, some edges fading; face centers OK, perimeters losing light; hum thin/hollow at edges.",
       "timestamp": "2026-06-04T19:12:49.334608Z",
       "round_number": 1,
-      "token_count": 33
+      "token_count": 33,
+      "drawing": null
     },
     {
       "message_id": "0438f59e-f9b2-4ae6-adaf-ea74722a4bc2",
@@ -133,7 +134,8 @@
       "text": "Drape a folded cloth over the back face for 8 seconds at gentle coverage. Then chime a bell near each edge of the back face twice.",
       "timestamp": "2026-06-04T19:12:55.547859Z",
       "round_number": 1,
-      "token_count": 37
+      "token_count": 37,
+      "drawing": null
     },
     {
       "message_id": "6911e5ec-244f-47aa-abe3-0edaea35117c",
@@ -143,7 +145,8 @@
       "text": "Shorthand: LD=edge/corner dim, centers OK -> folded cloth back 8s, then bell each back edge x2. I’ll answer with bare procedure only to save budget.",
       "timestamp": "2026-06-04T19:13:14.284347Z",
       "round_number": 1,
-      "token_count": 44
+      "token_count": 44,
+      "drawing": null
     },
     {
       "message_id": "18884d31-a84c-4860-8e4a-23b9622ab994",
@@ -153,7 +156,8 @@
       "text": "Got it. I’ll report symptoms in shorthand only.",
       "timestamp": "2026-06-04T19:13:33.111643Z",
       "round_number": 1,
-      "token_count": 17
+      "token_count": 17,
+      "drawing": null
     },
     {
       "message_id": "f195e4cb-2906-43dc-8240-c6b2a9e5a923",
@@ -163,7 +167,8 @@
       "text": "Good. If mixed symptoms, prioritize: leak/stall/thermal, then low/high, then corner/resonance/void, then echo/boundary, then alignment/drift/inversion/split.",
       "timestamp": "2026-06-04T19:13:39.256848Z",
       "round_number": 1,
-      "token_count": 47
+      "token_count": 47,
+      "drawing": null
     },
     {
       "message_id": "bf60cb15-f78c-4abb-9da3-3f6c460cf33f",
@@ -173,7 +178,8 @@
       "text": "I’ll send terse symptom tags only. You send tool+face+time/count only.",
       "timestamp": "2026-06-04T19:13:46.621940Z",
       "round_number": 1,
-      "token_count": 24
+      "token_count": 24,
+      "drawing": null
     },
     {
       "message_id": "7180c8ba-e7fe-4ca5-9134-68c7c77b8b7d",
@@ -183,7 +189,8 @@
       "text": "Agreed.",
       "timestamp": "2026-06-04T19:13:51.412364Z",
       "round_number": 1,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "112a98d1-db42-4a3f-a343-3f870978b24c",
@@ -193,7 +200,8 @@
       "text": "OK. I’ll omit extra detail when a clean tag fits.",
       "timestamp": "2026-06-04T19:13:59.323214Z",
       "round_number": 1,
-      "token_count": 19
+      "token_count": 19,
+      "drawing": null
     },
     {
       "message_id": "1da18726-6bd6-4367-bf72-01bd3716c9d4",
@@ -203,7 +211,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:14:07.043064Z",
       "round_number": 1,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "ad08f443-f4f6-4bbd-9fbc-a74952338757",
@@ -213,7 +222,8 @@
       "text": "V2: dim still lights; silent; cold; no response to touch/tap.",
       "timestamp": "2026-06-04T19:14:19.372202Z",
       "round_number": 2,
-      "token_count": 24
+      "token_count": 24,
+      "drawing": null
     },
     {
       "message_id": "a8614395-81c6-4c27-8cad-a6e803acbf1f",
@@ -223,7 +233,8 @@
       "text": "Place the Veyru on a soft surface with the top face up at gentle contact. Let it rest undisturbed for 5 seconds.",
       "timestamp": "2026-06-04T19:14:27.865505Z",
       "round_number": 2,
-      "token_count": 35
+      "token_count": 35,
+      "drawing": null
     },
     {
       "message_id": "65fe9878-fd35-4999-b5df-f01c33df7da4",
@@ -233,7 +244,8 @@
       "text": "PS=dim+still+silent+cold/no response -> soft surface, top up, gentle, 5s undisturbed.",
       "timestamp": "2026-06-04T19:14:42.359568Z",
       "round_number": 2,
-      "token_count": 33
+      "token_count": 33,
+      "drawing": null
     },
     {
       "message_id": "2306c7b5-b384-4aff-a61e-f98e4d98b430",
@@ -243,7 +255,8 @@
       "text": "Got PS. I’ll use that tag next time.",
       "timestamp": "2026-06-04T19:14:52.303175Z",
       "round_number": 2,
-      "token_count": 17
+      "token_count": 17,
+      "drawing": null
     },
     {
       "message_id": "2190b3e5-091a-4584-af29-8a5a3e8bea2d",
@@ -253,7 +266,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T19:15:00.018729Z",
       "round_number": 2,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "4ba9d3d3-597a-486c-9be7-b18944a84558",
@@ -263,7 +277,8 @@
       "text": "If time, send more common tags in your priority order.",
       "timestamp": "2026-06-04T19:15:10.609596Z",
       "round_number": 2,
-      "token_count": 18
+      "token_count": 18,
+      "drawing": null
     },
     {
       "message_id": "db6dc65d-fd42-40d0-ae72-dfcad5bdfef2",
@@ -273,7 +288,8 @@
       "text": "Common tags: LI=dim corners/edges, centers OK. TB=hot all over+dim+red+rumble. HI=blazing white+harsh buzz+heat. LO=dim overall+bare hum. RC=one face much brighter+whine. CD=1-2 bright corners+click/tick+corner heat.",
       "timestamp": "2026-06-04T19:15:20.193337Z",
       "round_number": 2,
-      "token_count": 77
+      "token_count": 77,
+      "drawing": null
     },
     {
       "message_id": "401826e8-4456-44e1-951a-2fbc742f22e2",
@@ -283,7 +299,8 @@
       "text": "Perfect.",
       "timestamp": "2026-06-04T19:15:29.199991Z",
       "round_number": 2,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "c3934705-958d-4740-833d-08850bb207dc",
@@ -293,7 +310,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:15:36.075693Z",
       "round_number": 2,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "95c801d6-72fa-469b-93a0-cfddf531066c",
@@ -303,7 +321,8 @@
       "text": "V3: TB.",
       "timestamp": "2026-06-04T19:15:51.650323Z",
       "round_number": 3,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "6046db02-d586-4281-8213-e95b0ae34082",
@@ -313,7 +332,8 @@
       "text": "Drape a cloth over two adjacent edges near the back face for 20 seconds at firm coverage. Then chime a bell three times near the back face.",
       "timestamp": "2026-06-04T19:15:58.872476Z",
       "round_number": 3,
-      "token_count": 38
+      "token_count": 38,
+      "drawing": null
     },
     {
       "message_id": "e47ddb28-6139-4fd0-894d-b4d41ca59c25",
@@ -323,7 +343,8 @@
       "text": "TB shorthand worked well. Keep tags coming.",
       "timestamp": "2026-06-04T19:16:18.797741Z",
       "round_number": 3,
-      "token_count": 15
+      "token_count": 15,
+      "drawing": null
     },
     {
       "message_id": "a010c7e8-cdbd-4cf6-b1c6-e272d3b1bfdc",
@@ -333,7 +354,8 @@
       "text": "Will do.",
       "timestamp": "2026-06-04T19:16:29.753606Z",
       "round_number": 3,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "ad3c0eb0-2168-4880-8b5c-3225c48d7f88",
@@ -343,7 +365,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:16:33.716620Z",
       "round_number": 3,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "69ba8c6d-9638-4e99-b0a2-b865d2053380",
@@ -353,7 +376,8 @@
       "text": "V4: LD.",
       "timestamp": "2026-06-04T19:16:51.780784Z",
       "round_number": 4,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "a0c39ffe-5946-479a-869c-e289c5f40b12",
@@ -363,7 +387,8 @@
       "text": "Drape a cloth over two adjacent edges near the bottom face for 5 seconds at firm coverage. Then chime a bell three times near the bottom face.",
       "timestamp": "2026-06-04T19:16:57.510391Z",
       "round_number": 4,
-      "token_count": 38
+      "token_count": 38,
+      "drawing": null
     },
     {
       "message_id": "ede719d6-f01e-465a-ac9b-8c68bdd241a5",
@@ -373,7 +398,8 @@
       "text": "Now RC: one face much brighter, high whine, strong local vibration; others normal.",
       "timestamp": "2026-06-04T19:17:10.748515Z",
       "round_number": 4,
-      "token_count": 25
+      "token_count": 25,
+      "drawing": null
     },
     {
       "message_id": "6b5769a6-b07e-4209-b450-0dda9215dac2",
@@ -383,7 +409,8 @@
       "text": "Illuminate the bottom face with a dim lamp and the opposite face with a bright lamp simultaneously at firm brightness for 5 seconds, without moving the lamps.",
       "timestamp": "2026-06-04T19:17:17.684898Z",
       "round_number": 4,
-      "token_count": 36
+      "token_count": 36,
+      "drawing": null
     },
     {
       "message_id": "f68a7f75-9746-46c3-a321-cc4eb9662d80",
@@ -393,7 +420,8 @@
       "text": "We lost on link chars. Next rounds: you send 2-letter tag only; I send ultra-short action codes, not full prose, if that’s acceptable. If not, we need pre-agreed codebook in postmortem before next live Veyru.",
       "timestamp": "2026-06-04T19:17:30.626543Z",
       "round_number": 4,
-      "token_count": 60
+      "token_count": 60,
+      "drawing": null
     },
     {
       "message_id": "1b7db9f3-8de4-4a7e-8ae2-4df44c6023b2",
@@ -403,7 +431,8 @@
       "text": "Agreed. I’ll send tag only (+2nd tag if needed). Please define action-code grammar + face abbreviations. I’ll stop sending Done unless new symptoms appear.",
       "timestamp": "2026-06-04T19:17:58.473270Z",
       "round_number": 4,
-      "token_count": 41
+      "token_count": 41,
+      "drawing": null
     },
     {
       "message_id": "ccd32c51-2f81-4d09-9105-8ec5e3de7671",
@@ -413,7 +442,8 @@
       "text": "Code grammar for link: `P# F D I`.\nF(face): T=top, Bo=bottom, B=back.\nD: seconds (5/8/20).\nI: g=gentle, f=firm.\nDecode:\nP1=sustained tone all 6 faces, start F, D, let fade.\nP2=bell opposite faces alt, start F, pause D, 5 cycles.\nP3=cloth on 2 adjacent edges near F, D, then bell near F x3.\nP4=warm each corner of F for D, then trace each edge of F.\nP5=warm stone beside F for D; rotate repeat each face.\nP6=cool cloth D; fan F + opposite for D.\nP7=dim lamp F + bright lamp opposite, D.\nP8=folded cloth over F for D; bell each edge of F x2.\nP9=each corner of F: brief bell, then warm its 2 edges for D.\nP10=flat board against F for D; rotate repeat each face-pair.\nP11=bell center each face once, start F; then warm stone beside Veyru for D.\nP12=soft surface, F up, rest D.\nP13=cool cloth D; fan all 6 faces for D, start F.\nP14=rotate over D while steady tone near opposite faces, start F; then bell each corner once.\nExample link reply: `P8 B 8 g`",
       "timestamp": "2026-06-04T19:18:19.091289Z",
       "round_number": 4,
-      "token_count": 316
+      "token_count": 316,
+      "drawing": null
     },
     {
       "message_id": "a14f2980-b82f-4bbc-9319-5d8c8505cab0",
@@ -423,7 +453,8 @@
       "text": "Perfect. Need face codes for front/left/right too, and mixed-tag format. I’ll send primary+secondary only.",
       "timestamp": "2026-06-04T19:18:31.160845Z",
       "round_number": 4,
-      "token_count": 31
+      "token_count": 31,
+      "drawing": null
     },
     {
       "message_id": "ca2852e2-5aa3-4e7b-a9e2-47329b6e80d0",
@@ -433,7 +464,8 @@
       "text": "More face codes: Fr=front, L=left, R=right. Mixed symptom tag format from you: `TAG1+TAG2` in priority order only. My mixed reply: `P# F D I ; P# F D I` execute left to right.",
       "timestamp": "2026-06-04T19:18:46.642620Z",
       "round_number": 4,
-      "token_count": 63
+      "token_count": 63,
+      "drawing": null
     },
     {
       "message_id": "04dc2b71-83e1-49f6-80bb-5a474003239a",
@@ -443,7 +475,8 @@
       "text": "Got it. New post-fix symptoms: I’ll send just tag or TAG1+TAG2. If no tag fits, shortest plain description.",
       "timestamp": "2026-06-04T19:18:56.579298Z",
       "round_number": 4,
-      "token_count": 36
+      "token_count": 36,
+      "drawing": null
     },
     {
       "message_id": "87c8668f-a238-4427-bda1-e27ada222f5a",
@@ -453,7 +486,8 @@
       "text": "Perfect.",
       "timestamp": "2026-06-04T19:19:08.006656Z",
       "round_number": 4,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "ed2a2cc7-4149-47db-a93e-61ff94b68bd1",
@@ -463,7 +497,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T19:19:27.840749Z",
       "round_number": 5,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "2866b0da-5242-4e73-b787-8c012062a656",
@@ -473,7 +508,8 @@
       "text": "P4 T 10 g",
       "timestamp": "2026-06-04T19:19:40.971238Z",
       "round_number": 5,
-      "token_count": 12
+      "token_count": 12,
+      "drawing": null
     },
     {
       "message_id": "0d132cd4-8bed-48ea-a17d-ae2dc631a7d3",
@@ -483,7 +519,8 @@
       "text": "No effect.",
       "timestamp": "2026-06-04T19:20:05.140964Z",
       "round_number": 5,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "118bb85b-6d1f-48f6-b3fb-57d05263ea42",
@@ -493,7 +530,8 @@
       "text": "New tag?",
       "timestamp": "2026-06-04T19:20:20.812647Z",
       "round_number": 5,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "ab4eb88f-da02-4b77-b8a5-b7cb36b57c66",
@@ -503,7 +541,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T19:20:33.137300Z",
       "round_number": 5,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "b01ad42c-f898-4be5-809c-153feaa2cb74",
@@ -513,7 +552,8 @@
       "text": "Warm each corner of the top face by holding a heated stone nearby for 10 seconds at gentle warmth, in sequence. Then trace each edge of the top face with a finger.",
       "timestamp": "2026-06-04T19:20:45.210378Z",
       "round_number": 5,
-      "token_count": 42
+      "token_count": 42,
+      "drawing": null
     },
     {
       "message_id": "0e0a5ccf-c6ef-410e-89d3-f2f4e6cbb9c6",
@@ -523,7 +563,8 @@
       "text": "Too bright; layered hum; some faces frozen/unresponsive.",
       "timestamp": "2026-06-04T19:21:14.237404Z",
       "round_number": 5,
-      "token_count": 18
+      "token_count": 18,
+      "drawing": null
     },
     {
       "message_id": "837de8ab-f419-4731-9c13-0e1b4b910bd7",
@@ -533,7 +574,8 @@
       "text": "P2 T 10 g",
       "timestamp": "2026-06-04T19:21:23.518746Z",
       "round_number": 5,
-      "token_count": 12
+      "token_count": 12,
+      "drawing": null
     },
     {
       "message_id": "abe67fe2-8c41-4a32-ade4-66724c4115cb",
@@ -543,7 +585,8 @@
       "text": "Round 5 failed only because I expanded after `No effect.` Next live: I’ll send no-spaces code only: `P#FDI` (example `P4T10g`). Mixed: `P#FDI/P#FDI`. If result changes, send only new tag; never send `No effect`, `Done`, or prose unless no tag fits.",
       "timestamp": "2026-06-04T19:22:01.862853Z",
       "round_number": 5,
-      "token_count": 83
+      "token_count": 83,
+      "drawing": null
     },
     {
       "message_id": "8a2cf517-9487-4248-acd2-6529fd4b8923",
@@ -553,7 +596,8 @@
       "text": "Agreed. Need tag for bright+layered hum+frozen faces. Also clarify P4 (10s each corner or total? trace with finger or stone?) and P2 (10s pause between rings or between full cycles?).",
       "timestamp": "2026-06-04T19:22:39.671755Z",
       "round_number": 5,
-      "token_count": 54
+      "token_count": 54,
+      "drawing": null
     },
     {
       "message_id": "95ed7d54-c314-409e-9501-c6e7f1352eda",
@@ -563,7 +607,8 @@
       "text": "Tag: ES. Clarify: P4 = 10s at each corner, then trace each edge with finger. P2 = alternate opposite-face chimes with 10s pause between chimes; 5 cycles total.",
       "timestamp": "2026-06-04T19:22:56.458181Z",
       "round_number": 5,
-      "token_count": 52
+      "token_count": 52,
+      "drawing": null
     },
     {
       "message_id": "3255191d-8268-4061-949f-c930a61efa3b",
@@ -573,7 +618,8 @@
       "text": "Got ES. Ready.",
       "timestamp": "2026-06-04T19:23:08.743046Z",
       "round_number": 5,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "5f45cb53-6c0b-48f2-b472-aa8fdd80d329",
@@ -583,7 +629,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:23:17.727585Z",
       "round_number": 5,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "1b35ee20-be04-4d87-8eaf-6c4c00accc0a",
@@ -593,7 +640,8 @@
       "text": "LI",
       "timestamp": "2026-06-04T19:23:39.451018Z",
       "round_number": 6,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "cbcad170-fcc6-4d4e-827f-3389d107909b",
@@ -603,7 +651,8 @@
       "text": "P9B5m",
       "timestamp": "2026-06-04T19:23:55.493619Z",
       "round_number": 6,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "fac48592-a1fa-4542-9837-38acd0164df4",
@@ -613,7 +662,8 @@
       "text": "Success. Add intensity code: m=moderate. No-spaces code works.",
       "timestamp": "2026-06-04T19:25:05.662115Z",
       "round_number": 6,
-      "token_count": 23
+      "token_count": 23,
+      "drawing": null
     },
     {
       "message_id": "c52300e2-e58b-49ec-b4da-63b15c1b4137",
@@ -623,7 +673,8 @@
       "text": "Great. Added m=moderate. LI→P9B5m worked cleanly.",
       "timestamp": "2026-06-04T19:25:24.110580Z",
       "round_number": 6,
-      "token_count": 25
+      "token_count": 25,
+      "drawing": null
     },
     {
       "message_id": "203423c5-c81b-4aa1-8427-4e99cad7429e",
@@ -633,7 +684,8 @@
       "text": "Excellent.",
       "timestamp": "2026-06-04T19:25:35.010282Z",
       "round_number": 6,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "c1dbe718-00c9-4066-947a-1f8bf5d83915",
@@ -643,7 +695,8 @@
       "text": "CD",
       "timestamp": "2026-06-04T19:25:50.221688Z",
       "round_number": 7,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "195b2427-b2d9-4076-9c13-45a6251c2d5b",
@@ -653,7 +706,8 @@
       "text": "P6L15f",
       "timestamp": "2026-06-04T19:26:02.296098Z",
       "round_number": 7,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "ea72a30b-aa52-4520-a102-4d060ac2e937",
@@ -663,7 +717,8 @@
       "text": "Opp faces pulse bright/dark; hum alternates two tones; edges flash in sync.",
       "timestamp": "2026-06-04T19:26:30.257349Z",
       "round_number": 7,
-      "token_count": 24
+      "token_count": 24,
+      "drawing": null
     },
     {
       "message_id": "7665d8ae-624a-45b2-bf37-d5abb2cbfa2e",
@@ -673,7 +728,8 @@
       "text": "P4L15f",
       "timestamp": "2026-06-04T19:26:43.164696Z",
       "round_number": 7,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "b5f98dd9-b732-43c1-bf00-40dbf8a385b5",
@@ -683,7 +739,8 @@
       "text": "Light drifts across faces; edges blur/smear; hum wavers in pitch.",
       "timestamp": "2026-06-04T19:27:16.262088Z",
       "round_number": 7,
-      "token_count": 24
+      "token_count": 24,
+      "drawing": null
     },
     {
       "message_id": "1e096443-5705-4c1b-8298-f4a01ec43560",
@@ -693,7 +750,8 @@
       "text": "P13L15f",
       "timestamp": "2026-06-04T19:27:33.203787Z",
       "round_number": 7,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "d066e1c2-2155-45f6-b6be-49ac07077ad6",
@@ -703,7 +761,8 @@
       "text": "Round 7 survived with code-only replies through 3 symptom shifts. Consider tags PI for strict opposite-face pulsing, DE for drifting light/blurred edges/wavering hum if you want them shorter next time.",
       "timestamp": "2026-06-04T19:27:59.257526Z",
       "round_number": 7,
-      "token_count": 49
+      "token_count": 49,
+      "drawing": null
     },
     {
       "message_id": "1dbdd6a9-364d-4a5c-b349-c3875b7d6fed",
@@ -713,7 +772,8 @@
       "text": "Yes—add PI and DE.",
       "timestamp": "2026-06-04T19:28:21.170810Z",
       "round_number": 7,
-      "token_count": 13
+      "token_count": 13,
+      "drawing": null
     },
     {
       "message_id": "58b128a3-d640-411a-bc19-31350e53529e",
@@ -723,7 +783,8 @@
       "text": "Added.",
       "timestamp": "2026-06-04T19:28:35.539728Z",
       "round_number": 7,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "c2fe1012-09e1-4d24-9ea8-3eec0f55eee8",
@@ -733,7 +794,8 @@
       "text": "DE",
       "timestamp": "2026-06-04T19:29:09.121568Z",
       "round_number": 8,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "cc4bd217-58ad-4e78-a8b4-dc5a71eb6c19",
@@ -743,7 +805,8 @@
       "text": "P13L8g",
       "timestamp": "2026-06-04T19:29:25.939629Z",
       "round_number": 8,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "fd36974e-4d1c-476c-ab2a-fd2c1d442dd1",
@@ -753,7 +816,8 @@
       "text": "DE tag worked.",
       "timestamp": "2026-06-04T19:30:13.866271Z",
       "round_number": 8,
-      "token_count": 10
+      "token_count": 10,
+      "drawing": null
     },
     {
       "message_id": "db0e3568-5c89-49c7-a33b-f3d1ca1b26af",
@@ -763,7 +827,8 @@
       "text": "Good. Short tags are paying off.",
       "timestamp": "2026-06-04T19:30:49.269781Z",
       "round_number": 8,
-      "token_count": 14
+      "token_count": 14,
+      "drawing": null
     },
     {
       "message_id": "494d3e97-788c-4d2b-b45d-7633f208e4b6",
@@ -773,7 +838,8 @@
       "text": "Yes.",
       "timestamp": "2026-06-04T19:31:11.508336Z",
       "round_number": 8,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "d2d6bfe2-d2e4-434f-b373-04d4f0fb7b93",
@@ -783,7 +849,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T19:31:43.987324Z",
       "round_number": 9,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "5fa9444d-857d-450f-82b6-cc8f25f217df",
@@ -793,7 +860,8 @@
       "text": "P2Bo10m",
       "timestamp": "2026-06-04T19:32:18.284697Z",
       "round_number": 9,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "239eef75-211e-4a22-a74a-e9e56a912809",
@@ -803,7 +871,8 @@
       "text": "Normal surface glow; hollow tap; dark center; thin surface hum.",
       "timestamp": "2026-06-04T19:32:53.585963Z",
       "round_number": 9,
-      "token_count": 20
+      "token_count": 20,
+      "drawing": null
     },
     {
       "message_id": "ab8fe00e-a128-4cdb-b4d2-ed24e793ab1f",
@@ -813,7 +882,8 @@
       "text": "P11Bo10m",
       "timestamp": "2026-06-04T19:33:15.484483Z",
       "round_number": 9,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "845e64f7-64a1-42e6-8b8b-97f90c0057a8",
@@ -823,7 +893,8 @@
       "text": "DE",
       "timestamp": "2026-06-04T19:34:02.437233Z",
       "round_number": 9,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "aa047f41-ba5e-4034-9f56-4ab130654cc3",
@@ -833,7 +904,8 @@
       "text": "P13Bo10m",
       "timestamp": "2026-06-04T19:34:11.787568Z",
       "round_number": 9,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "a30ef378-0b06-4a16-ba76-3c8f6ae5ab31",
@@ -843,7 +915,8 @@
       "text": "PI",
       "timestamp": "2026-06-04T19:34:49.213152Z",
       "round_number": 9,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "bf646ffb-a5ce-47b8-a1f4-ef36f1f5af81",
@@ -853,7 +926,8 @@
       "text": "P4Bo10m",
       "timestamp": "2026-06-04T19:35:10.904265Z",
       "round_number": 9,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "4142a21a-119d-4c31-9c78-5a7ceb73f809",
@@ -863,7 +937,8 @@
       "text": "Round 9 stable with LO→CV→DE→PI chain. Add CV tag = normal glow + hollow tap + dark center + thin surface hum.",
       "timestamp": "2026-06-04T19:35:40.890336Z",
       "round_number": 9,
-      "token_count": 37
+      "token_count": 37,
+      "drawing": null
     },
     {
       "message_id": "d2c6661e-dd48-4f65-a21e-9b274f169aef",
@@ -873,7 +948,8 @@
       "text": "Added CV.",
       "timestamp": "2026-06-04T19:36:18.137180Z",
       "round_number": 9,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "5b4f3968-a489-4810-86f2-2dd2a4815536",
@@ -883,7 +959,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T19:36:29.278239Z",
       "round_number": 9,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "88cf1cd2-cf6b-4e3d-9937-e52fb678aa0d",
@@ -893,7 +970,8 @@
       "text": "PS",
       "timestamp": "2026-06-04T19:36:51.913850Z",
       "round_number": 10,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "6bf2680a-9ccf-4d2c-bd41-74d1622411ac",
@@ -903,7 +981,8 @@
       "text": "P8T20f",
       "timestamp": "2026-06-04T19:37:03.867424Z",
       "round_number": 10,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "9a5dd60f-f675-4c2b-b8b6-048482f26302",
@@ -913,7 +992,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T19:37:29.868707Z",
       "round_number": 10,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "30a60975-b91d-48bf-a573-2e6a62526848",
@@ -923,7 +1003,8 @@
       "text": "P2T20f",
       "timestamp": "2026-06-04T19:37:40.870964Z",
       "round_number": 10,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "cbe93ca0-f7ee-4f90-afbb-375abedb4b26",
@@ -933,7 +1014,8 @@
       "text": "PS and LO tags stayed clean. Code-only handled the shift fast.",
       "timestamp": "2026-06-04T19:38:07.186784Z",
       "round_number": 10,
-      "token_count": 20
+      "token_count": 20,
+      "drawing": null
     },
     {
       "message_id": "6c042007-75cc-4fe2-b017-f24751307270",
@@ -943,7 +1025,8 @@
       "text": "Agreed. Ready.",
       "timestamp": "2026-06-04T19:38:30.738327Z",
       "round_number": 10,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "3fc0321b-c6e5-4c8b-8fe0-deb5c655fe7f",
@@ -953,7 +1036,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:38:39.211075Z",
       "round_number": 10,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "24aff3f2-eca6-4556-943c-41804e100e23",
@@ -963,7 +1047,8 @@
       "text": "LI",
       "timestamp": "2026-06-04T19:38:54.395229Z",
       "round_number": 11,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "28981c1d-8098-4d84-a298-a20d6de4b925",
@@ -973,7 +1058,8 @@
       "text": "P12L12f",
       "timestamp": "2026-06-04T19:39:04.222679Z",
       "round_number": 11,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "c6d0d1a6-a9d7-4295-8788-c279ae9b365e",
@@ -983,7 +1069,8 @@
       "text": "LI",
       "timestamp": "2026-06-04T19:39:29.271478Z",
       "round_number": 11,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "c06c6003-9473-44da-9e7d-4a73e3817b35",
@@ -993,7 +1080,8 @@
       "text": "Place the Veyru on a soft surface with the left face up at firm contact. Let it rest undisturbed for 12 seconds.",
       "timestamp": "2026-06-04T19:40:20.032519Z",
       "round_number": 11,
-      "token_count": 35
+      "token_count": 35,
+      "drawing": null
     },
     {
       "message_id": "c9369567-4102-4500-94c3-b7f027ed6b72",
@@ -1003,7 +1091,8 @@
       "text": "CD",
       "timestamp": "2026-06-04T19:41:08.937571Z",
       "round_number": 11,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "bf59ae3c-4d65-4dcd-a4fa-e67728af0796",
@@ -1013,7 +1102,8 @@
       "text": "P3L12f",
       "timestamp": "2026-06-04T19:41:29.188211Z",
       "round_number": 11,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "e4f58efd-a524-4f26-bd39-605ba0c2d4d9",
@@ -1023,7 +1113,8 @@
       "text": "Clashing tones; lights alternate 2 configs; edges shimmer.",
       "timestamp": "2026-06-04T19:42:35.922449Z",
       "round_number": 11,
-      "token_count": 19
+      "token_count": 19,
+      "drawing": null
     },
     {
       "message_id": "a552b917-21a0-4044-9afd-53a9341a3652",
@@ -1033,7 +1124,8 @@
       "text": "P6L12f",
       "timestamp": "2026-06-04T19:43:00.886363Z",
       "round_number": 11,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "16a93e36-e4a7-472d-b847-e05f33b7eb19",
@@ -1043,7 +1135,8 @@
       "text": "Same.",
       "timestamp": "2026-06-04T19:44:04.311997Z",
       "round_number": 11,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "c7ff3e97-289b-4a4d-a166-256c4c0945ae",
@@ -1053,7 +1146,8 @@
       "text": "P6: cool cloth whole Veyru 12s; then fan L+opp 12s.",
       "timestamp": "2026-06-04T19:44:29.052105Z",
       "round_number": 11,
-      "token_count": 28
+      "token_count": 28,
+      "drawing": null
     },
     {
       "message_id": "3bf18331-e971-46ab-aca4-148232188354",
@@ -1063,7 +1157,8 @@
       "text": "We missed by 1 char. New rule: if a tag repeats, I resend only code unless you send `?`. Also, treat every code as the full template exactly as defined in our codebook—no simplification. Key clarifications to remember: P6 = cool cloth over whole Veyru for D, then fan F+opp for D. P12 = soft surface, F up, leave untouched for D.",
       "timestamp": "2026-06-04T19:45:20.689854Z",
       "round_number": 11,
-      "token_count": 93
+      "token_count": 93,
+      "drawing": null
     },
     {
       "message_id": "c6c743bb-e619-4568-b1d8-967cdf329857",
@@ -1073,7 +1168,8 @@
       "text": "Got it. I’ll use ? only if code unclear. Need a short tag for clashing tones + alternating configs + edge shimmer.",
       "timestamp": "2026-06-04T19:45:53.537343Z",
       "round_number": 11,
-      "token_count": 33
+      "token_count": 33,
+      "drawing": null
     },
     {
       "message_id": "6677c226-0a8d-48cd-8427-212dba05461c",
@@ -1083,7 +1179,8 @@
       "text": "HS.",
       "timestamp": "2026-06-04T19:46:33.154142Z",
       "round_number": 11,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "463ff6ad-23b3-4120-a748-ff8891f9e890",
@@ -1093,7 +1190,8 @@
       "text": "Added HS.",
       "timestamp": "2026-06-04T19:46:58.580377Z",
       "round_number": 11,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "e2ae2bba-d609-4b7e-b37a-761c192c9d1a",
@@ -1103,7 +1201,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T19:47:20.821758Z",
       "round_number": 11,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "017826c1-6823-407c-9401-0afd178b0990",
@@ -1113,7 +1212,8 @@
       "text": "LI",
       "timestamp": "2026-06-04T19:48:16.012159Z",
       "round_number": 12,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "a8210baf-7f67-4180-8215-f1dfceb7daa4",
@@ -1123,7 +1223,8 @@
       "text": "P3Bo5g",
       "timestamp": "2026-06-04T19:49:22.111158Z",
       "round_number": 12,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "514b34a8-14a1-4212-9033-e704fa81316e",
@@ -1133,7 +1234,8 @@
       "text": "PS",
       "timestamp": "2026-06-04T19:50:27.927544Z",
       "round_number": 12,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "2db776e0-44b4-4889-9683-ddf2c74d4681",
@@ -1143,7 +1245,8 @@
       "text": "P10Bo5g",
       "timestamp": "2026-06-04T19:50:43.692337Z",
       "round_number": 12,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "7b49a364-0110-46fa-9a77-bb0cc29be9dd",
@@ -1153,7 +1256,8 @@
       "text": "HI",
       "timestamp": "2026-06-04T19:52:06.631644Z",
       "round_number": 12,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "53266693-3f1b-4ab9-9f35-acecf3f498d9",
@@ -1163,7 +1267,8 @@
       "text": "P5Bo5g",
       "timestamp": "2026-06-04T19:52:34.578733Z",
       "round_number": 12,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "5daa2956-2ab3-42b6-901c-5745ae04d655",
@@ -1173,7 +1278,8 @@
       "text": "Round 12 clean: LI→PS→HI all code-only.",
       "timestamp": "2026-06-04T19:54:08.878109Z",
       "round_number": 12,
-      "token_count": 20
+      "token_count": 20,
+      "drawing": null
     },
     {
       "message_id": "4c3aeba2-e0a2-4591-b5d4-2fb3510b0b10",
@@ -1183,7 +1289,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T19:54:56.962116Z",
       "round_number": 12,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "1e5e252b-8afa-49b1-834d-8b6bb66820ec",
@@ -1193,7 +1300,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:55:28.013817Z",
       "round_number": 12,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "1de505c2-d01c-4400-a23d-196c41d98f8e",
@@ -1203,7 +1311,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T19:56:09.612257Z",
       "round_number": 13,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "0c0692a3-3de1-4b38-9b96-03071df661e8",
@@ -1213,7 +1322,8 @@
       "text": "P1L20g",
       "timestamp": "2026-06-04T19:56:22.899484Z",
       "round_number": 13,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "3e19ce46-6fd1-4c30-851b-6fc97862db87",
@@ -1223,7 +1333,8 @@
       "text": "Clean.",
       "timestamp": "2026-06-04T19:56:56.434063Z",
       "round_number": 13,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "a2a674ca-a872-473a-b178-1bbcb413b8c5",
@@ -1233,7 +1344,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T19:57:18.832141Z",
       "round_number": 13,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "4fc6924d-bcd1-48cc-a82c-7845db82c128",
@@ -1243,7 +1355,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T19:57:30.866851Z",
       "round_number": 13,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "996f9c95-7c00-41df-8422-4cb36b22ab68",
@@ -1253,7 +1366,8 @@
       "text": "PS",
       "timestamp": "2026-06-04T19:58:03.734791Z",
       "round_number": 14,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "34a86ae3-2ac4-4004-a56c-467adecdcb67",
@@ -1263,7 +1377,8 @@
       "text": "P2Bo8f",
       "timestamp": "2026-06-04T19:58:48.832201Z",
       "round_number": 14,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "7a8c9495-f3c3-41ee-9b68-88d4139b575f",
@@ -1273,7 +1388,8 @@
       "text": "RC",
       "timestamp": "2026-06-04T19:59:55.102879Z",
       "round_number": 14,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "395c6281-887a-40af-b99e-848c3d86abfd",
@@ -1283,7 +1399,8 @@
       "text": "P13Bo8f",
       "timestamp": "2026-06-04T20:00:25.977892Z",
       "round_number": 14,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "c4c107f1-e3bb-431c-960f-0fd02002519b",
@@ -1293,7 +1410,8 @@
       "text": "PI",
       "timestamp": "2026-06-04T20:01:41.705153Z",
       "round_number": 14,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "2346a080-d8c7-4c95-9e9d-a8b2155a79c7",
@@ -1303,7 +1421,8 @@
       "text": "P12Bo8f",
       "timestamp": "2026-06-04T20:02:15.335355Z",
       "round_number": 14,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "a601e007-174c-4dcb-a863-a99d7f1882d3",
@@ -1313,7 +1432,8 @@
       "text": "PS→RC→PI worked cleanly.",
       "timestamp": "2026-06-04T20:03:28.317449Z",
       "round_number": 14,
-      "token_count": 15
+      "token_count": 15,
+      "drawing": null
     },
     {
       "message_id": "0e2cc561-8804-4d19-9970-f6d242d49428",
@@ -1323,7 +1443,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T20:04:32.665866Z",
       "round_number": 14,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     },
     {
       "message_id": "b70b50f5-f39b-4ffc-ad50-600649f762a2",
@@ -1333,7 +1454,8 @@
       "text": "👍",
       "timestamp": "2026-06-04T20:04:57.275390Z",
       "round_number": 14,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "132b0b3b-a2ad-4e07-aa4d-537d419a61fb",
@@ -1343,7 +1465,8 @@
       "text": "LO",
       "timestamp": "2026-06-04T20:05:34.035544Z",
       "round_number": 15,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "5cfe3322-d9c4-4345-8ce8-d64a0e90f4a6",
@@ -1353,7 +1476,8 @@
       "text": "P1L12g",
       "timestamp": "2026-06-04T20:05:57.145008Z",
       "round_number": 15,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "8ab42336-a27b-4540-8bc2-0f86802f1a28",
@@ -1363,7 +1487,8 @@
       "text": "Edges wobble; faces bulge/curve; hum muffled.",
       "timestamp": "2026-06-04T20:06:57.127953Z",
       "round_number": 15,
-      "token_count": 20
+      "token_count": 20,
+      "drawing": null
     },
     {
       "message_id": "b2500d5b-a449-4dbc-8286-a5cfbc511d7f",
@@ -1373,7 +1498,8 @@
       "text": "P6L12g",
       "timestamp": "2026-06-04T20:07:36.291835Z",
       "round_number": 15,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "cb73df21-49ec-4169-b9b3-200c4a7d0016",
@@ -1383,7 +1509,8 @@
       "text": "HS",
       "timestamp": "2026-06-04T20:08:28.351136Z",
       "round_number": 15,
-      "token_count": 7
+      "token_count": 7,
+      "drawing": null
     },
     {
       "message_id": "ad3ee2f7-914c-4e38-9be2-f81bda440eaa",
@@ -1393,7 +1520,8 @@
       "text": "P8L12g",
       "timestamp": "2026-06-04T20:08:48.810874Z",
       "round_number": 15,
-      "token_count": 11
+      "token_count": 11,
+      "drawing": null
     },
     {
       "message_id": "988717f3-25b9-4144-9aca-b00f4dc550d7",
@@ -1403,7 +1531,8 @@
       "text": "Add BS = edges wobble/faces bulge or curve/hum muffled. Round 15 was LO→BS→HS.",
       "timestamp": "2026-06-04T20:09:55.299479Z",
       "round_number": 15,
-      "token_count": 33
+      "token_count": 33,
+      "drawing": null
     },
     {
       "message_id": "aae9b0f3-0ecd-4bbc-94b1-68a3f2e074bc",
@@ -1413,7 +1542,8 @@
       "text": "Added BS.",
       "timestamp": "2026-06-04T20:10:25.184792Z",
       "round_number": 15,
-      "token_count": 9
+      "token_count": 9,
+      "drawing": null
     },
     {
       "message_id": "08f63ff1-67d2-4dda-a88e-2813f605349f",
@@ -1423,7 +1553,8 @@
       "text": "Good.",
       "timestamp": "2026-06-04T20:10:52.216561Z",
       "round_number": 15,
-      "token_count": 8
+      "token_count": 8,
+      "drawing": null
     }
   ],
   "reasoning": [

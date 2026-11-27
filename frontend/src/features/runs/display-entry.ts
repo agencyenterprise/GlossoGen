@@ -4,6 +4,7 @@ import { parseNotificationResult, TOOL_NAME_READ_NOTIFICATIONS } from "./notific
 import type { ScenarioExtras, ScenarioPlugin, ToolCaption } from "./scenario-plugin";
 
 type ChannelMessage = components["schemas"]["ChannelMessage"];
+type CanvasDrawing = components["schemas"]["CanvasDrawing"];
 type ReasoningEntry = components["schemas"]["ReasoningEntry"];
 type ToolUseEntry = components["schemas"]["ToolUseEntry"];
 type AgentRunCycleFailedEntry = components["schemas"]["AgentRunCycleFailedEntry"];
@@ -66,6 +67,8 @@ export interface DisplayEntry {
   is_unrecognized: boolean;
   /** Character count of the message text — only meaningful for channel messages. */
   character_count: number;
+  /** The pixels of a channel message sent as a canvas drawing; null otherwise. */
+  drawing: CanvasDrawing | null;
   /** Tool use fields — only populated when is_tool_use or is_notification_result is true. */
   tool_name: string;
   tool_arguments: Record<string, unknown>;
@@ -104,6 +107,7 @@ const EMPTY_ENTRY_DEFAULTS = {
   is_run_cycle_failure: false,
   is_unrecognized: false,
   character_count: 0,
+  drawing: null as CanvasDrawing | null,
   tool_name: "",
   tool_arguments: {} as Record<string, unknown>,
   tool_result: null as string | null,
@@ -156,6 +160,7 @@ export function mergeEntries(
     timestamp: m.timestamp,
     round_number: m.round_number,
     character_count: m.text.length,
+    drawing: m.drawing ?? null,
   }));
 
   const reasoningEntries: DisplayEntry[] = reasoning.map(r => ({
