@@ -1977,7 +1977,7 @@ scores.</p>
 </tr>
 <tr>
 <td><code>text</code></td>
-<td>what the sender composed</td>
+<td>what the sender composed; for a canvas drawing, its size and every painted pixel written out, in both text columns</td>
 </tr>
 <tr>
 <td><code>delivered_text</code></td>
@@ -1985,11 +1985,15 @@ scores.</p>
 </tr>
 <tr>
 <td><code>chars</code></td>
-<td><code>len(text)</code>, the per-message value <code>mean_chars_per_message</code> averages</td>
+<td><code>len(text)</code>, the per-message value <code>mean_chars_per_message</code> averages; empty for a canvas drawing</td>
+</tr>
+<tr>
+<td><code>pixels</code></td>
+<td>the painted pixels of a canvas drawing; empty for a text message</td>
 </tr>
 <tr>
 <td><code>character_entropy_bits</code>, <code>gzip_compression_ratio</code></td>
-<td>recomputed here with the same helpers those metrics use</td>
+<td>recomputed here with the same helpers those metrics use; empty for a canvas drawing</td>
 </tr>
 <tr>
 <td><code>repetition_factor</code></td>

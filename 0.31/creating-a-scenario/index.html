@@ -1272,6 +1272,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#sending-drawings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sending drawings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#replacing-the-runner-prompts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1906,6 +1917,17 @@
     <span class="md-ellipsis">
       
         Replacing send_message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sending-drawings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sending drawings
       
     </span>
   </a>
@@ -2702,6 +2724,30 @@ scores the direct channels whose members all belong to it.</p>
 <a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="n">agent_id</span><span class="o">=</span><span class="n">agent_id</span><span class="p">,</span> <span class="n">channel_id</span><span class="o">=</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span>
 <a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="p">)</span>
 </code></pre></div>
+<h3 id="sending-drawings">Sending drawings<a class="headerlink" href="#sending-drawings" title="Permanent link">&para;</a></h3>
+<p>A scenario can let agents send canvas drawings as messages. An agent names the
+pixels to paint, and the recipients receive the drawing as an image.</p>
+<ul>
+<li>The scenario offers its own tool that builds a <code>CanvasDrawing</code> (a width, a
+  height and the painted pixels) and posts it with
+  <code>self.runtime.publish_drawing(agent_id, channel_id, drawing, force)</code>. The
+  call applies <code>validate_outgoing_message</code> and the unread-messages check as
+  <code>publish_message</code> does. The tool can return the <code>SendMessageResult</code> it gets
+  back.</li>
+<li>The stored message has an empty <code>text</code> and the drawing in its <code>drawing</code>
+  field. <code>transform_outgoing_message</code> does not run on it.</li>
+<li>The world receives <code>on_drawing(agent_id, channel_id, drawing)</code> in place of
+  <code>on_message</code>, then <code>on_message_async</code> with the drawing on the <code>MessageEvent</code>.
+  The default <code>on_drawing</code> does nothing, so a world that charges for drawings
+  overrides it.</li>
+<li><code>read_channel</code> and a held send list a drawing with an empty text and an image
+  number, and attach the drawing as a PNG to the same tool result. The model
+  receives the image, not the coordinates. The event log records the PNG on
+  <code>tool_result_received</code>, so a resume or a fork rebuilds the agent's history
+  with it.</li>
+<li>The run page draws each drawing in the chat.</li>
+</ul>
+<p>spot_the_intersection's <code>link_medium: "canvas"</code> uses all of these.</p>
 <h3 id="replacing-the-runner-prompts">Replacing the runner prompts<a class="headerlink" href="#replacing-the-runner-prompts" title="Permanent link">&para;</a></h3>
 <p><code>runner_prompts(agent_id)</code> returns a <code>RunnerPrompts</code> or <code>None</code>. <code>None</code>, the
 default, keeps the platform's. A replacement sets the suffix appended to the
