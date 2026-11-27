@@ -94,7 +94,13 @@ async def wait_for_vllm(*, settings: GpuSettings, process: subprocess.Popen[byte
 
 
 def load_trainer(*, settings: GpuSettings) -> AdapterTrainer:
-    """Qwen3.8-27B in bf16 on the trainer's GPU, ready for adapters."""
+    """Qwen3.8-27B in bf16 on the trainer's GPU, ready for adapters.
+
+    The trainer's allocator uses expandable segments. Without them, a long game's rows left 18 GB
+    of the trainer's GPU reserved but unallocated, and a 3.7 GB allocation failed. The setting
+    applies to this process only, so the vLLM subprocess keeps its own allocator.
+    """
+    torch.cuda.memory._set_allocator_settings("expandable_segments:True")
     model = Qwen3_5ForConditionalGeneration.from_pretrained(
         snapshot_download(repo_id=settings.model_name),
         dtype=torch.bfloat16,
