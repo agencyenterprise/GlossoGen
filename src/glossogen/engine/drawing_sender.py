@@ -22,7 +22,7 @@ from glossogen.models.mcp_responses import SendMessageResult, SendStatus
 from glossogen.scenario_contract.scenario_base import ScenarioRuntimeHandle
 from glossogen.scenario_contract.scenario_tool import ScenarioTool
 
-MAX_CANVAS_SIDE = 64
+MAX_CANVAS_SIDE = 256
 """The widest or tallest canvas a scenario's knobs accept."""
 
 ChannelForRecipient = Callable[[str, str], Awaitable[str]]

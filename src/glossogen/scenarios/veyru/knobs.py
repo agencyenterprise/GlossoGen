@@ -14,6 +14,9 @@ from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_model_settings import JudgeModelSettings
 from glossogen.scenario_contract.base_knobs import BaseKnobs
 
+NO_TIME_BUDGET = -1
+"""The ``round_time_budget_seconds`` value that sets no budget."""
+
 
 class VeyruKnobs(BaseKnobs):
     """Configuration knobs for the Veyru stabilization scenario.
@@ -21,8 +24,10 @@ class VeyruKnobs(BaseKnobs):
     ``round_time_budget_seconds`` is the fixed per-round budget applied to
     every case: every character sent on the comm link costs one simulated
     second, and if the running total exceeds the budget the Veyru
-    collapses. ``seed`` controls the random shuffle of failure motifs into
-    round cases. ``postmortem_enabled``
+    collapses. ``NO_TIME_BUDGET`` (``-1``) sets no budget, so no Veyru
+    collapses for what its team sends; only a canvas run accepts it.
+    ``seed`` controls the random shuffle of failure motifs into round cases.
+    ``postmortem_enabled``
     controls whether a shared discussion phase follows each round.
     ``two_teams`` is an opt-in toggle that runs two isolated observer/
     stabilization engineer teams in parallel on identical cases each round.
@@ -78,6 +83,23 @@ class VeyruKnobs(BaseKnobs):
     link_medium: LinkMedium
     canvas_width: int = Field(ge=1, le=MAX_CANVAS_SIDE)
     canvas_height: int = Field(ge=1, le=MAX_CANVAS_SIDE)
+
+    @model_validator(mode="after")
+    def _validate_budget(self) -> "VeyruKnobs":
+        if self.round_time_budget_seconds == NO_TIME_BUDGET:
+            if self.link_medium != LinkMedium.CANVAS:
+                raise ValueError(
+                    f"round_time_budget_seconds={NO_TIME_BUDGET} (no budget) needs "
+                    f"link_medium={LinkMedium.CANVAS.value!r}: the text prompts charge every "
+                    "character against a budget"
+                )
+            return self
+        if self.round_time_budget_seconds <= 0:
+            raise ValueError(
+                f"round_time_budget_seconds must be > 0, or {NO_TIME_BUDGET} for no budget "
+                f"(got {self.round_time_budget_seconds})"
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_canvas(self) -> "VeyruKnobs":

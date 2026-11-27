@@ -268,7 +268,7 @@ and `-1`.
 - `team_characters`: `total` (a team is charged every character its members
   sent) or `busiest_member` (the most any one member sent).
 - `link_medium`: `text` or `canvas`, and `canvas_width` / `canvas_height`, from
-  1 to 64, which only a canvas run reads. See [Canvas drawings](#canvas-drawings).
+  1 to 256, which only a canvas run reads. See [Canvas drawings](#canvas-drawings).
 - `simulated_opponent_ratio`: `null` plays both teams. With `two_teams: true`,
   a positive number simulates Team B at that fixed share of Team A's characters,
   and a `[low, high]` pair with `0 < low <= high` draws the share each round in

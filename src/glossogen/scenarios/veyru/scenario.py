@@ -93,7 +93,7 @@ from glossogen.scenarios.veyru.injection_rendering import (
     render_postmortem_injection,
     render_round_injection,
 )
-from glossogen.scenarios.veyru.knobs import VeyruKnobs
+from glossogen.scenarios.veyru.knobs import NO_TIME_BUDGET, VeyruKnobs
 from glossogen.scenarios.veyru.run_detail_extension import VeyruRunDetailExtension
 from glossogen.scenarios.veyru.team_declaration import (
     WORLD_DISPLAY_NAME,
@@ -239,6 +239,7 @@ class VeyruScenario(SimulationScenario):
             "canvas_width": self._knobs.canvas_width,
             "canvas_height": self._knobs.canvas_height,
             "unit_singular": charge_unit_singular(medium=self._knobs.link_medium),
+            "no_budget": self._knobs.round_time_budget_seconds == NO_TIME_BUDGET,
         }
 
     def scenario_description(self) -> str:
@@ -619,13 +620,21 @@ class VeyruScenario(SimulationScenario):
         )
 
     def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
-        """Point the protocol_explanation metric at Veyru's per-role describe templates."""
+        """Point the protocol_explanation metric at Veyru's per-role describe templates.
+
+        A canvas run asks how the drawings encoded symptoms and instructions.
+        """
         scenario_root = Path(__file__).resolve().parent
+        observer_template = "field_observer_describe.jinja"
+        engineer_template = "engineer_describe.jinja"
+        if self._knobs.link_medium == LinkMedium.CANVAS:
+            observer_template = "field_observer_describe_canvas.jinja"
+            engineer_template = "engineer_describe_canvas.jinja"
         return ProtocolExplanationConfig(
             prompts_dir=scenario_root / "prompts" / "describe",
             role_groups=_protocol_role_groups(),
             role_templates={
-                "field_observer": "field_observer_describe.jinja",
-                "stabilization_engineer": "engineer_describe.jinja",
+                "field_observer": observer_template,
+                "stabilization_engineer": engineer_template,
             },
         )

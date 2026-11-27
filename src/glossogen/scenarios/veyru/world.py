@@ -34,6 +34,7 @@ from glossogen.scenarios.veyru.ids import (
     VEYRU_STABILIZED_MARKER,
     TeamId,
 )
+from glossogen.scenarios.veyru.knobs import NO_TIME_BUDGET
 from glossogen.scenarios.veyru.outcome_reconstruction import (
     compute_outcome_if_needed,
     restore_outcomes_from_events,
@@ -381,6 +382,8 @@ class VeyruWorld(RoundWorld):
             return
         if team.veyru_stabilized:
             return
+        if self._current_case.time_budget_seconds == NO_TIME_BUDGET:
+            return
         if self.characters_used(team_id=team_id) > self._current_case.time_budget_seconds:
             team.veyru_alive = False
 
@@ -416,6 +419,8 @@ class VeyruWorld(RoundWorld):
         team = self._teams[team_id]
         time_elapsed = self.characters_used(team_id=team_id)
         budget = self._current_case.time_budget_seconds
+        if budget == NO_TIME_BUDGET:
+            return
         if not team.veyru_alive and self.claim_round_budget_threshold(
             team_id=team_id, round_budget_threshold=THRESHOLD_COLLAPSED
         ):

@@ -149,3 +149,20 @@ async def test_text_on_the_comm_link_is_refused_in_a_canvas_run(
     ]
     assert json.loads(refused.result)["status"] == "rejected"
     assert result.of_type(event_type=MessageSent) == []
+
+
+async def test_no_budget_never_collapses_the_veyru(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = await play(
+        scenario=canvas_scenario(budget=-1),
+        scripts={OBSERVER: [draw(), SayTurn(text="done")], ENGINEER: [SayTurn(text="done")]},
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+
+    assert [
+        event.text
+        for event in result.of_type(event_type=WorldEventDelivered)
+        if "exceeded budget" in event.text or "CRITICAL" in event.text
+    ] == []

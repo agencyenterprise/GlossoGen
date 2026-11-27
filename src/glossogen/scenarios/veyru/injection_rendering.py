@@ -27,7 +27,7 @@ from glossogen.scenarios.veyru.ids import (
     STABILIZATION_ENGINEER_INJECTION_TEMPLATE,
     TEAM_SOLO_ID,
 )
-from glossogen.scenarios.veyru.knobs import VeyruKnobs
+from glossogen.scenarios.veyru.knobs import NO_TIME_BUDGET, VeyruKnobs
 from glossogen.scenarios.veyru.veyru_cases import (
     StellarMapping,
     VeyruCase,
@@ -271,9 +271,10 @@ def render_postmortem_injection(
     return rendered
 
 
-def _unit_variables(knobs: VeyruKnobs) -> dict[str, str]:
-    """The words an injection uses for what a message costs under the run's link medium."""
+def _unit_variables(knobs: VeyruKnobs) -> dict[str, str | bool]:
+    """The words an injection uses for what a message costs, and whether a budget applies."""
     return {
+        "no_budget": knobs.round_time_budget_seconds == NO_TIME_BUDGET,
         "unit": charge_unit(medium=knobs.link_medium),
         "unit_singular": charge_unit_singular(medium=knobs.link_medium),
         "unit_abbreviation": charge_unit_abbreviation(medium=knobs.link_medium),
