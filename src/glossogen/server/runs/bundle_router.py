@@ -32,6 +32,7 @@ from glossogen.run_export.run_trajectory_loader import load_run_trajectories
 from glossogen.run_export.runs_zip_archive import write_single_run_zip
 from glossogen.run_storage.archive_member_filter import is_always_excluded
 from glossogen.run_storage.event_parsing import parse_event_bytes
+from glossogen.run_storage.history_transfer_manifest import read_history_transfer_manifest
 from glossogen.run_storage.jsonl_lines import first_nonblank_line
 from glossogen.run_storage.run_archive import claim_run_dir
 from glossogen.run_storage.run_bundle import (
@@ -42,7 +43,7 @@ from glossogen.run_storage.run_bundle import (
 from glossogen.run_storage.run_file_paths import event_log_path
 from glossogen.run_storage.run_identity import compose_run_id
 from glossogen.run_storage.run_labels_file import read_run_labels
-from glossogen.run_storage.run_lineage import read_timeline_parent
+from glossogen.run_storage.run_lineage import TimelineParent, read_timeline_parent
 from glossogen.run_storage.run_summary_models import RunSummary
 from glossogen.scenario_contract.scenario_name import is_valid_scenario_name
 from glossogen.server.runs.archive_streaming_response import (
@@ -331,11 +332,25 @@ class _BundleImportOutcome(NamedTuple):
 
     ``freshly_extracted`` is ``False`` when the run was already present on
     disk and the call short-circuited; the caller skips the ``runs`` row
-    insert in that case, since a row already exists.
+    insert in that case, since a row already exists. ``timeline_parent`` is
+    the extracted run's, read from its manifests, and ``None`` when it was not
+    extracted or is not derived.
     """
 
     response: ImportBundleResponse
     freshly_extracted: bool
+    timeline_parent: TimelineParent | None
+
+
+def _read_derivation_manifests(run_dir: Path) -> TimelineParent | None:
+    """Parse every derivation manifest that names a file to read, returning the lineage.
+
+    Those manifests name files that resume, the trajectory exports and the probes
+    later read from the run directory, and the model refuses a name that leaves it.
+    Parsing them here refuses such a bundle at upload instead of at first read.
+    """
+    read_history_transfer_manifest(run_dir=run_dir)
+    return read_timeline_parent(run_dir=run_dir)
 
 
 def _index_existing_run_dirs(summaries: list[RunSummary]) -> dict[str, str]:
@@ -414,6 +429,7 @@ def _extract_and_validate_bundle(
                     run_dir=existing_dir,
                 ),
                 freshly_extracted=False,
+                timeline_parent=None,
             )
 
         run_dir = claim_run_dir(
@@ -435,6 +451,17 @@ def _extract_and_validate_bundle(
                 detail="Failed to extract bundle",
             )
 
+        try:
+            timeline_parent = _read_derivation_manifests(run_dir=run_dir)
+        except ValueError as exc:
+            # A ValidationError, or a lineage run id with no scenario part.
+            logger.exception("Bundle extracted to %s carries an invalid manifest", run_dir)
+            shutil.rmtree(run_dir, ignore_errors=True)
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid bundle: a derivation manifest does not parse: {exc}",
+            ) from exc
+
     # Rename directory to preserve the original timestamp so the run list
     # shows the execution time rather than the import time.
     target_dir = _rename_to_original_timestamp(
@@ -449,6 +476,7 @@ def _extract_and_validate_bundle(
             run_dir=str(target_dir),
         ),
         freshly_extracted=True,
+        timeline_parent=timeline_parent,
     )
 
 
@@ -504,7 +532,7 @@ async def import_run_bundle(
 
     if outcome.freshly_extracted:
         run_dir = Path(outcome.response.run_dir)
-        timeline_parent = read_timeline_parent(run_dir=run_dir)
+        timeline_parent = outcome.timeline_parent
         source_run_scenario: str | None = None
         source_run_dir_name: str | None = None
         if timeline_parent is not None:

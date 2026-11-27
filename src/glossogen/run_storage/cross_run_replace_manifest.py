@@ -14,6 +14,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from glossogen.run_storage.manifest_file_name import RunDirFileName
+
 CROSS_RUN_REPLACE_MANIFEST_FILENAME = "cross_run_replace_manifest.json"
 IMPORTED_HISTORY_SOURCE_FILENAME = "imported_history_source.jsonl"
 
@@ -30,9 +32,9 @@ class CrossRunReplaceManifest(BaseModel):
     ``source_a_run_id`` / ``source_a_run_dir`` describe the *target* run
     (the timeline being modified). ``source_b_run_id`` /
     ``source_b_run_dir`` describe the run the imported agent comes from.
-    ``imported_history_source`` is the relative path inside the new run
-    dir of the verbatim copy of Sim B's JSONL used to rebuild the
-    imported agent's pydantic-ai history.
+    ``imported_history_source`` is the file name, inside the new run dir,
+    of the verbatim copy of Sim B's JSONL used to rebuild the imported
+    agent's pydantic-ai history.
 
     ``source_b_round_end`` is the last round of Sim B whose events feed
     into the imported agent's history. ``source_b_cutoff_event_id`` is
@@ -46,7 +48,7 @@ class CrossRunReplaceManifest(BaseModel):
     source_a_run_dir: str
     source_b_run_id: str
     source_b_run_dir: str
-    imported_history_source: str
+    imported_history_source: RunDirFileName
     round_start: int
     rounds_after_swap: int
     target_event_id: str

@@ -17,6 +17,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from glossogen.run_storage.manifest_file_name import RunDirFileName
+
 HISTORY_TRANSFER_MANIFEST_FILENAME = "history_transfer_manifest.json"
 
 
@@ -31,7 +33,7 @@ class TransferredSeat(BaseModel):
     source_agent_id: str
     source_model: str
     source_provider: str
-    history_file: str
+    history_file: RunDirFileName
 
 
 class HistoryTransferManifest(BaseModel):
