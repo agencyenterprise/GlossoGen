@@ -242,16 +242,17 @@
 | src/glossogen/run\_replay/transferred\_history.py                                                      |       59 |        0 |       18 |        0 |    100% |           |
 | src/glossogen/run\_storage/\_\_init\_\_.py                                                             |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/run\_storage/archive\_member\_filter.py                                                  |       24 |        1 |       16 |        1 |     95% |        60 |
-| src/glossogen/run\_storage/cross\_run\_replace\_manifest.py                                            |       10 |        0 |        2 |        0 |    100% |           |
+| src/glossogen/run\_storage/cross\_run\_replace\_manifest.py                                            |       11 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/run\_storage/derivation\_manifest\_reader.py                                             |       54 |        0 |       20 |        0 |    100% |           |
 | src/glossogen/run\_storage/derived\_run\_start.py                                                      |       12 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/run\_storage/eval\_manifest.py                                                           |       43 |        2 |        8 |        1 |     94% |60-\>exit, 82-83 |
 | src/glossogen/run\_storage/evaluation\_score\_reader.py                                                |       47 |        1 |        6 |        1 |     96% |        93 |
 | src/glossogen/run\_storage/event\_log\_reader.py                                                       |       64 |        0 |       26 |        2 |     98% |185-\>184, 196-\>195 |
 | src/glossogen/run\_storage/event\_parsing.py                                                           |       65 |        0 |       22 |        0 |    100% |           |
-| src/glossogen/run\_storage/history\_transfer\_manifest.py                                              |       15 |        0 |        2 |        0 |    100% |           |
+| src/glossogen/run\_storage/history\_transfer\_manifest.py                                              |       16 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/run\_storage/jsonl\_lines.py                                                             |       53 |        0 |       22 |        0 |    100% |           |
 | src/glossogen/run\_storage/knob\_filter.py                                                             |      132 |        0 |       62 |        0 |    100% |           |
+| src/glossogen/run\_storage/manifest\_file\_name.py                                                     |        8 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/run\_storage/protocol\_agreement\_file.py                                                |       20 |        3 |        2 |        0 |     86% |     34-36 |
 | src/glossogen/run\_storage/recorded\_token\_ids.py                                                     |       27 |        0 |       12 |        0 |    100% |           |
 | src/glossogen/run\_storage/replace\_manifest.py                                                        |       15 |        0 |        2 |        0 |    100% |           |
@@ -597,7 +598,7 @@
 | src/glossogen/server/runs/analysis\_router.py                                                          |       47 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/server/runs/archive\_streaming\_response.py                                              |       27 |        0 |        2 |        0 |    100% |           |
 | src/glossogen/server/runs/branch\_sources.py                                                           |       56 |        0 |       10 |        0 |    100% |           |
-| src/glossogen/server/runs/bundle\_router.py                                                            |      197 |       27 |       48 |       12 |     84% |81-83, 241, 282, 295, 298, 301, 322, 326, 370-372, 383-384, 395, 431-433, 475, 481-483, 496-497, 511-512 |
+| src/glossogen/server/runs/bundle\_router.py                                                            |      207 |       25 |       48 |       12 |     85% |82-84, 242, 283, 296, 299, 302, 323, 327, 385-387, 398-399, 410, 447-449, 503, 509-511, 539-540 |
 | src/glossogen/server/runs/bundle\_tar\_limits.py                                                       |       32 |        0 |       10 |        1 |     98% |   62-\>68 |
 | src/glossogen/server/runs/dashboard\_router.py                                                         |       53 |        1 |        6 |        1 |     97% |        96 |
 | src/glossogen/server/runs/dashboard\_store\_resolution.py                                              |       16 |        1 |        4 |        1 |     90% |        26 |
@@ -636,7 +637,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **31316** | **3954** | **9042** | **1190** | **85%** |           |
+| **TOTAL**                                                                                              | **31336** | **3952** | **9044** | **1190** | **85%** |           |
 
 
 ## Setup coverage badge
