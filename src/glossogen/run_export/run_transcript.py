@@ -111,7 +111,7 @@ def _render_single(event: SimulationEvent) -> str | None:
         return f"[{event.agent_id} receives from {event.tool_name}] {event.result}"
     if isinstance(event, MessageSent):
         message = event.message
-        return f"[{message.sender_agent_id} -> #{message.channel_id}] {message.text}"
+        return f"[{message.sender_agent_id} -> #{message.channel_id}] {message.readable_text}"
     if isinstance(event, InjectionDelivered):
         return f"[briefing to {event.agent_id}]\n{event.text}"
     return _render_other(event=event)

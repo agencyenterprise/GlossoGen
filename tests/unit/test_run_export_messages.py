@@ -325,6 +325,23 @@ def test_the_text_is_what_the_sender_composed_with_the_delivery_beside_it(
     assert message.chars == len("lift 12")
 
 
+def test_a_drawing_is_written_out_and_counted_in_pixels(tmp_path: Path) -> None:
+    """A drawing has no text to score: its pixels are written out and counted instead."""
+    run_dir = tmp_path / "runs" / SCENARIO / RUN_DIR_NAME
+    drawing_event = message_event("m1", 1, "link", "yard_lead", "")
+    message = drawing_event["message"]
+    assert isinstance(message, dict)
+    message["drawing"] = {"width": 4, "height": 3, "pixels": [{"x": 0, "y": 0}, {"x": 3, "y": 2}]}
+    write_log(run_dir=run_dir, lines=[drawing_event])
+
+    [exported] = load_run_messages(summary=make_summary(run_dir=run_dir)).messages
+
+    assert exported.text == "[drawing 4x3, 2 pixels: [0, 0] [3, 2]]"
+    assert exported.delivered_text == exported.text
+    assert (exported.chars, exported.pixels) == (None, 2)
+    assert (exported.character_entropy_bits, exported.gzip_compression_ratio) == (None, None)
+
+
 def test_the_per_message_numbers_match_the_metric_helpers(run_dir: Path) -> None:
     """Recomputed at export time, so what they must equal is what the metrics compute."""
     [first, _] = load_run_messages(summary=make_summary(run_dir=run_dir)).messages

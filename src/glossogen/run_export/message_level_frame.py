@@ -49,6 +49,7 @@ MESSAGE_COLUMNS: tuple[str, ...] = (
     "sender_display_name",
     "timestamp",
     "chars",
+    "pixels",
     "character_entropy_bits",
     "gzip_compression_ratio",
     "repetition_factor",
@@ -61,6 +62,7 @@ MESSAGE_COLUMNS: tuple[str, ...] = (
 # text, where the column name is the whole story.
 MESSAGE_COLUMN_UNITS: dict[str, str] = {
     "chars": "characters",
+    "pixels": "painted pixels (canvas drawings only)",
     "character_entropy_bits": "bits/char (lower = more repetitive)",
     "gzip_compression_ratio": "compressed/original bytes (lower = more compressible)",
     "repetition_factor": "encodings per information unit (x; 1.0 = no repetition)",
@@ -98,13 +100,21 @@ def _message_cells(
         render_cell(text=sender.provider),
         render_cell(text=message.sender_display_name),
         message.timestamp.isoformat(),
-        str(message.chars),
+        _render_count(value=message.chars),
+        _render_count(value=message.pixels),
         render_number(value=message.character_entropy_bits),
         render_number(value=message.gzip_compression_ratio),
         render_number(value=message.repetition_factor),
         render_cell(text=message.text),
         render_cell(text=message.delivered_text),
     ]
+
+
+def _render_count(value: int | None) -> str:
+    """A count cell, empty when the message has no such count."""
+    if value is None:
+        return ""
+    return str(value)
 
 
 def build_message_level_frame(

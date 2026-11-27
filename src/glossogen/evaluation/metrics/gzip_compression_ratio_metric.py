@@ -24,6 +24,7 @@ link), not the channel-delivered text, so noise transforms do not contaminate it
 import logging
 from pathlib import Path
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.gzip_compression import gzip_compression_ratio
 from glossogen.evaluation.metric_core.primary_channel_message_scores import (
     MessageScorer,
@@ -61,6 +62,8 @@ class GzipCompressionRatioMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round compression-ratio stats."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, llm_provider, run_dir, options
         channels = scenario.get_primary_channels()
         if not channels:

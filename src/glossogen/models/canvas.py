@@ -52,6 +52,11 @@ class CanvasDrawing(BaseModel):
         """How many pixels the drawing paints."""
         return len(self.pixels)
 
+    def as_text(self) -> str:
+        """The drawing as one line: its size, pixel count and each painted pixel as ``[x, y]``."""
+        pixels = " ".join(f"[{pixel.x}, {pixel.y}]" for pixel in self.pixels)
+        return f"[drawing {self.width}x{self.height}, {self.pixel_count} pixels: {pixels}]"
+
 
 class ToolResultImage(BaseModel):
     """An image attached to a tool result, numbered as the result's text refers to it.

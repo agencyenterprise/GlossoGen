@@ -13,8 +13,6 @@ A scenario's scoring code may count a team's charge in fields called
 
 from enum import StrEnum
 
-from glossogen.models.canvas import CanvasDrawing
-
 SEND_DRAWING_TOOL = "send_drawing"
 
 
@@ -44,13 +42,6 @@ def charge_unit_abbreviation(medium: LinkMedium) -> str:
     if medium == LinkMedium.CANVAS:
         return "pixels"
     return "chars"
-
-
-def message_charge(text: str, drawing: CanvasDrawing | None) -> int:
-    """What one message costs: its painted pixels when it is a drawing, else its characters."""
-    if drawing is not None:
-        return drawing.pixel_count
-    return len(text)
 
 
 TEXT_REFUSED_ON_CANVAS_LINK = (

@@ -29,6 +29,20 @@ class SimulationMessage(BaseModel):
     round_number: int
     drawing: CanvasDrawing | None = Field(default=None, exclude_if=lambda drawing: drawing is None)
 
+    @property
+    def size(self) -> int:
+        """The message's length: its painted pixels when it is a drawing, else its characters."""
+        if self.drawing is not None:
+            return self.drawing.pixel_count
+        return len(self.text)
+
+    @property
+    def readable_text(self) -> str:
+        """The message as a reader sees it in plain text: its text, or the drawing written out."""
+        if self.drawing is not None:
+            return self.drawing.as_text()
+        return self.text
+
     @model_validator(mode="before")
     @classmethod
     def _backfill_sender_display_name(cls, data: Any) -> Any:

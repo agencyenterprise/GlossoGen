@@ -54,13 +54,13 @@ Every character sent over the link costs one second of the Veyru's remaining sta
 {% include "_unreliable_link.jinja" %}
 
 STABILIZATION:
-Give the technician instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.
+Give the technician instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again.{% if not canvas %} The tool call itself does not cost time — only messages on the comm link do.{% elif not no_budget %} The tool call itself does not cost time — only drawings on the comm link do.{% endif %}
 
 {% if not no_budget %}You will be told each Veyru's time budget. Budget pressure is constant across all rounds.{% endif %}
 {% if postmortem_enabled %}
 
 DISCUSSION PHASE:
-After each round, there is a discussion phase where both you and the technician can talk in the "team discussion" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.
+After each round, there is a discussion phase where both you and the technician can talk in the "team discussion" channel (channel_id: postmortem). Use this time to {% if canvas %}agree on what your drawings mean{% else %}develop shorthand{% endif %} and coordinate strategies for future rounds.{% if not no_budget %} Messages in the discussion channel do NOT cost time.{% endif %}
 {% endif %}
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:

@@ -1,9 +1,8 @@
 """The messages a recorded log shows a team was charged for.
 
 A member's message on its team's link or on a direct channel costs its team,
-its characters or, for a drawing, its painted pixels (see
-:func:`glossogen.engine.canvas_link.message_charge`), and stops costing once every member has
-submitted for the round. The live world
+its characters or, for a drawing, its painted pixels (the message's ``size``),
+and stops costing once every member has submitted for the round. The live world
 applies that rule as messages arrive; this module applies it to an event log,
 for a resume and for the metrics that split a team's count by member.
 """
@@ -11,7 +10,6 @@ for a resume and for the metrics that split a team's count by member.
 from collections.abc import Mapping, Sequence
 from typing import Any, NamedTuple
 
-from glossogen.engine.canvas_link import message_charge
 from glossogen.models.event import MessageSent
 from glossogen.scenarios.spot_the_intersection.events import IntersectionSubmissionRecorded
 from glossogen.scenarios.spot_the_intersection.world_state import TeamState, metered_team_id
@@ -57,7 +55,7 @@ def read_metered_messages(
                 team_id=team_id,
                 sender_agent_id=event.message.sender_agent_id,
                 channel_id=event.message.channel_id,
-                charge=message_charge(text=event.message.text, drawing=event.message.drawing),
+                charge=event.message.size,
             )
         )
     return metered

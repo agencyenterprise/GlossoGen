@@ -130,10 +130,11 @@ scores.
 | `message_id`, `timestamp` | from the message event |
 | `sender_agent_id`, `sender_display_name` | from the message event |
 | `sender_role`, `sender_model`, `sender_provider` | resolved from the run's roster, which the message event does not carry |
-| `text` | what the sender composed |
+| `text` | what the sender composed; for a canvas drawing, its size and every painted pixel written out, in both text columns |
 | `delivered_text` | what the channel delivered, which differs under a transform like veyru's noise |
-| `chars` | `len(text)`, the per-message value `mean_chars_per_message` averages |
-| `character_entropy_bits`, `gzip_compression_ratio` | recomputed here with the same helpers those metrics use |
+| `chars` | `len(text)`, the per-message value `mean_chars_per_message` averages; empty for a canvas drawing |
+| `pixels` | the painted pixels of a canvas drawing; empty for a text message |
+| `character_entropy_bits`, `gzip_compression_ratio` | recomputed here with the same helpers those metrics use; empty for a canvas drawing |
 | `repetition_factor` | joined by `message_id` from the `language_repetition` sidecar, empty when the metric never ran |
 
 Every channel is exported, so filter on `is_primary_channel` rather than having

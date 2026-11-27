@@ -15,6 +15,7 @@ do not contaminate the signal. Deterministic: it does not consult the LLM provid
 import logging
 from pathlib import Path
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.primary_channel_message_scores import (
     MessageScorer,
     MessageScoreWording,
@@ -55,6 +56,8 @@ class EnglishNgramSurprisalMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score primary-channel messages and report per-round surprisal stats."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, llm_provider, run_dir, options
         channels = scenario.get_primary_channels()
         if not channels:

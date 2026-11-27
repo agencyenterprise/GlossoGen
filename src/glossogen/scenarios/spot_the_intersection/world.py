@@ -17,7 +17,6 @@ from typing import Any, NamedTuple
 from glossogen.engine.canvas_link import (
     LinkMedium,
     charge_unit,
-    message_charge,
 )
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
@@ -317,7 +316,7 @@ class SpotTheIntersectionWorld(RoundWorld):
             text=text,
             token_count=token_count,
         )
-        self._charge(team=team, agent_id=agent_id, amount=message_charge(text=text, drawing=None))
+        self._charge(team=team, agent_id=agent_id, amount=len(text))
 
     def on_drawing(self, agent_id: str, channel_id: str, drawing: CanvasDrawing) -> None:
         """Meter a drawing by its painted pixels until its team locks, as ``on_message`` does."""
@@ -325,7 +324,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         if team is None:
             return
         super().on_drawing(agent_id=agent_id, channel_id=team.link_channel_id, drawing=drawing)
-        self._charge(team=team, agent_id=agent_id, amount=message_charge(text="", drawing=drawing))
+        self._charge(team=team, agent_id=agent_id, amount=drawing.pixel_count)
 
     def _charged_team(self, agent_id: str, channel_id: str) -> TeamState | None:
         """The team a message costs, or ``None`` when it costs no team.

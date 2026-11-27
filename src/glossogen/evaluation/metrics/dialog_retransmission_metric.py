@@ -36,6 +36,7 @@ from typing import NamedTuple, Self
 
 from pydantic import BaseModel, Field, model_validator
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.pristine_text_index import build_pristine_text_index
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.evaluation.round_transcript_builder import build_round_transcripts
@@ -131,6 +132,8 @@ class DialogRetransmissionMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Count dialog and retransmission-request messages per round, averaged over replicas."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, run_dir, options
         round_transcripts = build_round_transcripts(
             events=events,

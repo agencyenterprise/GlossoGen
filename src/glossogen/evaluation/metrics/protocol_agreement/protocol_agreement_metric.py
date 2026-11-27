@@ -12,6 +12,7 @@ from pathlib import Path
 
 import aiofiles
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metrics.protocol_agreement.cited_transcript import (
     CitedEntry,
     build_cited_entries,
@@ -59,6 +60,8 @@ class ProtocolAgreementMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Ask the judge once about the whole run; ``[]`` when the run has nothing to read."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = scenario, options
         entries = build_cited_entries(events=events)
         if not entries:

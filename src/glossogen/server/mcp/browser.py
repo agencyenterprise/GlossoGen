@@ -604,6 +604,7 @@ async def _tool_get_run(
                 text=m.text,
                 timestamp=m.timestamp,
                 round_number=m.round_number,
+                drawing=m.drawing,
             )
             for m in page
         ],
