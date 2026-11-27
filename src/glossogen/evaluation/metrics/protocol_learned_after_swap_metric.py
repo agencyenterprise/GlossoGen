@@ -13,6 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.prompts.prompt_renderer import render_evaluator_prompt
 from glossogen.llm.provider import LLMMessage, LLMProvider
 from glossogen.models.agent_config import AgentConfig
@@ -86,6 +87,8 @@ class ProtocolLearnedAfterSwapMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score newcomer adoption of the pre-boundary protocol."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = run_dir, options
         window = scenario.detect_protocol_boundary_window(
             events=events,

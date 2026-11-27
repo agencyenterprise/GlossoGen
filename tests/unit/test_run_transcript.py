@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.canvas import CanvasDrawing, CanvasPixel
 from glossogen.models.event import (
     AgentRegistered,
     AgentResumed,
@@ -184,6 +185,29 @@ def test_round_keeps_what_agents_were_told_wrote_called_and_received() -> None:
     assert "[observer -> #link] T bright" in round_one
     assert "[observer receives from send_message] sent" in round_one
     assert "[observer waits for any] Waiting for the engineer's reply." in round_one
+
+
+def test_a_drawing_is_written_out_as_its_size_and_pixels() -> None:
+    drawing = MessageSent(
+        round_number=1,
+        message=SimulationMessage(
+            message_id="m-drawing",
+            channel_id="link",
+            sender_agent_id="observer",
+            sender_display_name="Field Observer",
+            text="",
+            timestamp=datetime(2026, 8, 1, tzinfo=UTC),
+            round_number=1,
+            drawing=CanvasDrawing(
+                width=16, height=16, pixels=[CanvasPixel(x=2, y=5), CanvasPixel(x=3, y=5)]
+            ),
+        ),
+        token_count=0,
+    )
+
+    round_one = render_run_transcript(events=[drawing])[0].text
+
+    assert "[observer -> #link] [drawing 16x16, 2 pixels: [2, 5] [3, 5]]" in round_one
 
 
 def test_round_drops_repeated_calls_and_wait_bookkeeping() -> None:

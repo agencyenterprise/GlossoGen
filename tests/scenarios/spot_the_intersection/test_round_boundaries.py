@@ -54,6 +54,7 @@ async def test_a_submission_after_the_round_was_scored_is_refused() -> None:
         cell=cell_label(column=answer.column, row=answer.row),
     )
 
+    assert isinstance(reply, str)
     assert reply.startswith("This round has ended")
     assert not world.has_submitted(agent_id=TEAM_A[3])
     assert world.outcome_for(team_id="team_a", round_number=1) == scored

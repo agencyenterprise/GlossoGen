@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metrics.flagged_round_judge import (
     FlaggedRoundVerdict,
     judge_flagged_rounds,
@@ -68,6 +69,8 @@ class NeologismMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Evaluate whether agents invented new vocabulary."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = run_dir, options
         return await judge_flagged_rounds(
             metric_name=self.name,

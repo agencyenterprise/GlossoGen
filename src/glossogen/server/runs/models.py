@@ -11,6 +11,7 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Discriminator, JsonValue, SerializeAsAny
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.models.event import RunStatus
 from glossogen.models.protocol_agreement import ProtocolAgreementReport
 from glossogen.models.thinking_part_record import ThinkingPartRecord
@@ -516,13 +517,17 @@ class ImportBundleResponse(BaseModel):
 
 
 class SSESimulationMessagePayload(BaseModel):
-    """Nested message payload inside an SSE message_sent event."""
+    """Nested message payload inside an SSE message_sent event.
+
+    ``drawing`` is present only on a message sent as a canvas drawing.
+    """
 
     message_id: str
     channel_id: str
     sender_agent_id: str
     text: str
     timestamp: datetime
+    drawing: CanvasDrawing | None = None
 
 
 class SSESimulationStarted(BaseModel):

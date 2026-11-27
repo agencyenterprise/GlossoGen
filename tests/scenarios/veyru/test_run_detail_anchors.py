@@ -54,6 +54,7 @@ def message(message_id: str, channel_id: str, seconds: int) -> ChannelMessage:
         timestamp=at(seconds=seconds),
         round_number=1,
         token_count=1,
+        drawing=None,
     )
 
 

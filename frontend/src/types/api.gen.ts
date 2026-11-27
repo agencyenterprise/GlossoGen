@@ -1481,8 +1481,36 @@ export interface components {
             derived_count: number;
         };
         /**
+         * CanvasDrawing
+         * @description The pixels one message paints on a ``width`` x ``height`` canvas.
+         *
+         *     A drawing paints at least one pixel, each pixel inside the canvas, and no
+         *     pixel twice.
+         */
+        CanvasDrawing: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Pixels */
+            pixels: components["schemas"]["CanvasPixel"][];
+        };
+        /**
+         * CanvasPixel
+         * @description One painted pixel: its column ``x`` and row ``y``, from 0 at the top left.
+         */
+        CanvasPixel: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /**
          * ChannelMessage
          * @description A message sent by an agent to a channel.
+         *
+         *     ``drawing`` holds the pixels of a message sent as a canvas drawing, whose
+         *     ``text`` is empty, and is ``None`` for a text message.
          */
         ChannelMessage: {
             /** Message Id */
@@ -1504,6 +1532,7 @@ export interface components {
             round_number: number;
             /** Token Count */
             token_count: number;
+            drawing: components["schemas"]["CanvasDrawing"] | null;
         };
         /**
          * ChartEncoding
@@ -3876,6 +3905,8 @@ export interface components {
         /**
          * SSESimulationMessagePayload
          * @description Nested message payload inside an SSE message_sent event.
+         *
+         *     ``drawing`` is present only on a message sent as a canvas drawing.
          */
         SSESimulationMessagePayload: {
             /** Message Id */
@@ -3891,6 +3922,7 @@ export interface components {
              * Format: date-time
              */
             timestamp: string;
+            drawing?: components["schemas"]["CanvasDrawing"] | null;
         };
         /**
          * SSESimulationStarted

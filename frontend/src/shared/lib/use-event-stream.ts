@@ -222,6 +222,7 @@ export function useEventStream(
           timestamp: msg.timestamp,
           round_number: data.round_number,
           token_count: data.token_count,
+          drawing: msg.drawing ?? null,
         };
         setMessages(prev => [...prev, channelMessage]);
       });

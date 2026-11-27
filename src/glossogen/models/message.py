@@ -3,7 +3,9 @@
 from datetime import datetime
 from typing import Any, cast
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from glossogen.models.canvas import CanvasDrawing
 
 
 class SimulationMessage(BaseModel):
@@ -13,6 +15,9 @@ class SimulationMessage(BaseModel):
     ``get_agent_display_name_at_round`` so historical messages render under
     the display name the slot held when they were sent (relevant for
     scenarios that rotate identity behind a single ``agent_id``).
+
+    ``drawing`` is set on a message sent as a canvas drawing, whose ``text`` is
+    empty. It is ``None`` on a text message.
     """
 
     message_id: str
@@ -22,6 +27,21 @@ class SimulationMessage(BaseModel):
     text: str
     timestamp: datetime
     round_number: int
+    drawing: CanvasDrawing | None = Field(default=None, exclude_if=lambda drawing: drawing is None)
+
+    @property
+    def size(self) -> int:
+        """The message's length: its painted pixels when it is a drawing, else its characters."""
+        if self.drawing is not None:
+            return self.drawing.pixel_count
+        return len(self.text)
+
+    @property
+    def readable_text(self) -> str:
+        """The message as a reader sees it in plain text: its text, or the drawing written out."""
+        if self.drawing is not None:
+            return self.drawing.as_text()
+        return self.text
 
     @model_validator(mode="before")
     @classmethod

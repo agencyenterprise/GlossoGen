@@ -6,7 +6,9 @@ with validated structures that agents receive as JSON.
 
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from glossogen.models.canvas import ToolResultImage
 
 
 class SendStatus(StrEnum):
@@ -26,12 +28,28 @@ class ChannelMessage(BaseModel):
     is the time the message was sent expressed as seconds since the simulation
     began (millisecond precision), so agents reason about relative timing
     without a verbose wall-clock timestamp.
+
+    ``image`` is set on a drawing: it is the number of the image attached to the
+    same tool result, and ``text`` is empty. A text message leaves it out.
     """
 
     round: int
     sender: str
     text: str
     elapsed_seconds: float
+    image: int | None = Field(default=None, exclude_if=lambda image: image is None)
+
+
+class CarriesImages(BaseModel):
+    """A tool result that can attach images, such as the drawings among the messages it lists.
+
+    ``attached_images`` is left out of the JSON the agent reads. The runner
+    attaches each image to the tool result, so the model sees the image itself.
+    """
+
+    attached_images: list[ToolResultImage] = Field(
+        default_factory=list[ToolResultImage], exclude=True
+    )
 
 
 class SendReceipt(BaseModel):
@@ -58,7 +76,7 @@ class RecordedSendReceipt(BaseModel):
     message_id: str | None = None
 
 
-class ReadChannelResult(BaseModel):
+class ReadChannelResult(CarriesImages):
     """Response from the read_channel MCP tool.
 
     ``current_round`` is the round the simulation is in at read time, so the
@@ -70,12 +88,13 @@ class ReadChannelResult(BaseModel):
     messages: list[ChannelMessage]
 
 
-class SendMessageResult(SendReceipt):
+class SendMessageResult(SendReceipt, CarriesImages):
     """Response from the send_message MCP tool.
 
     On success, status is ``SendStatus.SENT`` and new_messages is empty.
     On conflict (new messages arrived since the agent's last read_channel),
-    status is ``SendStatus.CONFLICT`` and new_messages contains the unseen messages.
+    status is ``SendStatus.CONFLICT`` and new_messages contains the unseen messages,
+    with the drawings among them rendered in ``attached_images``.
     The token_count reports the word count of the original text as a proxy
     for LLM tokens, or zero when the message was not delivered. ``current_round``
     is the round the simulation is in at send time, mirroring the field on

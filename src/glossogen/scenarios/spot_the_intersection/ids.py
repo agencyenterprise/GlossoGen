@@ -5,6 +5,8 @@ and world notifications. Agent ids are built per seat in :mod:`seats`, since a
 team's size is a knob.
 """
 
+from glossogen.engine.canvas_link import SEND_DRAWING_TOOL
+
 TEAM_SOLO_ID = "solo"
 TEAM_A_ID = "team_a"
 TEAM_B_ID = "team_b"
@@ -19,6 +21,7 @@ POSTMORTEM_B_CHANNEL_ID = "postmortem_b"
 SEND_MESSAGE_TOOL = "send_message"
 SUBMIT_OBJECT_TOOL = "submit_object"
 TOOLS_VIEWER = (SEND_MESSAGE_TOOL, SUBMIT_OBJECT_TOOL)
+TOOLS_CANVAS_VIEWER = (*TOOLS_VIEWER, SEND_DRAWING_TOOL)
 
 VIEWER_SYSTEM_TEMPLATE = "viewer_system.jinja"
 VIEWER_INJECTION_TEMPLATE = "viewer_injection.jinja"

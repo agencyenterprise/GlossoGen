@@ -8,6 +8,7 @@ debrief. A simulated Team B is declared nowhere: only Team A's viewers play,
 under the same names they hold in a two-team run.
 """
 
+from glossogen.engine.canvas_link import LinkMedium
 from glossogen.engine.team_declaration import (
     Debrief,
     DebriefPolicy,
@@ -16,7 +17,11 @@ from glossogen.engine.team_declaration import (
     TaskChannel,
     TeamSpec,
 )
-from glossogen.scenarios.spot_the_intersection.ids import TOOLS_VIEWER, VIEWER_SYSTEM_TEMPLATE
+from glossogen.scenarios.spot_the_intersection.ids import (
+    TOOLS_CANVAS_VIEWER,
+    TOOLS_VIEWER,
+    VIEWER_SYSTEM_TEMPLATE,
+)
 from glossogen.scenarios.spot_the_intersection.knobs import SpotTheIntersectionKnobs
 from glossogen.scenarios.spot_the_intersection.postmortem_modes import PostmortemMode
 from glossogen.scenarios.spot_the_intersection.seats import (
@@ -30,13 +35,19 @@ from glossogen.scenarios.spot_the_intersection.seats import (
 )
 
 
-def _viewer(team_id: str, index: int) -> RoleSpec:
-    """Build one viewer, present from round one and a member of the team's debrief, if any."""
+def _viewer(team_id: str, index: int, link_medium: LinkMedium) -> RoleSpec:
+    """Build one viewer, present from round one and a member of the team's debrief, if any.
+
+    Under the canvas medium it is also offered ``send_drawing``.
+    """
+    tool_names = TOOLS_VIEWER
+    if link_medium == LinkMedium.CANVAS:
+        tool_names = TOOLS_CANVAS_VIEWER
     return RoleSpec(
         agent_id=viewer_id(team_id=team_id, index=index),
         role_name=viewer_role_name(team_id=team_id, index=index),
         system_template=VIEWER_SYSTEM_TEMPLATE,
-        tool_names=TOOLS_VIEWER,
+        tool_names=tool_names,
         joins_debrief=True,
         starts_as_member=True,
     )
@@ -77,7 +88,8 @@ def intersection_teams(knobs: SpotTheIntersectionKnobs) -> tuple[TeamSpec, ...]:
                 ),
                 debrief=_debrief(team_id=team_id, active=debrief_active),
                 roles=tuple(
-                    _viewer(team_id=team_id, index=index) for index in range(knobs.team_size)
+                    _viewer(team_id=team_id, index=index, link_medium=knobs.link_medium)
+                    for index in range(knobs.team_size)
                 ),
             )
         )

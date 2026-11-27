@@ -20,6 +20,9 @@
   "team_characters": "total",
   "postmortem_mode": "whole_team",
   "postmortem_character_limit": -1,
+  "link_medium": "text",
+  "canvas_width": 16,
+  "canvas_height": 16,
   "simulated_opponent_ratio": null,
   "model_overrides": {},
   "replace_agent_default_channel_visibility": {

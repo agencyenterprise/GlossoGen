@@ -1,7 +1,8 @@
 """World simulation for the spot_the_intersection scenario.
 
-Holds the run's certified boards, meters the characters each viewer sends on
-its team's link and direct channels, and records each viewer's submission. A
+Holds the run's certified boards, meters what each viewer sends on its team's
+link and direct channels (characters, or pixels under the canvas medium), and
+records each viewer's submission. A
 team is charged under the run's ``TeamCharacters`` rule. A team locks once every
 member has submitted, latching its charge, and traffic after that is not
 metered. When the round ends every team is scored (see :mod:`world_state`) and
@@ -13,9 +14,14 @@ from its log.
 from collections.abc import Mapping, Sequence
 from typing import Any, NamedTuple
 
+from glossogen.engine.canvas_link import (
+    LinkMedium,
+    charge_unit,
+)
 from glossogen.engine.round_outcome_log import RoundOutcomeLog
 from glossogen.engine.round_world import RoundWorld
 from glossogen.engine.team_declaration import TeamSpec
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.scenario_contract.scenario_world import MessageEvent, WorldContext
 from glossogen.scenarios.spot_the_intersection.board_generation import RoundBoards
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
@@ -64,7 +70,7 @@ class SubmissionReceipt(NamedTuple):
 
 
 class SpotTheIntersectionWorld(RoundWorld):
-    """Per-team world that meters link characters and locks complete teams."""
+    """Per-team world that meters what each team sends and locks complete teams."""
 
     def __init__(
         self,
@@ -76,6 +82,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         simulated_opponent: SimulatedOpponent | None,
         round_time_budget_seconds: int,
         team_characters: TeamCharacters,
+        link_medium: LinkMedium,
     ) -> None:
         super().__init__(
             team_specs=team_specs,
@@ -88,6 +95,7 @@ class SpotTheIntersectionWorld(RoundWorld):
         self._simulated_opponent = simulated_opponent
         self._budget = round_time_budget_seconds
         self._team_characters = team_characters
+        self._unit = charge_unit(medium=link_medium)
         self._seats = seats_by_agent_id(teams=team_specs)
         self._role_names = {
             role.agent_id: role.role_name for spec in team_specs for role in spec.roles
@@ -288,24 +296,19 @@ class SpotTheIntersectionWorld(RoundWorld):
                 continue
             await self._world_context.send_update_to_channel(
                 channel_id=team.link_channel_id,
-                text=_terminal_text(outcome=outcome, team_characters=self._team_characters),
+                text=_terminal_text(
+                    outcome=outcome, team_characters=self._team_characters, unit=self._unit
+                ),
             )
 
     def on_message(self, agent_id: str, channel_id: str, text: str, token_count: int) -> None:
-        """Meter a message until its team locks, then flag an exhausted budget.
+        """Meter a text message until its team locks, then flag an exhausted budget.
 
         The engine's team total counts a direct message as if it were sent on
         the team's link.
         """
-        team_id = metered_team_id(
-            teams=self._teams, sender_agent_id=agent_id, channel_id=channel_id
-        )
-        if team_id is None:
-            return
-        team = self._teams[team_id]
-        if team.locked:
-            # Charged before this check, post-lock chatter would cost a team
-            # characters its score no longer counts.
+        team = self._charged_team(agent_id=agent_id, channel_id=channel_id)
+        if team is None:
             return
         super().on_message(
             agent_id=agent_id,
@@ -313,7 +316,35 @@ class SpotTheIntersectionWorld(RoundWorld):
             text=text,
             token_count=token_count,
         )
-        team.characters_by_agent[agent_id] = team.characters_by_agent.get(agent_id, 0) + len(text)
+        self._charge(team=team, agent_id=agent_id, amount=len(text))
+
+    def on_drawing(self, agent_id: str, channel_id: str, drawing: CanvasDrawing) -> None:
+        """Meter a drawing by its painted pixels until its team locks, as ``on_message`` does."""
+        team = self._charged_team(agent_id=agent_id, channel_id=channel_id)
+        if team is None:
+            return
+        super().on_drawing(agent_id=agent_id, channel_id=team.link_channel_id, drawing=drawing)
+        self._charge(team=team, agent_id=agent_id, amount=drawing.pixel_count)
+
+    def _charged_team(self, agent_id: str, channel_id: str) -> TeamState | None:
+        """The team a message costs, or ``None`` when it costs no team.
+
+        A locked team is not charged: charged before this check, post-lock
+        chatter would cost a team what its score no longer counts.
+        """
+        team_id = metered_team_id(
+            teams=self._teams, sender_agent_id=agent_id, channel_id=channel_id
+        )
+        if team_id is None:
+            return None
+        team = self._teams[team_id]
+        if team.locked:
+            return None
+        return team
+
+    def _charge(self, team: TeamState, agent_id: str, amount: int) -> None:
+        """Add ``amount`` to what ``agent_id`` has sent, then flag an exhausted budget."""
+        team.characters_by_agent[agent_id] = team.characters_by_agent.get(agent_id, 0) + amount
         if self._budget > 0 and team.charged(rule=self._team_characters) >= self._budget:
             team.round_budget_exceeded = True
 
@@ -343,7 +374,7 @@ class SpotTheIntersectionWorld(RoundWorld):
             )
 
     def _busiest_member_name(self, team: TeamState) -> str:
-        """The display name of the member who has sent the most characters this round."""
+        """The display name of the member who has been charged the most this round."""
         agent_id = busiest_member(characters_by_agent=team.characters_by_agent)
         if agent_id is None:
             raise RuntimeError(f"{team.team_id} has sent nothing, so it has no busiest member")
@@ -354,11 +385,11 @@ class SpotTheIntersectionWorld(RoundWorld):
         if self._team_characters == TeamCharacters.BUSIEST_MEMBER:
             return (
                 f"{BUDGET_EXCEEDED_MARKER}. {self._busiest_member_name(team=team)} has sent {used} "
-                f"characters; each member's budget was {self._budget}. This round can no longer "
+                f"{self._unit}; each member's budget was {self._budget}. This round can no longer "
                 "be won."
             )
         return (
-            f"{BUDGET_EXCEEDED_MARKER}. Your team has sent {used} characters; the budget "
+            f"{BUDGET_EXCEEDED_MARKER}. Your team has sent {used} {self._unit}; the budget "
             f"was {self._budget}. This round can no longer be won."
         )
 
@@ -367,21 +398,21 @@ class SpotTheIntersectionWorld(RoundWorld):
         if self._team_characters == TeamCharacters.BUSIEST_MEMBER:
             return (
                 f"{BUDGET_LOW_MARKER}. {self._busiest_member_name(team=team)} has sent {used} of "
-                f"the {self._budget} characters each member may send."
+                f"the {self._budget} {self._unit} each member may send."
             )
         remaining = self._budget - used
-        return f"{BUDGET_LOW_MARKER}. {remaining} of {self._budget} budget characters remain."
+        return f"{BUDGET_LOW_MARKER}. {remaining} of {self._budget} budget {self._unit} remain."
 
 
-def _terminal_text(outcome: IntersectionOutcome, team_characters: TeamCharacters) -> str:
+def _terminal_text(outcome: IntersectionOutcome, team_characters: TeamCharacters, unit: str) -> str:
     """The end-of-round result one team reads on its link.
 
     An exhausted budget is reported first: it can end the round before the
     team's last members submit, so their missing submissions follow from it.
     """
-    characters = f"{outcome.characters_used} characters"
+    characters = f"{outcome.characters_used} {unit}"
     if team_characters == TeamCharacters.BUSIEST_MEMBER:
-        characters = f"{outcome.characters_used} characters from your busiest member"
+        characters = f"{outcome.characters_used} {unit} from your busiest member"
     if outcome.budget_exceeded:
         return (
             f"{ROUND_RESULT_MARKER}. Communication budget exceeded ({characters}); your team "

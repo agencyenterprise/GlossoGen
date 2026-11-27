@@ -31,6 +31,7 @@ function linkMessage() {
     timestamp: "2026-10-09T06:14:00.000Z",
     round_number: 1,
     token_count: 4,
+    drawing: null,
   };
 }
 

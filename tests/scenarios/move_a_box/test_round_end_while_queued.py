@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
+from pydantic import BaseModel
 
 from glossogen.models.event import SimulationEvent
 from glossogen.models.round_end_trigger import RoundEndTrigger
@@ -37,7 +38,7 @@ pytestmark = pytest.mark.xdist_group("move_a_box")
 
 ENDED = "Round 1 ended after 0 of 1 actions landed. Call read_notifications(wait_for='next_round')."
 
-ToolExecutors = dict[str, Callable[..., Awaitable[str]]]
+ToolExecutors = dict[str, Callable[..., Awaitable[str | BaseModel]]]
 FloorCall = Callable[[ToolExecutors, str], Coroutine[Any, Any, str]]
 
 
@@ -109,29 +110,41 @@ async def briefed_round(overrides: dict[str, Any], tmp_path: Path) -> Floor:
     return Floor(scenario=scenario, runtime=runtime, logger=logger, tools=tools)
 
 
+def text_of(result: str | BaseModel) -> str:
+    """A move_a_box tool's reply, which is always text."""
+    assert isinstance(result, str)
+    return result
+
+
 async def act_stand_by(tools: ToolExecutors, agent_id: str) -> str:
-    return await tools["act"](
-        agent_id=agent_id,
-        steps=[PlannedStep(action=CrateAction.STAND_BY, direction=None)],
-        reasoning="Scripted list.",
+    return text_of(
+        result=await tools["act"](
+            agent_id=agent_id,
+            steps=[PlannedStep(action=CrateAction.STAND_BY, direction=None)],
+            reasoning="Scripted list.",
+        )
     )
 
 
 async def stand_by(tools: ToolExecutors, agent_id: str) -> str:
-    return await tools["stand_by"](agent_id=agent_id, reasoning="Scripted stand by.")
+    return text_of(
+        result=await tools["stand_by"](agent_id=agent_id, reasoning="Scripted stand by.")
+    )
 
 
 async def haul(tools: ToolExecutors, agent_id: str) -> str:
-    return await tools["haul"](
-        agent_id=agent_id,
-        method=HaulMethod.CART,
-        direction=Direction.RIGHT,
-        reasoning="Scripted haul.",
+    return text_of(
+        result=await tools["haul"](
+            agent_id=agent_id,
+            method=HaulMethod.CART,
+            direction=Direction.RIGHT,
+            reasoning="Scripted haul.",
+        )
     )
 
 
 async def finish(tools: ToolExecutors, agent_id: str) -> str:
-    return await tools["finish"](agent_id=agent_id, reasoning="Scripted finish.")
+    return text_of(result=await tools["finish"](agent_id=agent_id, reasoning="Scripted finish."))
 
 
 class QueuedCall(NamedTuple):

@@ -1,12 +1,17 @@
 """Per-round and postmortem injections, and reading a board back out of one.
 
 A viewer's round injection carries the previous round's result, the budget when
-one is set (worded for the run's messaging and character rule), and its own
-board, one line per object. ``board_lines_from_injection``
+one is set (worded for the run's messaging, its character rule and its link
+medium), and its own board, one line per object. ``board_lines_from_injection``
 is the inverse the audit uses: it recovers the board exactly as delivered, so a
 recorded run can be certified on what its viewers were actually sent.
 """
 
+from glossogen.engine.canvas_link import (
+    LinkMedium,
+    charge_unit,
+    charge_unit_singular,
+)
 from glossogen.scenarios.spot_the_intersection.ids import (
     POSTMORTEM_INJECTION_TEMPLATE,
     VIEWER_INJECTION_TEMPLATE,
@@ -31,6 +36,7 @@ def render_round_injection(
     round_time_budget_seconds: int,
     messaging: Messaging,
     team_characters: TeamCharacters,
+    link_medium: LinkMedium,
 ) -> str:
     """The round-start injection for one viewer."""
     return renderer.render(
@@ -43,6 +49,8 @@ def render_round_injection(
             "round_time_budget_seconds": round_time_budget_seconds,
             "one_to_one": messaging == Messaging.ONE_TO_ONE,
             "team_characters": team_characters.value,
+            "unit": charge_unit(medium=link_medium),
+            "unit_singular": charge_unit_singular(medium=link_medium),
         },
     )
 
@@ -52,6 +60,7 @@ def render_postmortem_injection(
     round_number: int,
     previous_outcome: IntersectionOutcome | None,
     team_characters: TeamCharacters,
+    link_medium: LinkMedium,
     postmortem_mode: PostmortemMode,
     postmortem_character_limit: int,
     author_role_name: str | None,
@@ -68,6 +77,8 @@ def render_postmortem_injection(
             "round_number": round_number,
             "previous_outcome": previous_outcome,
             "team_characters": team_characters.value,
+            "unit": charge_unit(medium=link_medium),
+            "unit_singular": charge_unit_singular(medium=link_medium),
             "postmortem_mode": postmortem_mode.value,
             "postmortem_character_limit": postmortem_character_limit,
             "author_role_name": author_role_name,

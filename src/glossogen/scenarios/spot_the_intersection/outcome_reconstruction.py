@@ -154,7 +154,7 @@ def _read_rounds(teams: dict[str, TeamState], events: list[Any]) -> _RecordedRou
         by_team = recorded.characters_sent.setdefault(message.round_number, {})
         by_agent = by_team.setdefault(message.team_id, {})
         sender = message.sender_agent_id
-        by_agent[sender] = by_agent.get(sender, 0) + message.characters
+        by_agent[sender] = by_agent.get(sender, 0) + message.charge
     return recorded
 
 

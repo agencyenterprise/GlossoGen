@@ -5,12 +5,14 @@ team whose budget it spends, counting task channels only, and tracks which
 points in the round budget each team has already been told about.
 
 A scenario adds its own budget rule by overriding ``on_message`` and calling up,
-which is what makes the total accumulate. ``characters_used`` reads the running
-total, ``claim_round_budget_threshold`` answers whether an announcement is still
+which is what makes the total accumulate. A canvas drawing is charged its
+painted pixels through ``on_drawing``, into the same total. ``characters_used``
+reads the running total, ``claim_round_budget_threshold`` answers whether an announcement is still
 owed, and ``begin_round`` clears both at a round boundary.
 """
 
 from glossogen.engine.team_declaration import TeamSpec
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.scenario_contract.scenario_world import ScenarioWorld
 
 
@@ -138,6 +140,16 @@ class RoundWorld(ScenarioWorld):
         message was sent.
         """
         _ = token_count
+        self._charge_team_budget(agent_id=agent_id, channel_id=channel_id, amount=len(text))
+
+    def on_drawing(self, agent_id: str, channel_id: str, drawing: CanvasDrawing) -> None:
+        """Charge a drawing's painted pixels as ``on_message`` charges characters."""
+        self._charge_team_budget(
+            agent_id=agent_id, channel_id=channel_id, amount=drawing.pixel_count
+        )
+
+    def _charge_team_budget(self, agent_id: str, channel_id: str, amount: int) -> None:
+        """Add ``amount`` to the team whose budget a message on ``channel_id`` spends."""
         if channel_id not in self._task_channel_ids:
             return
         team_id = self._team_id_by_task_channel_id.get(channel_id)
@@ -145,4 +157,4 @@ class RoundWorld(ScenarioWorld):
             team_id = self._team_id_by_agent_id.get(agent_id)
         if team_id is None:
             return
-        self._characters_used_by_team_id[team_id] += len(text)
+        self._characters_used_by_team_id[team_id] += amount

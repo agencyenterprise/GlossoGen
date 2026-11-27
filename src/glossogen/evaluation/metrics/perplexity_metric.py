@@ -17,6 +17,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.optional_ml_backend import (
     load_incremental_lm_scorer,
     require_perplexity_backend,
@@ -60,6 +61,8 @@ class PerplexityMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score each primary channel's messages and report per-round perplexity stats."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, llm_provider, run_dir, options
         # Applicability first: a scenario with no primary channel has nothing to
         # score regardless of which packages are installed, and demanding a

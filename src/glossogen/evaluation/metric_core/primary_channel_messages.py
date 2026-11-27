@@ -1,6 +1,8 @@
 """Per-round grouping of the messages sent on a set of channels.
 
 ``group_messages_by_round`` groups the ``MessageSent`` events themselves.
+``collect_message_sizes_by_round`` reduces them to their sizes: characters, or
+painted pixels for a drawing.
 ``collect_primary_messages_by_round`` reduces them to the texts a metric scores;
 the caller picks which text of a ``MessageSent`` counts: the text the channel
 delivered (``transmitted_text``), or the text the sender composed before a
@@ -58,6 +60,48 @@ def group_messages_by_round(
     return [
         RoundMessageEvents(round_number=rn, messages=by_round[rn]) for rn in sorted(by_round.keys())
     ]
+
+
+class RoundMessageSizes(NamedTuple):
+    """The sizes of the non-empty messages on a set of channels in one round."""
+
+    round_number: int
+    sizes: list[int]
+
+
+class MessageSizes(NamedTuple):
+    """Message sizes by round, and their unit.
+
+    The unit is ``pixels`` when the channels carried drawings, else ``chars``.
+    """
+
+    unit: str
+    rounds: list[RoundMessageSizes]
+
+
+def collect_message_sizes_by_round(
+    events: list[SimulationEvent],
+    channel_ids: frozenset[str],
+) -> MessageSizes:
+    """The size of each message on ``channel_ids``, by round.
+
+    A message's size is its characters, or a drawing's painted pixels. Returns
+    one ``RoundMessageSizes`` per round that carried at least one non-empty
+    message, sorted by round number.
+    """
+    rounds: list[RoundMessageSizes] = []
+    carried_drawings = False
+    for round_messages in group_messages_by_round(events=events, channel_ids=channel_ids):
+        messages = [event.message for event in round_messages.messages]
+        if any(message.drawing is not None for message in messages):
+            carried_drawings = True
+        sizes = [message.size for message in messages if message.size > 0]
+        if sizes:
+            rounds.append(RoundMessageSizes(round_number=round_messages.round_number, sizes=sizes))
+    unit = "chars"
+    if carried_drawings:
+        unit = "pixels"
+    return MessageSizes(unit=unit, rounds=rounds)
 
 
 def collect_primary_messages_by_round(

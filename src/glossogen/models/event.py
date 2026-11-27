@@ -27,6 +27,7 @@ from typing import (
 from pydantic import Discriminator, Field, TypeAdapter, model_serializer, model_validator
 
 from glossogen.models.agent_model_settings import AgentModelSettings
+from glossogen.models.canvas import ToolResultImage
 from glossogen.models.channel_visibility import ChannelVisibility
 from glossogen.models.event_base import EventBase, TokenUsage
 from glossogen.models.glossogen_build import GlossogenBuild
@@ -197,7 +198,11 @@ class ToolCallInvoked(EventBase):
 
 
 class ToolResultReceived(EventBase):
-    """Emitted when a tool call completes and the result is returned to the agent."""
+    """Emitted when a tool call completes and the result is returned to the agent.
+
+    ``images`` are the images attached to the result, such as the drawings a
+    ``read_channel`` result lists, in the order the agent received them.
+    """
 
     event_type: Literal["tool_result_received"] = "tool_result_received"
     agent_id: str
@@ -205,6 +210,9 @@ class ToolResultReceived(EventBase):
     call_id: str
     arguments: dict[str, Any]
     result: str
+    images: list[ToolResultImage] = Field(
+        default_factory=list[ToolResultImage], exclude_if=lambda images: not images
+    )
 
 
 class ContextCompacted(EventBase):

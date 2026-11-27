@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from glossogen.models.canvas import CanvasDrawing
+
 
 class McpScenario(BaseModel):
     """A single scenario entry for the list_scenarios response."""
@@ -235,7 +237,10 @@ class McpRunMetadata(BaseModel):
 
 
 class McpMessage(BaseModel):
-    """A channel message in the get_run response."""
+    """A channel message in the get_run response.
+
+    ``drawing`` is set on a message sent as a canvas drawing, whose ``text`` is empty.
+    """
 
     message_id: str
     channel_id: str
@@ -243,6 +248,7 @@ class McpMessage(BaseModel):
     text: str
     timestamp: datetime
     round_number: int
+    drawing: CanvasDrawing | None
 
 
 class McpReasoning(BaseModel):

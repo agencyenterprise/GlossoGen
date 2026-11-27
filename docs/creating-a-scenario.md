@@ -522,6 +522,32 @@ async def send_to(self, agent_id: str, text: str, to: list[str] | None) -> SendM
     )
 ```
 
+### Sending drawings
+
+A scenario can let agents send canvas drawings as messages. An agent names the
+pixels to paint, and the recipients receive the drawing as an image.
+
+- The scenario offers its own tool that builds a `CanvasDrawing` (a width, a
+  height and the painted pixels) and posts it with
+  `self.runtime.publish_drawing(agent_id, channel_id, drawing, force)`. The
+  call applies `validate_outgoing_message` and the unread-messages check as
+  `publish_message` does. The tool can return the `SendMessageResult` it gets
+  back.
+- The stored message has an empty `text` and the drawing in its `drawing`
+  field. `transform_outgoing_message` does not run on it.
+- The world receives `on_drawing(agent_id, channel_id, drawing)` in place of
+  `on_message`, then `on_message_async` with the drawing on the `MessageEvent`.
+  The default `on_drawing` does nothing, so a world that charges for drawings
+  overrides it.
+- `read_channel` and a held send list a drawing with an empty text and an image
+  number, and attach the drawing as a PNG to the same tool result. The model
+  receives the image, not the coordinates. The event log records the PNG on
+  `tool_result_received`, so a resume or a fork rebuilds the agent's history
+  with it.
+- The run page draws each drawing in the chat.
+
+spot_the_intersection's `link_medium: "canvas"` uses all of these.
+
 ### Replacing the runner prompts
 
 `runner_prompts(agent_id)` returns a `RunnerPrompts` or `None`. `None`, the

@@ -7,6 +7,7 @@ import { deriveInitials, type AgentColor } from "./agent-colors";
 import type { DisplayEntry } from "./display-entry";
 import type { ChatRow } from "./chat-rows";
 import { formatTime } from "./format";
+import { CanvasDrawingView } from "./canvas-drawing-view";
 import { ProseMarkdown } from "./prose-markdown";
 import { NotificationDisplay } from "./notification-display";
 import { ToolCallDisplay } from "./tool-call-display";
@@ -208,6 +209,7 @@ export const ChatEntryRow = memo(function ChatEntryRow({
             />
           ) : (
             <>
+              {entry.drawing !== null ? <CanvasDrawingView drawing={entry.drawing} /> : null}
               {displayText ? (
                 <ProseMarkdown
                   className={cn(

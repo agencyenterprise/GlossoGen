@@ -4,10 +4,12 @@ Each team has ``team_size`` viewers, each holding a private board of objects.
 Exactly one object is on every board of a team; others are on some boards but
 not all. The viewers talk on their team's link channel, or with ``messaging``
 set to ``one_to_one`` one teammate at a time on direct channels, to find the
-common object, and every member submits it with ``submit_object``. With two
-teams on the same boards, the correct team charged the fewest characters wins
-the round. After each round a discussion phase lets viewers agree on
-conventions, under the rules ``postmortem_mode`` and
+common object, and every member submits it with ``submit_object``. With
+``link_medium`` set to ``canvas`` they send drawings with ``send_drawing``
+instead of text, and receive their teammates' drawings as images. With two
+teams on the same boards, the correct team charged the fewest characters (or
+pixels, under the canvas medium) wins the round. After each round a discussion
+phase lets viewers agree on conventions, under the rules ``postmortem_mode`` and
 ``postmortem_character_limit`` set (see :mod:`postmortem_modes`).
 
 Each round's boards are generated and certified from their rendered lines before
@@ -23,6 +25,13 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from glossogen.engine import team_structure
+from glossogen.engine.canvas_link import (
+    TEXT_REFUSED_ON_CANVAS_LINK,
+    LinkMedium,
+    charge_unit,
+    charge_unit_singular,
+)
+from glossogen.engine.drawing_sender import DrawingSender, rejected_send
 from glossogen.engine.team_declaration import RoleSpec
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel, ChannelTemplateEntry
@@ -129,6 +138,11 @@ _LINK_CHANNELS = frozenset({LINK_CHANNEL_ID, LINK_A_CHANNEL_ID, LINK_B_CHANNEL_I
 _VIEWER_ROLE_GROUP = "viewer"
 
 
+def _is_round_channel(channel_id: str) -> bool:
+    """Whether ``channel_id`` is a link or direct channel, where viewers talk during a round."""
+    return channel_id in _LINK_CHANNELS or channel_id.startswith(DIRECT_CHANNEL_PREFIX)
+
+
 def _closed_in_discussion(channel_id: str) -> str | None:
     """Why ``channel_id``, a link or direct channel, is shut in a discussion phase, or ``None``."""
     if channel_id in _LINK_CHANNELS:
@@ -217,6 +231,14 @@ class SpotTheIntersectionScenario(SimulationScenario):
             ),
             round_time_budget_seconds=knobs.round_time_budget_seconds,
             team_characters=knobs.team_characters,
+            link_medium=knobs.link_medium,
+        )
+        self._drawing_sender = DrawingSender(
+            width=knobs.canvas_width,
+            height=knobs.canvas_height,
+            link_channel_ids=_LINK_CHANNELS,
+            in_postmortem=lambda: self._world.in_postmortem,
+            get_runtime=lambda: self.runtime,
         )
 
     def get_knobs(self) -> SpotTheIntersectionKnobs:
@@ -237,8 +259,19 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 "round_count": self._knobs.round_count,
                 "postmortem_mode": self._knobs.postmortem_mode.value,
                 "postmortem_character_limit": self._knobs.postmortem_character_limit,
+                **self._medium_variables(),
             },
         )
+
+    def _medium_variables(self) -> dict[str, Any]:
+        """The template variables that word a prompt for the run's link medium."""
+        return {
+            "canvas": self._knobs.link_medium == LinkMedium.CANVAS,
+            "canvas_width": self._knobs.canvas_width,
+            "canvas_height": self._knobs.canvas_height,
+            "unit": charge_unit(medium=self._knobs.link_medium),
+            "unit_singular": charge_unit_singular(medium=self._knobs.link_medium),
+        }
 
     def _render_system_prompt(self, role: RoleSpec, channels: list[ChannelTemplateEntry]) -> str:
         """Render one viewer's system prompt over the channels it reaches and its teammates.
@@ -277,6 +310,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
                     teams=self._team_specs, agent_id=role.agent_id
                 ),
                 "seat_index": seat.board_index,
+                **self._medium_variables(),
             },
         )
 
@@ -327,6 +361,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
             round_time_budget_seconds=self._knobs.round_time_budget_seconds,
             messaging=self._knobs.messaging,
             team_characters=self._knobs.team_characters,
+            link_medium=self._knobs.link_medium,
         )
 
     def get_postmortem_injection(self, round_number: int, agent_id: str) -> str | None:
@@ -349,6 +384,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
             round_number=round_number,
             previous_outcome=self._world.previous_outcome(team_id=seat.team_id),
             team_characters=self._knobs.team_characters,
+            link_medium=self._knobs.link_medium,
             postmortem_mode=self._knobs.postmortem_mode,
             postmortem_character_limit=self._knobs.postmortem_character_limit,
             author_role_name=author_role_name,
@@ -391,7 +427,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
                 RoundResult(
                     success=outcome.correct,
                     team_id=result_team_id,
-                    reason=outcome_reason(outcome=outcome),
+                    reason=outcome_reason(outcome=outcome, link_medium=self._knobs.link_medium),
                 )
             )
         return results
@@ -517,12 +553,14 @@ class SpotTheIntersectionScenario(SimulationScenario):
         viewer posts in the discussion phase; ``validate_outgoing_message``
         refuses the link.
         """
-        channel_id = to
-        if not self._is_declared_channel_of(agent_id=agent_id, channel_id=to):
-            channel_id = await self.runtime.direct_channel_for(
-                agent_id=agent_id, recipient_agent_ids=[to]
-            )
+        channel_id = await self._channel_for_recipient(agent_id, to)
         return await self._publish(agent_id=agent_id, channel_id=channel_id, text=text, force=force)
+
+    async def _channel_for_recipient(self, agent_id: str, to: str) -> str:
+        """The channel a one-to-one ``to`` reaches: one ``agent_id`` belongs to, or a direct one."""
+        if self._is_declared_channel_of(agent_id=agent_id, channel_id=to):
+            return to
+        return await self.runtime.direct_channel_for(agent_id=agent_id, recipient_agent_ids=[to])
 
     async def _publish(
         self, agent_id: str, channel_id: str, text: str, force: bool
@@ -530,9 +568,16 @@ class SpotTheIntersectionScenario(SimulationScenario):
         """Publish one message; in a discussion phase, hold it to the phase's partner and limit.
 
         With a character limit, every send in the phase returns what the sender
-        has left.
+        has left. Under the canvas medium, text on the link or a direct channel
+        during a round is refused: those channels carry drawings.
         """
         if not self._world.in_postmortem:
+            if self._knobs.link_medium == LinkMedium.CANVAS and _is_round_channel(
+                channel_id=channel_id
+            ):
+                return rejected_send(
+                    detail=TEXT_REFUSED_ON_CANVAS_LINK, current_round=self.runtime.current_round
+                )
             return await self.runtime.publish_message(
                 agent_id=agent_id, channel_id=channel_id, text=text, force=force
             )
@@ -592,7 +637,7 @@ class SpotTheIntersectionScenario(SimulationScenario):
     def transform_outgoing_message(self, agent_id: str, channel_id: str, text: str) -> str:
         """Apply per-character noise to messages on the link and direct channels."""
         _ = agent_id
-        if channel_id not in _LINK_CHANNELS and not channel_id.startswith(DIRECT_CHANNEL_PREFIX):
+        if not _is_round_channel(channel_id=channel_id):
             return text
         return apply_character_noise(
             text=text,
@@ -630,8 +675,11 @@ class SpotTheIntersectionScenario(SimulationScenario):
     def get_protocol_probe_config(self) -> ProtocolProbeConfig | None:
         """Opt into the protocol-probe metrics with one symmetric viewer role group.
 
-        One-to-one runs are asked which teammate they would message first.
+        One-to-one runs are asked which teammate they would message first. A
+        canvas run has none: the probe asks for the text a viewer would send.
         """
+        if self._knobs.link_medium == LinkMedium.CANVAS:
+            return None
         scenario_root = Path(__file__).resolve().parent
         template = "viewer_probe.jinja"
         if self._knobs.messaging == Messaging.ONE_TO_ONE:
@@ -646,12 +694,15 @@ class SpotTheIntersectionScenario(SimulationScenario):
     def get_protocol_explanation_config(self) -> ProtocolExplanationConfig | None:
         """Tailor the protocol-explanation metric with the viewer describe template.
 
-        One-to-one runs are asked how messages travelled between teammates.
+        One-to-one runs are asked how messages travelled between teammates, and
+        canvas runs how their drawings encoded an object.
         """
         scenario_root = Path(__file__).resolve().parent
         template = "viewer_describe.jinja"
         if self._knobs.messaging == Messaging.ONE_TO_ONE:
             template = "viewer_describe_one_to_one.jinja"
+        if self._knobs.link_medium == LinkMedium.CANVAS:
+            template = "viewer_describe_canvas.jinja"
         return ProtocolExplanationConfig(
             prompts_dir=scenario_root / "prompts" / "describe",
             role_groups={_VIEWER_ROLE_GROUP: self._viewer_role_names()},
@@ -663,5 +714,16 @@ class SpotTheIntersectionScenario(SimulationScenario):
         return self._world
 
     def get_tools(self) -> list[ScenarioTool]:
-        """Return the submit_object tool."""
-        return build_tools(world=self._world, get_runtime=lambda: self._runtime)
+        """Return the submit_object tool, and send_drawing under the canvas medium."""
+        tools = build_tools(world=self._world, get_runtime=lambda: self._runtime)
+        if self._knobs.link_medium != LinkMedium.CANVAS:
+            return tools
+        if self._knobs.messaging == Messaging.ONE_TO_ONE:
+            tools.append(
+                self._drawing_sender.teammate_tool(
+                    channel_for_recipient=self._channel_for_recipient
+                )
+            )
+        else:
+            tools.append(self._drawing_sender.link_tool())
+        return tools

@@ -1,4 +1,7 @@
 {
+  "canvas_height": 16,
+  "canvas_width": 16,
+  "link_medium": "text",
   "announce_swap": false,
   "channel_noise_level": 0.0,
   "easy_round_numbers": [],

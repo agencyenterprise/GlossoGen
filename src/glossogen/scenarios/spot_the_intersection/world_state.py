@@ -16,6 +16,11 @@ from enum import StrEnum
 from fractions import Fraction
 from typing import NamedTuple, Self
 
+from glossogen.engine.canvas_link import (
+    LinkMedium,
+    charge_unit,
+    charge_unit_abbreviation,
+)
 from glossogen.engine.fewest_characters_winner import fewest_characters_winners
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX
 from glossogen.scenarios.spot_the_intersection.board_model import BoardObject
@@ -314,19 +319,21 @@ def _opponent_of(
     return others[0]
 
 
-def outcome_reason(outcome: IntersectionOutcome) -> str:
+def outcome_reason(outcome: IntersectionOutcome, link_medium: LinkMedium) -> str:
     """A one-line reason for the round result the clock records.
 
     An exhausted budget comes first, since it can end the round before every
     member has submitted. Against a simulated opponent the reason names it and
-    its count; the viewers are never told it was simulated.
+    its count; the viewers are never told it was simulated. The counts are in
+    the unit ``link_medium`` charges.
     """
+    unit = charge_unit_abbreviation(medium=link_medium)
     counts = (
         f"{outcome.members_correct}/{outcome.members_required} submitted the answer, "
-        f"{outcome.characters_used} chars"
+        f"{outcome.characters_used} {unit}"
     )
     if outcome.opponent_simulated:
-        counts = f"{counts}, simulated opponent {outcome.opponent_characters} chars"
+        counts = f"{counts}, simulated opponent {outcome.opponent_characters} {unit}"
     if outcome.budget_exceeded:
         return f"over budget ({counts})"
     if outcome.members_submitted < outcome.members_required:
@@ -337,7 +344,7 @@ def outcome_reason(outcome: IntersectionOutcome) -> str:
     if outcome.won:
         return f"won ({counts})"
     if outcome.correct and outcome.competitive:
-        return f"correct but the other team used fewer characters ({counts})"
+        return f"correct but the other team used fewer {charge_unit(medium=link_medium)} ({counts})"
     if outcome.correct:
         return f"correct ({counts})"
     if not outcome.agreed:

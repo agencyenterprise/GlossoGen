@@ -10,22 +10,24 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import NamedTuple
 from uuid import uuid4
 
 from glossogen.llm.token_counter import TokenCounter, create_token_counter
 from glossogen.models.agent_config import AgentConfig
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.models.channel import DIRECT_CHANNEL_PREFIX, Channel
-from glossogen.models.elapsed_time import elapsed_seconds_since_start
 from glossogen.models.event import (
     ChannelCreated,
     InjectionDelivered,
     MessageSent,
     PostmortemStarted,
 )
-from glossogen.models.mcp_responses import ChannelMessage, SendMessageResult, SendStatus
+from glossogen.models.mcp_responses import SendMessageResult, SendStatus
 from glossogen.models.message import SimulationMessage
 from glossogen.models.unread_channel_messages import UnreadChannelMessages
 from glossogen.runtime.agent_session import AgentSession
+from glossogen.runtime.channel_message_views import channel_message_views
 from glossogen.runtime.channel_router import ChannelRouter
 from glossogen.runtime.event_logger import EventLogger
 from glossogen.runtime.wait_registry import WaitRegistry
@@ -40,6 +42,13 @@ from glossogen.scenario_contract.protocol import SimulationScenario
 from glossogen.scenario_contract.scenario_world import MessageEvent
 
 logger = logging.getLogger(__name__)
+
+
+class OutgoingMessage(NamedTuple):
+    """What an agent sends: text, or a drawing with empty text."""
+
+    text: str
+    drawing: CanvasDrawing | None
 
 
 class SimulationRuntime:
@@ -263,29 +272,34 @@ class SimulationRuntime:
         self,
         agent_id: str,
         channel_id: str,
-        text: str,
+        outgoing: OutgoingMessage,
         token_count: int,
     ) -> None:
         """Update world state, then let the world react, before the send returns.
 
         The world sees a message twice: once for state the sending agent must
-        observe on its own turn, and once for the reactions, which is where
-        budget notifications come from. Both happen here, in that order, while
-        the sender waits.
+        observe on its own turn (``on_message``, or ``on_drawing`` for a
+        drawing), and once for the reactions, which is where budget
+        notifications come from. Both happen here, in that order, while the
+        sender waits.
         """
         world = self._scenario.get_world()
-        world.on_message(
-            agent_id=agent_id,
-            channel_id=channel_id,
-            text=text,
-            token_count=token_count,
-        )
+        if outgoing.drawing is None:
+            world.on_message(
+                agent_id=agent_id,
+                channel_id=channel_id,
+                text=outgoing.text,
+                token_count=token_count,
+            )
+        else:
+            world.on_drawing(agent_id=agent_id, channel_id=channel_id, drawing=outgoing.drawing)
         await world.on_message_async(
             event=MessageEvent(
                 agent_id=agent_id,
                 channel_id=channel_id,
-                text=text,
+                text=outgoing.text,
                 token_count=token_count,
+                drawing=outgoing.drawing,
             ),
             context=self._world_context,
         )
@@ -295,35 +309,59 @@ class SimulationRuntime:
     ) -> SendMessageResult:
         """Post ``text`` from ``agent_id`` to ``channel_id`` and tell the other members.
 
-        Refuses empty or whitespace-only text, and a channel the agent does not
-        belong to, with ``ValueError``: an empty message would cost no characters
-        while still telling the others who sent it. Returns
-        ``rejected`` when the scenario's ``validate_outgoing_message`` refuses the
-        send, and ``conflict`` with the unseen messages when the channel moved
-        since the agent last read it, unless ``force``. Otherwise stores the
-        scenario-transformed text, logs ``message_sent``, notifies the other
-        members and the world. The sender's read position moves past its own
-        message only when it had read everything before it.
+        Refuses empty or whitespace-only text with ``ValueError``: an empty
+        message would cost no characters while still telling the others who
+        sent it. Otherwise follows ``_publish``.
         """
         if not text.strip():
             raise ValueError("text is empty")
+        return await self._publish(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            outgoing=OutgoingMessage(text=text, drawing=None),
+            force=force,
+        )
+
+    async def publish_drawing(
+        self, agent_id: str, channel_id: str, drawing: CanvasDrawing, force: bool
+    ) -> SendMessageResult:
+        """Post ``drawing`` from ``agent_id`` to ``channel_id`` and tell the other members.
+
+        The message's text is empty and its token count zero. A reader receives
+        the drawing as an image. Otherwise follows ``_publish``.
+        """
+        return await self._publish(
+            agent_id=agent_id,
+            channel_id=channel_id,
+            outgoing=OutgoingMessage(text="", drawing=drawing),
+            force=force,
+        )
+
+    async def _publish(
+        self, agent_id: str, channel_id: str, outgoing: OutgoingMessage, force: bool
+    ) -> SendMessageResult:
+        """Store ``outgoing`` on ``channel_id`` unless the channel or the scenario refuses it.
+
+        Refuses a channel the agent does not belong to with ``ValueError``.
+        Returns ``rejected`` when the scenario's ``validate_outgoing_message``
+        refuses the send, and ``conflict`` with the unseen messages when the
+        channel moved since the agent last read it, unless ``force``. Otherwise
+        stores the message, logs ``message_sent``, notifies the other members
+        and the world. The sender's read position moves past its own message
+        only when it had read everything before it.
+        """
         if not self._channel_router.validate_membership(agent_id=agent_id, channel_id=channel_id):
             raise ValueError(f"You are not a member of channel '{channel_id}'")
         rejection_reason = self._scenario.validate_outgoing_message(
             agent_id=agent_id, channel_id=channel_id
         )
         if rejection_reason is not None:
-            return SendMessageResult(
-                status=SendStatus.REJECTED,
-                detail=rejection_reason,
-                new_messages=[],
-                token_count=0,
-                current_round=self._current_round,
-                message_id=None,
-            )
+            return self._rejected_result(detail=rejection_reason)
         # Count tokens before acquiring the lock to avoid holding the lock
         # during a potentially slow external API call.
-        token_count = await self.count_tokens(agent_id=agent_id, text=text)
+        token_count = 0
+        if outgoing.drawing is None:
+            token_count = await self.count_tokens(agent_id=agent_id, text=outgoing.text)
         session = self.resolve_session(agent_id=agent_id)
         async with self.get_channel_lock(channel_id=channel_id):
             # Token counting may await a provider. Membership can change, or a
@@ -341,14 +379,7 @@ class SimulationRuntime:
                 channel_id=channel_id,
             )
             if rejection_reason is not None:
-                return SendMessageResult(
-                    status=SendStatus.REJECTED,
-                    detail=rejection_reason,
-                    new_messages=[],
-                    token_count=0,
-                    current_round=self._current_round,
-                    message_id=None,
-                )
+                return self._rejected_result(detail=rejection_reason)
             last_seen = session.get_last_seen_count(channel_id=channel_id)
             if (
                 not force
@@ -358,10 +389,10 @@ class SimulationRuntime:
                     agent_id=agent_id, channel_id=channel_id, last_seen=last_seen
                 )
             message = await self._store_message(
-                session=session, channel_id=channel_id, text=text, token_count=token_count
+                session=session, channel_id=channel_id, outgoing=outgoing, token_count=token_count
             )
         await self.notify_world_of_message(
-            agent_id=agent_id, channel_id=channel_id, text=text, token_count=token_count
+            agent_id=agent_id, channel_id=channel_id, outgoing=outgoing, token_count=token_count
         )
         logger.info("Agent %s sent %d tokens to channel %s", agent_id, token_count, channel_id)
         return SendMessageResult(
@@ -371,6 +402,17 @@ class SimulationRuntime:
             token_count=token_count,
             current_round=self._current_round,
             message_id=message.message_id,
+        )
+
+    def _rejected_result(self, detail: str) -> SendMessageResult:
+        """The ``rejected`` answer to a send the scenario refused, with its reason."""
+        return SendMessageResult(
+            status=SendStatus.REJECTED,
+            detail=detail,
+            new_messages=[],
+            token_count=0,
+            current_round=self._current_round,
+            message_id=None,
         )
 
     def _conflict_result(self, agent_id: str, channel_id: str, last_seen: int) -> SendMessageResult:
@@ -385,41 +427,42 @@ class SimulationRuntime:
             last_seen,
             len(unseen),
         )
+        views = channel_message_views(
+            messages=unseen, simulation_start_time=self._simulation_start_time
+        )
         return SendMessageResult(
             status=SendStatus.CONFLICT,
             detail=(
                 f"{len(unseen)} new message(s) arrived since your last read. "
                 "Review them and either revise your message or re-send with force=true."
             ),
-            new_messages=[
-                ChannelMessage(
-                    round=message.round_number,
-                    sender=message.sender_display_name,
-                    text=message.text,
-                    elapsed_seconds=elapsed_seconds_since_start(
-                        when=message.timestamp, start=self._simulation_start_time
-                    ),
-                )
-                for message in unseen
-            ],
+            new_messages=views.messages,
             token_count=0,
             current_round=self._current_round,
             message_id=None,
+            attached_images=views.images,
         )
 
     async def _store_message(
-        self, session: AgentSession, channel_id: str, text: str, token_count: int
+        self, session: AgentSession, channel_id: str, outgoing: OutgoingMessage, token_count: int
     ) -> SimulationMessage:
         """Append and log one message, then tell every other member of the channel.
 
-        The sender's read position moves past its own message only when it had
-        read everything before it. A forced send over messages the sender has not
-        seen leaves them unread, so they are still delivered to it.
+        A text message is stored as the scenario's ``transform_outgoing_message``
+        returns it; a drawing is stored as drawn. The sender's read position
+        moves past its own message only when it had read everything before it.
+        A forced send over messages the sender has not seen leaves them unread,
+        so they are still delivered to it.
         """
         agent_id = session.agent_id
         was_up_to_date = session.get_last_seen_count(
             channel_id=channel_id
         ) == self._channel_router.get_message_count(channel_id=channel_id)
+        text = outgoing.text
+        if outgoing.drawing is None:
+            text = self._scenario.transform_outgoing_message(
+                agent_id=agent_id, channel_id=channel_id, text=outgoing.text
+            )
         message = SimulationMessage(
             message_id=str(uuid4()),
             channel_id=channel_id,
@@ -427,11 +470,10 @@ class SimulationRuntime:
             sender_display_name=self._scenario.get_agent_display_name_at_round(
                 agent_id=agent_id, round_number=self._current_round
             ),
-            text=self._scenario.transform_outgoing_message(
-                agent_id=agent_id, channel_id=channel_id, text=text
-            ),
+            text=text,
             timestamp=datetime.now(tz=UTC),
             round_number=self._current_round,
+            drawing=outgoing.drawing,
         )
         self._channel_router.append_message(message=message)
         await self._event_logger.log(

@@ -25,6 +25,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.communication.label_models import (
     CategoryConfidence,
@@ -65,6 +66,8 @@ class CommunicationFeaturePresenceMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Run the relabel judge against the supplied ontology and persist the vector."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs
         # Applicability before inputs, matching communication_open_coding. A
         # scenario that produces no communication rounds cannot be scored even

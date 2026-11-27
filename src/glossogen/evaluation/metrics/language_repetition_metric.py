@@ -28,6 +28,7 @@ from typing import NamedTuple, Self
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.primary_channel_messages import group_messages_by_round
 from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
@@ -134,6 +135,8 @@ class LanguageRepetitionMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Judge per-message redundancy on pristine primary-channel text, per round and channel."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, options
         channels = scenario.get_primary_channels()
         if not channels:

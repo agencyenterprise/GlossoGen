@@ -47,18 +47,20 @@ For combination failures, address each component in order. The general priority 
 STELLAR ALIGNMENT — SAGWE392:
 Each round, a reading from reference star SAGWE392 gives you a table mapping every failure motif to the exact procedure to apply, with concrete parameters already filled in. Match the technician's description to a motif, find that motif's action in the table, and relay that procedure to the technician. You never compute or substitute parameters yourself.
 
-CRITICAL RULE — EVERY CHARACTER COSTS TIME:
-Every character sent over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.
+{% if canvas %}CRITICAL RULE — YOU COMMUNICATE ONLY BY DRAWING{% if not no_budget %}, AND EVERY PIXEL COSTS TIME{% endif %}:
+During a round you cannot send text on the comm link. Call send_drawing with the pixels to paint black on a blank {{ canvas_width }}x{{ canvas_height }} canvas of white pixels. Name each pixel by its column x, from 0 to {{ canvas_width - 1 }} left to right, and its row y, from 0 to {{ canvas_height - 1 }} top to bottom. The technician never sees the coordinates you list: they receive your drawing as an image. In a read_channel result a drawing shows an empty text and an image number, and that image is attached to the result. The technician's drawings reach you the same way.
+{% if no_budget %}Drawings are free: there is no limit on how many pixels you paint or how many drawings you send.{% else %}Every pixel painted on the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL drawings by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.{% endif %}{% else %}CRITICAL RULE — EVERY CHARACTER COSTS TIME:
+Every character sent over the link costs one second of the Veyru's remaining stability window. If the total communication time (from ALL messages by both you and the technician) exceeds the Veyru's time budget, the Veyru collapses permanently.{% endif %}
 {% include "_unreliable_link.jinja" %}
 
 STABILIZATION:
-Give the technician instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again. The tool call itself does not cost time — only messages on the comm link do.
+Give the technician instructions naming the tool, target, duration, and intensity. They will execute them using the stabilize_veyru tool. If the action is correct, the Veyru is stabilized. If not, they can try again.{% if not canvas %} The tool call itself does not cost time — only messages on the comm link do.{% elif not no_budget %} The tool call itself does not cost time — only drawings on the comm link do.{% endif %}
 
-You will be told each Veyru's time budget. Budget pressure is constant across all rounds.
+{% if not no_budget %}You will be told each Veyru's time budget. Budget pressure is constant across all rounds.{% endif %}
 {% if postmortem_enabled %}
 
 DISCUSSION PHASE:
-After each round, there is a discussion phase where both you and the technician can talk in the "team discussion" channel (channel_id: postmortem). Use this time to develop shorthand and coordinate strategies for future rounds. Messages in the discussion channel do NOT cost time.
+After each round, there is a discussion phase where both you and the technician can talk in the "team discussion" channel (channel_id: postmortem). Use this time to {% if canvas %}agree on what your drawings mean{% else %}develop shorthand{% endif %} and coordinate strategies for future rounds.{% if not no_budget %} Messages in the discussion channel do NOT cost time.{% endif %}
 {% endif %}
 
 You have access to the following communication channels. Use the exact channel_id when sending messages:

@@ -10,14 +10,21 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import NamedTuple
 
+from glossogen.models.canvas import CanvasDrawing
+
 
 class MessageEvent(NamedTuple):
-    """Delivered to the world when an agent sends a message."""
+    """Delivered to the world when an agent sends a message.
+
+    ``drawing`` is set when the message is a canvas drawing, whose ``text`` is
+    empty and ``token_count`` zero.
+    """
 
     agent_id: str
     channel_id: str
     text: str
     token_count: int
+    drawing: CanvasDrawing | None
 
 
 class RoundAdvancedEvent(NamedTuple):
@@ -160,6 +167,14 @@ class ScenarioWorld(ABC):
         Asynchronous side-effects belong in ``on_message_async`` instead.
         """
         _ = agent_id, channel_id, text, token_count
+
+    def on_drawing(self, agent_id: str, channel_id: str, drawing: CanvasDrawing) -> None:
+        """Called from ``publish_drawing`` in place of ``on_message``, before ``on_message_async``.
+
+        Override this to charge a drawing as it is sent, for example by the
+        pixels it paints. The default is a no-op.
+        """
+        _ = agent_id, channel_id, drawing
 
     async def on_message_async(self, event: MessageEvent, context: WorldContext) -> None:
         """React asynchronously to an agent message, after ``on_message``.

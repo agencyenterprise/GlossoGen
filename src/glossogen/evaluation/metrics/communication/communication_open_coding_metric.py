@@ -21,6 +21,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from glossogen.evaluation.metric_core.drawing_runs import text_metric_skips_drawings
 from glossogen.evaluation.metric_core.sidecar_reading import object_rows, read_json_sidecar
 from glossogen.evaluation.metrics.communication.label_models import (
     CommunicationLabel,
@@ -58,6 +59,8 @@ class CommunicationOpenCodingMetric(Metric):
         options: MetricRunOptions,
     ) -> list[Measurement]:
         """Score one run's primary-channel + ground-truth with the open-coding judge."""
+        if text_metric_skips_drawings(metric_name=self.name, events=events):
+            return []
         _ = agent_configs, options
         rounds = scenario.build_communication_rounds(events=events)
         if not rounds:

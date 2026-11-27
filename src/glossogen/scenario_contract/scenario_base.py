@@ -31,6 +31,7 @@ from glossogen.llm.judge_cost import EvaluationCost
 from glossogen.model_catalog.provider_catalog import Provider
 from glossogen.models.agent_config import AgentConfig, AgentRole
 from glossogen.models.agent_model_settings import JudgeModelSettings
+from glossogen.models.canvas import CanvasDrawing
 from glossogen.models.channel import Channel
 from glossogen.models.event import AgentSwappedMidRun, SimulationEvent
 from glossogen.models.mcp_responses import SendMessageResult, SendReceipt
@@ -116,7 +117,8 @@ class ScenarioRuntimeHandle(Protocol):
 
     Scenarios receive this handle via ``bind_runtime`` and use it to log custom
     events, read the current round number, and, from a ``send_message`` or
-    ``read_notifications`` override, publish messages and read unread ones.
+    ``read_notifications`` override or a scenario tool, publish messages or
+    canvas drawings and read unread ones.
     Defined as a Protocol to avoid an import cycle with ``SimulationRuntime``.
     """
 
@@ -128,6 +130,10 @@ class ScenarioRuntimeHandle(Protocol):
 
     async def publish_message(
         self, agent_id: str, channel_id: str, text: str, force: bool
+    ) -> SendMessageResult: ...
+
+    async def publish_drawing(
+        self, agent_id: str, channel_id: str, drawing: CanvasDrawing, force: bool
     ) -> SendMessageResult: ...
 
     async def direct_channel_for(self, agent_id: str, recipient_agent_ids: list[str]) -> str: ...

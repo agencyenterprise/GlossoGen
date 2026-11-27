@@ -17,6 +17,9 @@ channel noise) does not make the exported text disagree with the scores computed
 over it. What the channel actually delivered is kept beside it, because under a
 transform the difference is the experiment.
 
+A canvas drawing has no text: both text columns write the drawing out as its
+size and painted pixels, ``pixels`` counts them, and the text scores are empty.
+
 The three per-message numbers are recomputed here rather than read from a report.
 They are deterministic, stdlib-only, and defined per message, while a report
 carries only their run-level mean. Surprisal (`perplexity`,
@@ -37,6 +40,7 @@ from glossogen.evaluation.metric_core.pristine_text_index import (
     build_pristine_text_index,
     pristine_text_for,
 )
+from glossogen.models.event import MessageSent
 from glossogen.run_export.message_event_scan import scan_message_events
 from glossogen.run_export.message_repetition_sidecar import read_repetition_by_message_id
 from glossogen.run_storage.run_file_paths import event_log_path
@@ -60,10 +64,26 @@ class ExportMessage(NamedTuple):
     timestamp: datetime
     text: str
     delivered_text: str
-    chars: int
-    character_entropy_bits: float
-    gzip_compression_ratio: float
+    chars: int | None
+    pixels: int | None
+    character_entropy_bits: float | None
+    gzip_compression_ratio: float | None
     repetition_factor: float | None
+
+
+class MessageContent(NamedTuple):
+    """A message's two text columns and the numbers computed from them.
+
+    A drawing has ``pixels`` and no text scores; a text message has the
+    text scores and no ``pixels``.
+    """
+
+    text: str
+    delivered_text: str
+    chars: int | None
+    pixels: int | None
+    character_entropy_bits: float | None
+    gzip_compression_ratio: float | None
 
 
 class ExportInjection(NamedTuple):
@@ -131,7 +151,7 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
         message = event.message
         key = (message.round_number, message.channel_id)
         index_by_round_channel[key] = index_by_round_channel.get(key, 0) + 1
-        text = pristine_text_for(index=pristine, message=event)
+        content = _message_content(event=event, pristine=pristine)
         messages.append(
             ExportMessage(
                 round_number=message.round_number,
@@ -143,12 +163,37 @@ def load_run_messages(summary: RunSummary) -> RunMessages:
                 sender_agent_id=message.sender_agent_id,
                 sender_display_name=message.sender_display_name,
                 timestamp=message.timestamp,
-                text=text,
-                delivered_text=message.text,
-                chars=len(text),
-                character_entropy_bits=character_entropy_bits(text=text),
-                gzip_compression_ratio=gzip_compression_ratio(text=text),
+                text=content.text,
+                delivered_text=content.delivered_text,
+                chars=content.chars,
+                pixels=content.pixels,
+                character_entropy_bits=content.character_entropy_bits,
+                gzip_compression_ratio=content.gzip_compression_ratio,
                 repetition_factor=repetition.get(message.message_id),
             )
         )
     return RunMessages(primary_resolved=primary.resolved, messages=messages)
+
+
+def _message_content(event: MessageSent, pristine: dict[str, str]) -> MessageContent:
+    """The text columns and per-message numbers of one message, drawing or text."""
+    drawing = event.message.drawing
+    if drawing is not None:
+        written_out = drawing.as_text()
+        return MessageContent(
+            text=written_out,
+            delivered_text=written_out,
+            chars=None,
+            pixels=drawing.pixel_count,
+            character_entropy_bits=None,
+            gzip_compression_ratio=None,
+        )
+    text = pristine_text_for(index=pristine, message=event)
+    return MessageContent(
+        text=text,
+        delivered_text=event.message.text,
+        chars=len(text),
+        pixels=None,
+        character_entropy_bits=character_entropy_bits(text=text),
+        gzip_compression_ratio=gzip_compression_ratio(text=text),
+    )

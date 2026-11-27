@@ -436,6 +436,7 @@ async def load_run_detail(
                     timestamp=msg.timestamp,
                     round_number=event.round_number,
                     token_count=event.token_count,
+                    drawing=msg.drawing,
                 )
             )
 
