@@ -172,6 +172,9 @@ def test_the_shared_policy_trains_ahead_of_its_games_with_round_credit_and_a_kl_
         (0, 1, 20),
         (STEPS, 1, 20),
     ]
+    for counts in report:
+        assert set(counts.first_item_by_seat) == {"player_a", "player_b"}
+        assert sum(counts.first_item_by_seat.values()) == counts.first_item
 
 
 def test_a_frozen_partner_plays_the_base_model_and_trains_nothing(

@@ -21,11 +21,13 @@ WIN = "win"
 
 
 class EvalCounts(NamedTuple):
-    """One evaluation's totals over its finished games."""
+    """One evaluation's totals over its finished games. ``first_item_by_seat`` splits
+    ``first_item`` by seat, so a run with a frozen partner can count its trained seat alone."""
 
     step: int
     games: int
     first_item: int
+    first_item_by_seat: dict[str, int]
     player_rounds: int
     won: int
     rounds: int
@@ -47,6 +49,15 @@ def seat_total(*, game: PlayedGame, reward: str) -> int:
     return sum(sum(seat.scores[reward].values()) for seat in game.scores.seats.values())
 
 
+def seat_first_items(*, games: list[PlayedGame]) -> dict[str, int]:
+    """Each seat's first-item finishes, summed over the games and their rounds."""
+    totals: dict[str, int] = {}
+    for game in games:
+        for seat, scores in game.scores.seats.items():
+            totals[seat] = totals.get(seat, 0) + sum(scores.scores[FIRST_ITEM].values())
+    return dict(sorted(totals.items()))
+
+
 def eval_counts(*, step: int, games: list[PlayedGame]) -> EvalCounts:
     """The totals of one evaluation; a won round counts once, not once per seat."""
     finished = [game for game in games if game.scores.finished]
@@ -54,6 +65,7 @@ def eval_counts(*, step: int, games: list[PlayedGame]) -> EvalCounts:
         step=step,
         games=len(finished),
         first_item=sum(seat_total(game=game, reward=FIRST_ITEM) for game in finished),
+        first_item_by_seat=seat_first_items(games=finished),
         player_rounds=sum(len(game.scores.seats) * len(game.scores.rounds) for game in finished),
         won=sum(seat_total(game=game, reward=WIN) // len(game.scores.seats) for game in finished),
         rounds=sum(len(game.scores.rounds) for game in finished),
@@ -77,10 +89,13 @@ def main() -> None:
     parser.add_argument("--run", required=True, type=Path)
     arguments = parser.parse_args()
     for counts in run_report(run=arguments.run):
+        by_seat = ", ".join(
+            f"{seat} {count}/{counts.rounds}" for seat, count in counts.first_item_by_seat.items()
+        )
         print(
             f"eval step {counts.step}: {counts.games} games finished, "
             f"won {counts.won}/{counts.rounds} rounds, "
-            f"first item {counts.first_item}/{counts.player_rounds} player-rounds",
+            f"first item {counts.first_item}/{counts.player_rounds} player-rounds ({by_seat})",
             flush=True,
         )
 
