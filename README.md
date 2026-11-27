@@ -194,8 +194,8 @@
 | src/glossogen/run\_derivation/\_\_init\_\_.py                                                          |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/run\_derivation/cross\_run\_replace\_agent.py                                            |       86 |       10 |       16 |        6 |     84% |141, 146, 159, 198, 204, 215, 304-307 |
 | src/glossogen/run\_derivation/history\_transfer.py                                                     |       83 |        3 |       26 |        3 |     94% |109, 165, 184 |
-| src/glossogen/run\_derivation/replace\_agent.py                                                        |      319 |       23 |      166 |       21 |     91% |223, 238, 287-\>286, 289, 295, 493-\>503, 498, 505, 539, 542, 581, 583, 623, 642, 647, 652, 657, 685, 941, 966, 977, 1069-1072 |
-| src/glossogen/run\_derivation/run\_jsonl\_rewriter.py                                                  |       37 |        1 |       12 |        1 |     96% |       100 |
+| src/glossogen/run\_derivation/replace\_agent.py                                                        |      320 |       23 |      166 |       21 |     91% |224, 239, 288-\>287, 290, 296, 494-\>504, 499, 506, 540, 543, 582, 584, 624, 643, 648, 653, 658, 686, 948, 973, 984, 1076-1079 |
+| src/glossogen/run\_derivation/run\_jsonl\_rewriter.py                                                  |       77 |        2 |       28 |        2 |     96% |   92, 175 |
 | src/glossogen/run\_derivation/run\_launching.py                                                        |        8 |        2 |        0 |        0 |     75% |     35-36 |
 | src/glossogen/run\_export/\_\_init\_\_.py                                                              |        0 |        0 |        0 |        0 |    100% |           |
 | src/glossogen/run\_export/agent\_identity\_columns.py                                                  |       35 |        0 |       10 |        0 |    100% |           |
@@ -229,7 +229,7 @@
 | src/glossogen/run\_export/run\_transcript.py                                                           |      103 |        3 |       48 |        3 |     96% |195, 198, 228 |
 | src/glossogen/run\_export/runs\_zip\_archive.py                                                        |       97 |        0 |       18 |        0 |    100% |           |
 | src/glossogen/run\_replay/\_\_init\_\_.py                                                              |        0 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/run\_replay/message\_history\_builder.py                                                 |      282 |       39 |      162 |       20 |     85% |102-104, 144, 146, 202, 221, 252, 287-288, 290, 294, 299, 304-309, 312, 380, 400, 478-493, 527, 550-551, 553, 571, 725, 761-\>759, 799-802 |
+| src/glossogen/run\_replay/message\_history\_builder.py                                                 |      283 |       39 |      162 |       20 |     85% |102-104, 144, 146, 202, 221, 252, 287-288, 290, 294, 299, 304-309, 312, 380, 400, 406, 478-493, 527, 550-551, 553, 571, 767-\>765, 805-808 |
 | src/glossogen/run\_replay/message\_rewind.py                                                           |      143 |       19 |       66 |        5 |     84% |118-119, 211-215, 284, 324, 346-\>339, 419-427, 450, 467-471, 560 |
 | src/glossogen/run\_replay/recorded\_run\_spend.py                                                      |       31 |        3 |       18 |        2 |     90% | 55-58, 71 |
 | src/glossogen/run\_replay/resume\_context\_writer.py                                                   |       36 |        1 |       16 |        1 |     96% |        74 |
@@ -265,7 +265,7 @@
 | src/glossogen/runners/history\_cleanup\_processor.py                                                   |      134 |        6 |       54 |        7 |     93% |74, 77, 103, 123, 125, 183, 224-\>220 |
 | src/glossogen/runners/open\_model\_anti\_corruption\_layer.py                                          |       42 |        3 |       12 |        3 |     89% |52, 66, 79 |
 | src/glossogen/runners/pydantic\_ai\_banner.py                                                          |        3 |        0 |        0 |        0 |    100% |           |
-| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      443 |       38 |      146 |       25 |     87% |104-105, 188, 193, 197, 274, 278, 311-\>310, 314-320, 382, 458-467, 514, 544, 574-575, 757-760, 825-826, 998-999, 1166-\>exit, 1182-\>1185, 1186, 1187-\>1196, 1191, 1196-\>1198, 1198-\>exit, 1203, 1204-\>exit, 1211, 1260-\>exit |
+| src/glossogen/runners/pydantic\_ai\_runner.py                                                          |      450 |       38 |      150 |       25 |     88% |104-105, 188, 193, 197, 274, 278, 318-\>317, 321-327, 389, 467-476, 523, 553, 583-584, 814-815, 987-988, 1054-1057, 1206-\>exit, 1222-\>1225, 1226, 1227-\>1236, 1231, 1236-\>1238, 1238-\>exit, 1243, 1244-\>exit, 1251, 1300-\>exit |
 | src/glossogen/runners/read\_notifications\_tool.py                                                     |       63 |        1 |       10 |        2 |     96% |65-\>64, 68 |
 | src/glossogen/runners/token\_id\_log.py                                                                |       19 |        0 |        4 |        0 |    100% |           |
 | src/glossogen/runtime/\_\_init\_\_.py                                                                  |        0 |        0 |        0 |        0 |    100% |           |
@@ -274,7 +274,7 @@
 | src/glossogen/runtime/agent\_session.py                                                                |       61 |        0 |        6 |        0 |    100% |           |
 | src/glossogen/runtime/agent\_swap.py                                                                   |       96 |       20 |       10 |        4 |     77% |83, 86, 100, 207-225, 261, 294-295 |
 | src/glossogen/runtime/agent\_tool\_specs.py                                                            |       28 |        0 |       10 |        0 |    100% |           |
-| src/glossogen/runtime/autonomous\_supervisor.py                                                        |      220 |       23 |       64 |        8 |     88% |121, 127, 171-176, 187-191, 238, 243-248, 253-254, 262-263, 280, 374-\>366, 461-\>459, 547-550, 575-576 |
+| src/glossogen/runtime/autonomous\_supervisor.py                                                        |      220 |       20 |       64 |        7 |     90% |121, 127, 171-176, 187-191, 238, 254, 262-263, 280, 374-\>366, 461-\>459, 547-550, 575-576 |
 | src/glossogen/runtime/channel\_router.py                                                               |       98 |        1 |       34 |        1 |     98% |        89 |
 | src/glossogen/runtime/communication\_tools.py                                                          |       27 |        2 |        4 |        2 |     87% |    35, 91 |
 | src/glossogen/runtime/event\_bus.py                                                                    |       30 |        8 |        6 |        2 |     72% |38-41, 44-45, 62-\>exit, 68-69 |
@@ -630,7 +630,7 @@
 | src/glossogen/thread\_export/export\_agent\_thread.py                                                  |       57 |        1 |       18 |        1 |     97% |        73 |
 | src/glossogen/thread\_export/provider\_thread\_serializer.py                                           |       96 |        0 |       64 |        4 |     98% |114-\>107, 135-\>129, 171-\>165, 207-\>202 |
 | src/glossogen/thread\_export/thread\_export\_models.py                                                 |       38 |        0 |        4 |        0 |    100% |           |
-| **TOTAL**                                                                                              | **31127** | **3948** | **9000** | **1188** | **85%** |           |
+| **TOTAL**                                                                                              | **31176** | **3946** | **9020** | **1188** | **85%** |           |
 
 
 ## Setup coverage badge
