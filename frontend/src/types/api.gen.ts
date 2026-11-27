@@ -1005,6 +1005,30 @@ export interface components {
             missing_count: number;
         };
         /**
+         * AgreementStage
+         * @description One step in how a convention spread: an agent first used it, or another agent
+         *     showed that it understood it.
+         * @enum {string}
+         */
+        AgreementStage: "proposed" | "understood";
+        /**
+         * AgreementStep
+         * @description One stage of a convention, with the judge's reading of it and its evidence.
+         *
+         *     ``round_number`` and ``agent_id`` are those of the first evidence entry.
+         */
+        AgreementStep: {
+            stage: components["schemas"]["AgreementStage"];
+            /** Round Number */
+            round_number: number;
+            /** Agent Id */
+            agent_id: string;
+            /** Explanation */
+            explanation: string;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceMessage"][];
+        };
+        /**
          * AllLabelsResponse
          * @description Response containing all unique labels across all runs.
          */
@@ -2152,6 +2176,24 @@ export interface components {
             cache_creation_input_tokens: number;
         };
         /**
+         * EvidenceMessage
+         * @description One channel message or tool call cited as evidence.
+         *
+         *     ``message_id`` is the id the run page uses for the entry: the message's own id,
+         *     or ``{event_id}-{call_id}`` for a tool call. ``text`` is the entry as the judge
+         *     read it, copied from the event log rather than written by the judge.
+         */
+        EvidenceMessage: {
+            /** Message Id */
+            message_id: string;
+            /** Round Number */
+            round_number: number;
+            /** Agent Id */
+            agent_id: string;
+            /** Text */
+            text: string;
+        };
+        /**
          * ExplicitRunSelection
          * @description Runs named one by one as ``scenario/run_dir_name`` ids.
          */
@@ -3143,6 +3185,35 @@ export interface components {
             from_round: number;
         };
         /**
+         * ProtocolAgreementReport
+         * @description The ``protocol_agreement`` sidecar: the judge's summary and each convention it found.
+         */
+        ProtocolAgreementReport: {
+            /** Summary */
+            summary: string;
+            /** Conventions */
+            conventions: components["schemas"]["ProtocolConvention"][];
+        };
+        /**
+         * ProtocolConvention
+         * @description One rule the agents used to read or write their signals, and how it spread.
+         *
+         *     ``first_shared_round`` is the first round in which every agent used the
+         *     convention, or ``None`` when not every agent did.
+         */
+        ProtocolConvention: {
+            /** Name */
+            name: string;
+            /** Meaning */
+            meaning: string;
+            /** Steps */
+            steps: components["schemas"]["AgreementStep"][];
+            /** Adopted By All */
+            adopted_by_all: boolean;
+            /** First Shared Round */
+            first_shared_round: number | null;
+        };
+        /**
          * RawExportRequest
          * @description Body for the raw run-folder zip.
          *
@@ -3383,6 +3454,7 @@ export interface components {
             /** Closing Exchanges */
             closing_exchanges: components["schemas"]["ClosingExchangeEntry"][];
             evaluation: components["schemas"]["EvalReportResponse"] | null;
+            protocol_agreement: components["schemas"]["ProtocolAgreementReport"] | null;
             /** Evaluation In Progress */
             evaluation_in_progress: boolean;
             /** Has Eval Log File */

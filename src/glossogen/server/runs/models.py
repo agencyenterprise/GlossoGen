@@ -12,6 +12,7 @@ from pydantic import BaseModel, Discriminator, JsonValue, SerializeAsAny
 
 from glossogen.models.agent_model_settings import AgentModelSettings
 from glossogen.models.event import RunStatus
+from glossogen.models.protocol_agreement import ProtocolAgreementReport
 from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.run_storage.run_summary_models import (
     CrossRunReplaceAgentSource,
@@ -386,6 +387,9 @@ class RunDetailResponse(BaseModel):
     # order. Empty for a run whose scenario sets no closing prompt.
     closing_exchanges: list[ClosingExchangeEntry]
     evaluation: EvalReportResponse | None
+    # The protocol_agreement metric's sidecar: how the agents came to share each
+    # convention, with the messages that show each step. None until that metric has run.
+    protocol_agreement: ProtocolAgreementReport | None
     evaluation_in_progress: bool
     has_eval_log_file: bool
     fork_source: ForkSource | None

@@ -44,6 +44,7 @@ from glossogen.run_storage.derivation_manifest_reader import (
 from glossogen.run_storage.eval_manifest import read_eval_manifest
 from glossogen.run_storage.event_log_reader import load_events
 from glossogen.run_storage.jsonl_lines import iter_nonblank_lines
+from glossogen.run_storage.protocol_agreement_file import read_protocol_agreement
 from glossogen.run_storage.run_discovery import completed_run_duration_seconds, unended_run_status
 from glossogen.run_storage.run_file_paths import evaluation_report_path
 from glossogen.run_storage.run_labels_file import read_run_labels
@@ -517,6 +518,7 @@ async def load_run_detail(
         status = unended_run_status(run_dir=run_dir)
     report_path = evaluation_report_path(run_dir=run_dir, scenario_name=scenario_name)
     evaluation = await load_evaluation_report(report_path=report_path)
+    protocol_agreement = await read_protocol_agreement(run_dir=run_dir)
     eval_manifest = read_eval_manifest(run_dir=run_dir)
     evaluation_in_progress = eval_manifest is not None
     has_eval_log_file = (run_dir / "eval_stdout.log").exists()
@@ -570,6 +572,7 @@ async def load_run_detail(
         run_cycle_failures=run_cycle_failures,
         closing_exchanges=closing_exchanges,
         evaluation=evaluation,
+        protocol_agreement=protocol_agreement,
         evaluation_in_progress=evaluation_in_progress,
         has_eval_log_file=has_eval_log_file,
         fork_source=fork_source,

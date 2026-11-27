@@ -88,6 +88,7 @@ written.
 | `protocol_probe` | the scenario provides no probe config |
 | `protocol_learned_after_swap` | the scenario reports no boundary or builds no communication rounds, or one side of the boundary has no rounds |
 | `protocol_explanation` | no agent has a history to reconstruct |
+| `protocol_agreement` | the run has no channel messages and no scenario tool calls |
 | The probe similarity metrics | see [Protocol](#protocol) |
 
 That is different from a metric that *cannot run*: a missing dependency or an error
@@ -204,6 +205,14 @@ transcript: an agent is re-instantiated with its own history and asked what
 the conventions are, and its answers are compared across replicas, across
 agents and across cutoffs.
 
+- `protocol_agreement` — LLM judge: how did the agents come to share each
+  convention? The judge reads every channel message and scenario tool call, with
+  its arguments, and names each convention, the messages in which one agent first
+  used it, and the messages in which another agent showed that it understood it.
+  Only messages that exist in the run are kept as evidence. `score` is the number of
+  conventions that every agent used. It writes `protocol_agreement.json`, which the
+  run page shows under "How they agreed", each piece of evidence linking to its
+  message
 - `protocol_explanation` — asks each agent, under its own original model and full
   end-of-run history, to describe the protocol it remembers. Uses the scenario's
   per-role template when it has one and a generic prompt otherwise, so it runs on

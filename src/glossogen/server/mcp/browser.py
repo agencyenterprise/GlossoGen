@@ -507,6 +507,7 @@ async def _tool_get_run(
             run_cycle_failures=[f for f in detail.run_cycle_failures if f.agent_id == agent_id],
             closing_exchanges=[c for c in detail.closing_exchanges if c.agent_id == agent_id],
             evaluation=detail.evaluation,
+            protocol_agreement=detail.protocol_agreement,
             evaluation_in_progress=detail.evaluation_in_progress,
             has_eval_log_file=detail.has_eval_log_file,
             fork_source=detail.fork_source,

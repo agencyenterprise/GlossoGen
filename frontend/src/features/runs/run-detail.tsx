@@ -118,6 +118,19 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
     setShowEvalLogs(false);
   }, []);
 
+  /** Show every channel and agent, then scroll to and highlight one message or tool call. */
+  function handleJumpToMessage(messageId: string) {
+    flushSync(() => {
+      setSelectedAgent(null);
+      setSelectedChannel(null);
+      setShowLogs(false);
+      setShowEvalLogs(false);
+      setHighlightedMessageId(null);
+    });
+    setHighlightNonce(n => n + 1);
+    setHighlightedMessageId(messageId);
+  }
+
   function handleNavigateToMessage(messageId: string, channelId: string) {
     flushSync(() => {
       setSelectedAgent(null);
@@ -528,7 +541,12 @@ export function RunDetail({ scenario, runDirName }: { scenario: string; runDirNa
 
         {/* Right panel: eval (completed) */}
         {!isInProgress && evaluation !== null && showEvalPanel ? (
-          <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
+          <EvalPanel
+            evaluation={evaluation}
+            protocolAgreement={restData.protocol_agreement}
+            onJumpToMessage={handleJumpToMessage}
+            onClose={() => setShowEvalPanel(false)}
+          />
         ) : null}
 
         {/* Right panel toggle (when hidden) */}

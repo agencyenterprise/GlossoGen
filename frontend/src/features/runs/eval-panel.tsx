@@ -5,18 +5,26 @@ import { PanelRightClose } from "lucide-react";
 import type { components } from "@/types/api.gen";
 import { EvidenceModal } from "./evidence-modal";
 import { formatCost, humanize } from "./format";
+import { ProtocolAgreementModal } from "./protocol-agreement-modal";
 
 type EvalReportResponse = components["schemas"]["EvalReportResponse"];
+type ProtocolAgreementReport = components["schemas"]["ProtocolAgreementReport"];
 type MeasurementResponse = components["schemas"]["MeasurementResponse"];
 
 export function EvalPanel({
   evaluation,
+  protocolAgreement,
+  onJumpToMessage,
   onClose,
 }: {
   evaluation: EvalReportResponse;
+  /** The protocol_agreement metric's sidecar, or null when that metric has not run. */
+  protocolAgreement: ProtocolAgreementReport | null;
+  onJumpToMessage: (messageId: string) => void;
   onClose: () => void;
 }) {
   const [expandedMeasurement, setExpandedMeasurement] = useState<MeasurementResponse | null>(null);
+  const [showAgreement, setShowAgreement] = useState(false);
 
   return (
     <div className="flex flex-col gap-4 overflow-y-auto border-l border-border p-3.5">
@@ -50,6 +58,31 @@ export function EvalPanel({
         </div>
       </div>
 
+      {/* How the agents agreed on a protocol */}
+      {protocolAgreement !== null ? (
+        <div>
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            How they agreed
+          </div>
+          <button
+            className="w-full rounded border border-border px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/50"
+            onClick={() => setShowAgreement(true)}
+          >
+            {protocolAgreement.conventions.length === 0 ? (
+              <span className="text-muted-foreground">No convention found</span>
+            ) : (
+              <ul className="space-y-0.5">
+                {protocolAgreement.conventions.map((convention, index) => (
+                  <li key={`${convention.name}::${index}`} className="truncate">
+                    {convention.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </button>
+        </div>
+      ) : null}
+
       {/* Evaluation Cost */}
       {evaluation.evaluation_cost ? (
         <div>
@@ -81,6 +114,17 @@ export function EvalPanel({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {showAgreement && protocolAgreement !== null ? (
+        <ProtocolAgreementModal
+          report={protocolAgreement}
+          onJumpToMessage={messageId => {
+            setShowAgreement(false);
+            onJumpToMessage(messageId);
+          }}
+          onClose={() => setShowAgreement(false)}
+        />
       ) : null}
 
       {expandedMeasurement ? (

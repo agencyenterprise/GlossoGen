@@ -137,6 +137,16 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
     setHighlightedMessageId(messageId);
   }, []);
 
+  const handleJumpToMessage = useCallback((messageId: string) => {
+    flushSync(() => {
+      setSelectedAgent(null);
+      setSelectedChannel(null);
+      setHighlightedMessageId(null);
+    });
+    setHighlightNonce(nonce => nonce + 1);
+    setHighlightedMessageId(messageId);
+  }, []);
+
   const closeTour = useCallback(() => {
     setTourOpen(false);
     setTimelineRound(null);
@@ -427,7 +437,12 @@ export function PublicRunViewer({ run }: { run: RunDetailResponse }) {
 
           {evaluation !== null && showEvalPanel ? (
             <div ref={evalRef} className="flex min-h-0 flex-col *:min-h-0 *:flex-1">
-              <EvalPanel evaluation={evaluation} onClose={() => setShowEvalPanel(false)} />
+              <EvalPanel
+                evaluation={evaluation}
+                protocolAgreement={run.protocol_agreement}
+                onJumpToMessage={handleJumpToMessage}
+                onClose={() => setShowEvalPanel(false)}
+              />
             </div>
           ) : null}
 

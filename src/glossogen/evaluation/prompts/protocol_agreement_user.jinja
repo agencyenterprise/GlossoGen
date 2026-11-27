@@ -1,0 +1,26 @@
+You are reading the whole run of a multi-agent simulation, {{ rounds | length }} rounds long, to find out how the agents came to share a protocol: the conventions they used to signal to each other, who used each one first, and when another agent showed that it understood it.
+
+The agents are: {{ agent_ids | join(", ") }}.
+
+What the agents can see of each other depends on the scenario. Channel messages, the lines that start with a channel name such as "#link:", are visible to the channel's members. A tool call is an action in the scenario. Some scenarios let other agents see an action's effect, for example a number that both agents can read. No agent sees another agent's tool-call arguments, so a "reasoning" argument shows only what its own agent meant or understood.
+
+Each line of the transcript starts with a reference in square brackets, such as [R3.12] for the 12th entry of round 3. Cite these references exactly.
+
+For each convention that at least one agent used on purpose:
+1. Name it, and say in one sentence what a value or message means under it.
+2. Give the "proposed" step: the entries in which an agent first used it.
+3. Give one "understood" step for each other agent that showed it understood the convention. Copying the other agent's values back is not enough to show understanding. Look for an agent that used the convention with new content of its own, decoded a value correctly and acted on it, or wrote in its own reasoning what the other agent's signal meant. Cite the entries that show it, and say in the explanation what the agent did that copying alone would not explain.
+4. Say whether every agent used the convention itself, and from which round.
+
+A rule that the agents added or changed later in the run counts as a convention of its own, from the round in which it appeared. For example, a rule to check two landmarks instead of one, made after a round that one landmark got wrong.
+
+Leave out conventions that no agent used on purpose, and steps that the transcript does not show. Do not cite an entry that is not in the transcript.
+
+References belong only in the "references" fields. In the summary and the explanations, name rounds and agents instead, because readers will not see the references.
+
+{% for round in rounds %}
+--- ROUND {{ round.round_number }} ({{ round.entry_count }} entries) ---
+{{ round.transcript }}
+{% endfor %}
+
+Submit your answer using the provided tool.
