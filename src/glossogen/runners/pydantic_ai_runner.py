@@ -282,8 +282,15 @@ class _StreamingState:
             token_logprobs=details[TOKEN_LOGPROBS_DETAIL],
         )
 
-    def discard_since_attempt_start(self) -> None:
-        """Drop what the current attempt accumulated and has not logged."""
+    def discard_failed_attempt(self) -> None:
+        """Drop what a failed or cancelled attempt accumulated and has not logged.
+
+        A response holding tool calls is kept whole: a tool call is accumulated
+        as it starts to run, so the response has acted on the world and is
+        logged even though its attempt did not complete.
+        """
+        if self.accumulated_tool_calls:
+            return
         self.response_token_ids = None
         mark = self._attempt_mark
         del self.accumulated_thinking[mark.thinking :]
@@ -420,8 +427,10 @@ async def _run_agent_call(
     replaying the cycle from its first prompt. A failure after a response
     arrived, in ``gate_model_response``, in the event handler or in a tool,
     resumes at the request that produced that response, which is sent again.
-    Whatever the failed attempt accumulated in ``state`` and had not logged yet
-    is discarded, so the retried response is logged once.
+    A response whose tool calls started to run stays in ``state`` and is logged
+    before the next request, or when the cycle ends. Anything else the failed
+    or cancelled attempt accumulated and had not logged is discarded, so a
+    response that is asked for again is logged once.
 
     ``before_model_request`` runs as each model request is issued, and
     ``gate_model_response`` is awaited once per response before anything the
@@ -472,8 +481,8 @@ async def _run_agent_call(
                 node = await agent_run.next(node)
             assert agent_run.result is not None
             return agent_run.result
-        except Exception:
-            state.discard_since_attempt_start()
+        except BaseException:
+            state.discard_failed_attempt()
             raise
         finally:
             record_usage(agent_run.usage)
@@ -716,9 +725,9 @@ class PydanticAIRunner(AgentRunner):
                     )
                 finally:
                     # Runs whether the cycle succeeded, raised or was cancelled, so
-                    # every attempt's usage is counted and the cycle's logging
-                    # tasks are awaited before the runner returns.
-                    all_background_tasks.extend(state.background_tasks)
+                    # every attempt's usage is counted, the cycle's last response is
+                    # logged, and the cycle's logging tasks are awaited before the
+                    # runner returns.
                     cycle_usage = last_recorded_usage
                     # Priced at the rates in effect as the cycle ends. Its usage is
                     # logged just after, on its last LLMResponseReceived, and the run
@@ -729,6 +738,15 @@ class PydanticAIRunner(AgentRunner):
                         cumulative_cost=cumulative_cost,
                         cost_tracker=cost_tracker,
                     )
+                    self._close_cycle(
+                        agent_id=agent_id,
+                        state=state,
+                        event_logger=event_logger,
+                        round_number=runtime.current_round,
+                        usage=simulation_token_usage(run_usage=cycle_usage),
+                        cycle_succeeded=cycle_succeeded,
+                    )
+                    all_background_tasks.extend(state.background_tasks)
 
                 if not cycle_succeeded or result is None:
                     # Every retry resumed at the failed request and still failed,
@@ -750,25 +768,6 @@ class PydanticAIRunner(AgentRunner):
                 )
                 total_turns += 1
 
-                # Safety net: flush a compaction block that had no following
-                # generation part this cycle (it normally closes when the response
-                # part after the compaction starts, in _process_stream_event).
-                if state.compaction_occurred:
-                    trailing_stop_reason = StopReason.END_TURN
-                    if state.accumulated_tool_calls:
-                        trailing_stop_reason = StopReason.TOOL_USE
-                    self._flush_response_block(
-                        agent_id=agent_id,
-                        state=state,
-                        event_logger=event_logger,
-                        stop_reason=trailing_stop_reason,
-                        round_number=runtime.current_round,
-                        usage=simulation_token_usage(run_usage=cycle_usage),
-                    )
-                self._flush_compaction_summary(
-                    agent_id=agent_id, event_logger=event_logger, state=state
-                )
-
                 logger.info(
                     "Agent %s cycle %d complete: in=%d out=%d "
                     "cache_read=%d cache_write=%d tokens",
@@ -778,16 +777,6 @@ class PydanticAIRunner(AgentRunner):
                     cycle_usage.output_tokens,
                     cycle_usage.cache_read_tokens,
                     cycle_usage.cache_write_tokens,
-                )
-
-                # Log any remaining reasoning + tool calls from the final response
-                self._flush_response_block(
-                    agent_id=agent_id,
-                    state=state,
-                    event_logger=event_logger,
-                    stop_reason=StopReason.END_TURN,
-                    round_number=runtime.current_round,
-                    usage=simulation_token_usage(run_usage=cycle_usage),
                 )
 
                 if termination.is_set:
@@ -1031,6 +1020,57 @@ class PydanticAIRunner(AgentRunner):
         state.compaction_provider_name = "unknown"
         state.compaction_id = None
         state.compaction_provider_details = None
+
+    def _close_cycle(
+        self,
+        agent_id: str,
+        state: _StreamingState,
+        event_logger: EventLogger,
+        round_number: int,
+        usage: TokenUsage,
+        cycle_succeeded: bool,
+    ) -> None:
+        """Log what a cycle accumulated and has not logged yet, with the cycle's usage.
+
+        A completed cycle logs a compaction block that no response followed, the
+        compaction summary and its final response. A cycle that failed or was
+        cancelled, at a swap or at the end of the run, logs the response whose
+        tool calls were running when it stopped; ``discard_failed_attempt`` has
+        already dropped any other unlogged response.
+        """
+        if not cycle_succeeded:
+            self._flush_response_block(
+                agent_id=agent_id,
+                state=state,
+                event_logger=event_logger,
+                stop_reason=StopReason.TOOL_USE,
+                round_number=round_number,
+                usage=usage,
+            )
+            return
+        # A compaction block normally closes when the response part after it
+        # starts, in _process_stream_event.
+        if state.compaction_occurred:
+            trailing_stop_reason = StopReason.END_TURN
+            if state.accumulated_tool_calls:
+                trailing_stop_reason = StopReason.TOOL_USE
+            self._flush_response_block(
+                agent_id=agent_id,
+                state=state,
+                event_logger=event_logger,
+                stop_reason=trailing_stop_reason,
+                round_number=round_number,
+                usage=usage,
+            )
+        self._flush_compaction_summary(agent_id=agent_id, event_logger=event_logger, state=state)
+        self._flush_response_block(
+            agent_id=agent_id,
+            state=state,
+            event_logger=event_logger,
+            stop_reason=StopReason.END_TURN,
+            round_number=round_number,
+            usage=usage,
+        )
 
     def _flush_response_block(
         self,

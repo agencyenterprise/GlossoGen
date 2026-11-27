@@ -53,6 +53,7 @@ from glossogen.run_config.provider_credentials import require_reachable_models
 from glossogen.run_config.run_config_validation import validate_run_config
 from glossogen.run_derivation.run_jsonl_rewriter import (
     drop_simulation_ended,
+    insert_responses_cut_at_boundary,
     patch_simulation_started_scenario_config,
     rewrite_run_jsonl,
 )
@@ -849,8 +850,9 @@ async def clone_source_at_boundary(
 ) -> ClonedRun:
     """Claim a run directory and copy ``source_run_dir`` into it, cut at the boundary.
 
-    The copied log ends at ``truncate_after_offset``, carries the new run's id,
-    and has no ``SimulationEnded``.
+    The copied log ends at ``truncate_after_offset``. Each source response whose
+    tool calls ran before that point is inserted just before the boundary event.
+    The log carries the new run's id and has no ``SimulationEnded``.
     """
     new_run_dir = claim_run_dir(runs_dir=runs_dir, scenario_name=scenario_name)
     new_log_path = event_log_path(run_dir=new_run_dir, scenario_name=scenario_name)
@@ -858,6 +860,11 @@ async def clone_source_at_boundary(
         source_dir=source_run_dir,
         target_dir=new_run_dir,
         jsonl_path_within_run=Path(new_log_path.name),
+        truncate_after_offset=truncate_after_offset,
+    )
+    await insert_responses_cut_at_boundary(
+        source_log_path=event_log_path(run_dir=source_run_dir, scenario_name=scenario_name),
+        log_path=new_log_path,
         truncate_after_offset=truncate_after_offset,
     )
     new_run_id = compose_run_id(scenario_name=scenario_name, run_dir_name=new_run_dir.name)

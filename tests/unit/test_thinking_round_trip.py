@@ -250,5 +250,5 @@ def test_a_failed_attempts_parts_are_discarded_and_a_delta_extends_the_newest_pa
     state.apply_thinking_delta(part_index=0, delta=ThinkingPartDelta(content_delta=" away"))
     assert [record.content for record in state.thinking_records()] == ["kept", "retried away"]
 
-    state.discard_since_attempt_start()
+    state.discard_failed_attempt()
     assert [record.content for record in state.thinking_records()] == ["kept"]
