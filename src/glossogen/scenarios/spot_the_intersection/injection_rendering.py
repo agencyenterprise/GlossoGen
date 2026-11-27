@@ -50,6 +50,7 @@ def render_round_injection(
             "one_to_one": messaging == Messaging.ONE_TO_ONE,
             "team_characters": team_characters.value,
             "unit": charge_unit(medium=link_medium),
+            "unit_singular": charge_unit_singular(medium=link_medium),
         },
     )
 

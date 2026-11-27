@@ -41,6 +41,14 @@ MODEL = "claude-opus-4-7"
 BASELINE_NOISE_LEVEL = 0.0
 BASELINE_NOISE_MODE = "mask"
 
+# The system prompts word the comm link for a text run: no canvas, a budget.
+TEXT_MEDIUM_VARIABLES = {
+    "canvas": False,
+    "canvas_width": 16,
+    "canvas_height": 16,
+    "no_budget": False,
+}
+
 CHANNELS = [
     {"display_name": "link", "channel_id": "link"},
     {"display_name": "team discussion", "channel_id": "postmortem"},
@@ -57,6 +65,7 @@ def render_engineer_system(postmortem_enabled: bool) -> str:
             "failure_motifs": FAILURE_MOTIFS,
             "channel_noise_level": BASELINE_NOISE_LEVEL,
             "noise_replacement_mode": BASELINE_NOISE_MODE,
+            **TEXT_MEDIUM_VARIABLES,
         },
     )
 
@@ -70,6 +79,7 @@ def render_observer_system(postmortem_enabled: bool) -> str:
             "postmortem_enabled": postmortem_enabled,
             "channel_noise_level": BASELINE_NOISE_LEVEL,
             "noise_replacement_mode": BASELINE_NOISE_MODE,
+            **TEXT_MEDIUM_VARIABLES,
         },
     )
 
