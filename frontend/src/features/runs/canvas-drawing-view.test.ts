@@ -45,6 +45,24 @@ it("paints one black square per pixel at the pixel's column and row", async () =
   expect(container.textContent).toContain("2 pixels · 4x3 canvas");
 });
 
+it("leaves out the grid on a canvas too large for it, so the pixels stay visible", async () => {
+  const large = { width: 256, height: 256, pixels: [{ x: 255, y: 0 }] };
+
+  await act(async () => root.render(createElement(CanvasDrawingView, { drawing: large })));
+
+  expect(container.querySelectorAll("line")).toHaveLength(0);
+  expect(container.querySelectorAll('rect[fill="#000000"]')).toHaveLength(1);
+  expect(container.querySelector("svg")?.getAttribute("width")).toBe("512");
+});
+
+it("draws the grid under the pixels on a small canvas", async () => {
+  await act(async () => root.render(createElement(CanvasDrawingView, { drawing: DRAWING })));
+
+  const shapes = [...container.querySelectorAll("svg > *")].map(shape => shape.tagName);
+  expect(shapes.lastIndexOf("line")).toBeLessThan(shapes.indexOf("rect", 1));
+  expect(container.querySelectorAll("line")).toHaveLength(5 + 4);
+});
+
 it("carries a drawing message's pixels into its chat entry", () => {
   const entries = mergeEntries(
     [
