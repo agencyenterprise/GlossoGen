@@ -21,6 +21,7 @@ from glossogen.models.event import (
     ToolResultReceived,
 )
 from glossogen.models.event_base import EventBase, TokenUsage
+from glossogen.models.thinking_part_record import ThinkingPartRecord
 from glossogen.models.tool_definition import ToolCallRequest
 from glossogen.run_replay.message_history_builder import build_message_history
 from glossogen.scenario_contract.platform_runner_prompts import platform_runner_prompts
@@ -159,3 +160,66 @@ def test_a_predecessor_call_cut_at_the_fork_stays_before_the_replacements_turns(
     )
 
     assert order == ["predecessor-r2", "my own words", "own-r3", "cut-r4"]
+
+
+def test_a_response_whose_only_call_never_returned_leaves_no_reasoning_only_turn() -> None:
+    """A runner cancelled inside its tool call logs the response, but the call has no result."""
+    unanswered = ToolCallRequest(
+        call_id="held", tool_name="record_finding", arguments={"finding": "held"}
+    )
+    events = _stamped(
+        events=[
+            _started(),
+            *_turn(round_number=1, text="round one", call_id="r1"),
+            ToolCallInvoked(
+                round_number=2,
+                agent_id=_AGENT,
+                call_id=unanswered.call_id,
+                tool_name=unanswered.tool_name,
+                arguments=unanswered.arguments,
+            ),
+            LLMResponseReceived(
+                round_number=2,
+                agent_id=_AGENT,
+                thinking="wait for the partner",
+                thinking_parts=[
+                    ThinkingPartRecord(
+                        content="wait for the partner",
+                        id="rs_1",
+                        signature=None,
+                        provider_name="openai",
+                    )
+                ],
+                text=None,
+                tool_calls=[unanswered],
+                stop_reason=StopReason.TOOL_USE,
+                usage=TokenUsage(
+                    input_tokens=1,
+                    output_tokens=1,
+                    reasoning_tokens=0,
+                    cache_read_input_tokens=0,
+                    cache_creation_input_tokens=0,
+                ),
+            ),
+        ]
+    )
+
+    history = build_message_history(
+        events=events,
+        agent_id=_AGENT,
+        system_prompt="do things",
+        runner_prompts=platform_runner_prompts(role_name="worker"),
+        target_timestamp=events[-1].timestamp,
+        cutoff_round=None,
+        tool_calls_only=False,
+        channel_visibility={},
+        history_floor_round=None,
+        filter_below_round=None,
+        split_parallel_tool_calls=False,
+    )
+
+    responses = [message for message in history if isinstance(message, ModelResponse)]
+    assert [type(part) for response in responses for part in response.parts] == [
+        TextPart,
+        ToolCallPart,
+    ]

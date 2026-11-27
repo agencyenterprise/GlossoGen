@@ -206,7 +206,7 @@ def test_a_discarded_attempt_drops_its_token_ids() -> None:
         details={PROMPT_TOKEN_IDS_DETAIL: [1], TOKEN_IDS_DETAIL: [2], TOKEN_LOGPROBS_DETAIL: [-0.5]}
     )
 
-    state.discard_since_attempt_start()
+    state.discard_failed_attempt()
 
     assert state.response_token_ids is None
 

@@ -738,7 +738,12 @@ def build_message_history(
             llm_resp=llm_resp,
             filter_below_round=filter_below_round,
         )
-        if not strip_verbal_parts and not parent_past_cutoff:
+        # A response that lost every tool call and wrote no text would be left
+        # holding only its reasoning, which providers reject as a turn.
+        only_reasoning_left = (
+            bool(llm_resp.tool_calls) and not kept_tool_calls and not llm_resp.text
+        )
+        if not strip_verbal_parts and not parent_past_cutoff and not only_reasoning_left:
             response_parts.extend(_recorded_thinking_parts(llm_resp=llm_resp))
             if llm_resp.text:
                 response_parts.append(TextPart(content=llm_resp.text))
