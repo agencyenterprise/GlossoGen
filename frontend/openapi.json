@@ -2485,6 +2485,51 @@
         "title": "AggregateCell",
         "description": "One measure's aggregate within one group, with what it was computed over."
       },
+      "AgreementStage": {
+        "type": "string",
+        "enum": [
+          "proposed",
+          "understood"
+        ],
+        "title": "AgreementStage",
+        "description": "One step in how a convention spread: an agent first used it, or another agent\nshowed that it understood it."
+      },
+      "AgreementStep": {
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/AgreementStage"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceMessage"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "round_number",
+          "agent_id",
+          "explanation",
+          "evidence"
+        ],
+        "title": "AgreementStep",
+        "description": "One stage of a convention, with the judge's reading of it and its evidence.\n\n``round_number`` and ``agent_id`` are those of the first evidence entry."
+      },
       "AllLabelsResponse": {
         "properties": {
           "labels": {
@@ -4975,6 +5020,35 @@
         "title": "EvaluationTokenUsage",
         "description": "Accumulated token counts across all LLM calls during an evaluation run.\n\n``input_tokens`` counts only the input that was neither read from nor written\nto the cache, the way the Anthropic API reports it."
       },
+      "EvidenceMessage": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          },
+          "round_number": {
+            "type": "integer",
+            "title": "Round Number"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "round_number",
+          "agent_id",
+          "text"
+        ],
+        "title": "EvidenceMessage",
+        "description": "One channel message or tool call cited as evidence.\n\n``message_id`` is the id the run page uses for the entry: the message's own id,\nor ``{event_id}-{call_id}`` for a tool call. ``text`` is the entry as the judge\nread it, copied from the event log rather than written by the judge."
+      },
       "ExplicitRunSelection": {
         "properties": {
           "kind": {
@@ -7067,6 +7141,72 @@
         "title": "PlayedModel",
         "description": "A model an agent played, from the round it started playing it.\n\n``thinking`` is the reasoning effort its requests were sent with, ``None``\nwhen they left it to the provider's default or the swap that started it\npredates recorded settings."
       },
+      "ProtocolAgreementReport": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "conventions": {
+            "items": {
+              "$ref": "#/components/schemas/ProtocolConvention"
+            },
+            "type": "array",
+            "title": "Conventions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "conventions"
+        ],
+        "title": "ProtocolAgreementReport",
+        "description": "The ``protocol_agreement`` sidecar: the judge's summary and each convention it found."
+      },
+      "ProtocolConvention": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "meaning": {
+            "type": "string",
+            "title": "Meaning"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "adopted_by_all": {
+            "type": "boolean",
+            "title": "Adopted By All"
+          },
+          "first_shared_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Shared Round"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "meaning",
+          "steps",
+          "adopted_by_all",
+          "first_shared_round"
+        ],
+        "title": "ProtocolConvention",
+        "description": "One rule the agents used to read or write their signals, and how it spread.\n\n``first_shared_round`` is the first round in which every agent used the\nconvention, or ``None`` when not every agent did."
+      },
       "RawExportRequest": {
         "properties": {
           "selection": {
@@ -7526,6 +7666,16 @@
               }
             ]
           },
+          "protocol_agreement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProtocolAgreementReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "evaluation_in_progress": {
             "type": "boolean",
             "title": "Evaluation In Progress"
@@ -7701,6 +7851,7 @@
           "run_cycle_failures",
           "closing_exchanges",
           "evaluation",
+          "protocol_agreement",
           "evaluation_in_progress",
           "has_eval_log_file",
           "fork_source",

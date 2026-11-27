@@ -37,6 +37,9 @@ from glossogen.evaluation.metrics.mcr_metric import MCRMetric
 from glossogen.evaluation.metrics.message_entropy_metric import MessageEntropyMetric
 from glossogen.evaluation.metrics.neologism_metric import NeologismMetric
 from glossogen.evaluation.metrics.perplexity_metric import PerplexityMetric
+from glossogen.evaluation.metrics.protocol_agreement.protocol_agreement_metric import (
+    ProtocolAgreementMetric,
+)
 from glossogen.evaluation.metrics.protocol_explanation_metric import ProtocolExplanationMetric
 from glossogen.evaluation.metrics.protocol_learned_after_swap_metric import (
     ProtocolLearnedAfterSwapMetric,
@@ -81,6 +84,7 @@ _GENERIC_METRICS: list[type[Metric]] = [
     NeologismMetric,
     PerplexityMetric,
     PostmortemEndedTimeoutMetric,
+    ProtocolAgreementMetric,
     ProtocolExplanationMetric,
     ProtocolLearnedAfterSwapMetric,
     ProtocolProbeMetric,

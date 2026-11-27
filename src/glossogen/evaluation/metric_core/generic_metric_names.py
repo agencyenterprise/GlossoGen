@@ -21,6 +21,7 @@ GENERIC_METRIC_NAMES: list[str] = [
     "neologism",
     "perplexity",
     "postmortem_ended_timeout",
+    "protocol_agreement",
     "protocol_explanation",
     "protocol_learned_after_swap",
     "protocol_probe",

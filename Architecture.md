@@ -352,6 +352,7 @@ metric that produced it:
 
 ```
 ├── language_repetition_messages.jsonl           # per-message redundancy factors, keyed by message_id
+├── protocol_agreement.json                      # each convention, who first used it, who understood it, and the messages
 ├── protocol_explanation_responses.jsonl         # one row per agent: its own account of the protocol
 ├── protocol_explanation_usage.json              # per-model token usage + cost for that probe batch
 ├── protocol_probe_responses.jsonl               # one row per (agent, question, replica)
